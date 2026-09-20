@@ -159,6 +159,22 @@ The same applies to `wal-g` and to running `backup.sh` by hand.
 **A backup unit failed.** `systemctl --failed` lists it; `journalctl -u interview-prep-backup@dump`
 and friends say why. All of them are safe to re-run.
 
+**WAL-G hangs instead of reporting an error.** Check the container has a CA bundle:
+
+```bash
+sudo docker exec interview-prep-postgres ls /etc/ssl/certs/ca-certificates.crt
+```
+
+The `postgres` image ships none, so WAL-G cannot verify Amazon's certificate. It does not say so:
+every TLS handshake fails, the AWS SDK retries with exponential backoff, and the command simply
+hangs. The Compose file mounts the host's bundle for exactly this reason. It cost an afternoon to
+find, because every individual component tested fine — the binary runs, DNS resolves, and `curl`
+uploads to the same bucket at 45 MB/s from the same network namespace, since curl carries its own
+certificates.
+
+`S3_LOG_LEVEL=DEVEL` alongside `WALG_LOG_LEVEL=DEVEL` is what made it visible: only the S3 log
+showed the request being retried with no response.
+
 ## Deliberate choices
 
 **No digest comparison in `update.sh`.** `docker compose pull` does nothing when the image is
