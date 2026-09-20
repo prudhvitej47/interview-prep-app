@@ -13,7 +13,7 @@
 
   <groupId>com.interviewprep</groupId>
   <artifactId>interview-prep-backend</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.1.0-SNAPSHOT</version>
   <name>interview-prep-backend</name>
   <description>Interview prep platform: API, curriculum loader and planner</description>
 
