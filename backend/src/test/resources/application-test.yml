@@ -1,0 +1,6 @@
+# Used by the Testcontainers-backed tests; the container supplies the connection details.
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    clean-disabled: false

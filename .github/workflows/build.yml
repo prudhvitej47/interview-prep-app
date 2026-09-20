@@ -1,0 +1,71 @@
+name: build
+
+# Every push and every pull request builds and tests the whole thing: the React app, the Spring
+# Boot app, the module boundaries and the migrations against a real Postgres.
+# Publishing an image is a separate workflow, added with the deploy path.
+
+on:
+  # Pull requests cover every branch, so pushes only need to be checked on main. Triggering on
+  # both for every branch would run the whole build twice on every commit to an open PR.
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      # Node is installed by frontend-maven-plugin at the version pinned in backend/pom.xml,
+      # so CI and the Mac build the front end identically. Only npm's cache is shared here.
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      # Testcontainers needs a Docker daemon; ubuntu-latest runners already have one.
+      - name: Build and test
+        run: ./mvnw -B verify
+        working-directory: backend
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            backend/target/surefire-reports/
+          retention-days: 7
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Proves the image still builds for the VM's architecture. It is not pushed anywhere;
+      # publishing arrives with the deploy path.
+      - name: Build image for linux/amd64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
