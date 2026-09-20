@@ -56,8 +56,10 @@ echo "configured for ${ECR_REGISTRY}"
 log "2/7 Deployment files from ${REPO_URL} (${REPO_REF})"
 install -d -m 755 "${BASE}"
 if [[ -d "${SRC}/.git" ]]; then
-  git -C "${SRC}" fetch --quiet origin "${REPO_REF}"
-  git -C "${SRC}" reset --quiet --hard "origin/${REPO_REF}"
+  # FETCH_HEAD rather than origin/<ref>: the clone is shallow and only tracks main, so a remote
+  # tracking branch does not exist for anything else.
+  git -C "${SRC}" fetch --quiet --depth 1 origin "${REPO_REF}"
+  git -C "${SRC}" reset --quiet --hard FETCH_HEAD
   echo "updated"
 else
   git clone --quiet --depth 1 --branch "${REPO_REF}" "${REPO_URL}" "${SRC}"
