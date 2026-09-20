@@ -44,6 +44,12 @@ s3() {
 
 in_postgres() { docker exec "${CONTAINER}" "$@"; }
 
+# WAL-G's backup-push opens a database connection, and it connects as the container's OS user —
+# root — for which there is no role. archive_command does not need this, but backup-push does.
+in_postgres_walg() {
+  docker exec --env PGUSER="${DB_USER}" --env PGDATABASE="${DB_NAME}" "${CONTAINER}" "$@"
+}
+
 require_running() {
   docker inspect --format '{{.State.Running}}' "${CONTAINER}" 2>/dev/null | grep -q true \
     || die "${CONTAINER} is not running"
@@ -54,13 +60,13 @@ require_running() {
 cmd_base() {
   require_running
   log "base backup starting"
-  in_postgres wal-g backup-push "${PGDATA_IN_CONTAINER}"
+  in_postgres_walg wal-g backup-push "${PGDATA_IN_CONTAINER}"
   log "base backup done"
   # Keep the last 7 base backups and the WAL they need. The bucket's own lifecycle rule expires
   # noncurrent versions after 30 days; this is what stops the current ones accumulating forever.
   # Tolerated on the first runs, when there is nothing to prune yet — a failure here must not
   # mask the fact that the backup above succeeded.
-  if in_postgres wal-g delete retain FULL 7 --confirm; then
+  if in_postgres_walg wal-g delete retain FULL 7 --confirm; then
     log "old base backups pruned"
   else
     log "nothing to prune yet"
@@ -173,7 +179,7 @@ cmd_status() {
   in_postgres psql -U "${DB_USER}" -d "${DB_NAME}" -c \
     "select archived_count, last_archived_time, failed_count, last_failed_time from pg_stat_archiver"
   echo "--- base backups"
-  in_postgres wal-g backup-list || echo "(none yet)"
+  in_postgres_walg wal-g backup-list || echo "(none yet)"
   echo "--- newest dumps"
   s3 GET "?list-type=2&prefix=dumps/&max-keys=100" \
     | grep -o '<Key>[^<]*</Key>' | sed 's|</\?Key>||g' | sort | tail -5
