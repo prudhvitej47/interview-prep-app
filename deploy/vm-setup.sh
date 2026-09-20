@@ -28,6 +28,10 @@ APP_ENV="/etc/interview-prep/app.env"
 
 log() { printf '\n==> %s\n' "$*"; }
 
+# An SSH session forwards the client's locale, which this VM does not have installed, and apt
+# prints a wall of perl warnings about it. Nothing here depends on the locale.
+export LC_ALL=C.UTF-8
+
 # ---------------------------------------------------------------------------
 log "1/6 ECR credential helper"
 # Turns the VM's existing AWS key into a registry token on demand, and refreshes it when it
@@ -101,8 +105,10 @@ tailscale serve status
 # ---------------------------------------------------------------------------
 log "6/6 State"
 systemctl --no-pager --lines=0 status interview-prep.service || true
-docker compose --project-name interview-prep \
-  --file "${SRC}/deploy/docker-compose.yml" ps || true
+# `docker compose ps` would re-read the database password to interpolate the file it is only
+# reporting on. Asking Docker for the project's containers needs no secret at all.
+docker ps --filter "label=com.docker.compose.project=interview-prep" \
+  --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' || true
 
 cat <<'DONE'
 

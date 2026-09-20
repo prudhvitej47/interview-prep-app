@@ -74,6 +74,19 @@ sudo docker compose -p interview-prep \
   -f /opt/interview-prep/src/deploy/docker-compose.yml logs -f app
 ```
 
+## Confirmed on the VM, 2026-09-20
+
+The first run of `vm-setup.sh` pulled both images, brought the stack up and served the app over
+HTTPS. Worth recording because two of these were assumptions until then:
+
+- The VM pulled from ECR with the `backup-writer` key already on it, through
+  `amazon-ecr-credential-helper`. No AWS CLI, no `docker login`.
+- The update timer ran, pulled, found the image unchanged and left the container alone —
+  `Container interview-prep-app Running`, no restart.
+- `tailscale serve` obtained a Let's Encrypt certificate for the tailnet name and terminates TLS.
+- Memory sits at about 245 MB for the app and 59 MB for PostgreSQL, with 1.1 GB free and no swap
+  in use.
+
 ## Deliberate choices
 
 **No digest comparison in `update.sh`.** `docker compose pull` does nothing when the image is
