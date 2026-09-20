@@ -116,8 +116,13 @@ install -m 644 "${SRC}/deploy/backup/interview-prep-backup@.service" /etc/system
 install -m 644 "${SRC}"/deploy/backup/interview-prep-backup@*.timer /etc/systemd/system/
 chmod +x "${SRC}/deploy/backup/backup.sh"
 systemctl daemon-reload
-systemctl enable --now interview-prep.service
-systemctl enable --now interview-prep-update.timer
+# enable, then restart. `enable --now` starts a unit only if it is not already active, and
+# interview-prep.service is Type=oneshot with RemainAfterExit=yes — so on a re-run it stays
+# "active" and the new Compose file is never applied. That made this script silently fail to do
+# the one thing it exists for.
+systemctl enable interview-prep.service interview-prep-update.timer
+systemctl restart interview-prep.service
+systemctl start interview-prep-update.timer
 for job in base dump check restore-test; do
   systemctl enable --now "interview-prep-backup@${job}.timer"
 done

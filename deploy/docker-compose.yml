@@ -20,7 +20,12 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set by /etc/interview-prep/backup.env}
       AWS_REGION: ${AWS_REGION:?set by /etc/interview-prep/backup.env}
       WALG_S3_PREFIX: ${WALG_S3_PREFIX:?set by /etc/interview-prep/backup.env}
-      WALG_COMPRESSION_METHOD: brotli
+      # lz4 is WAL-G's default and costs almost no CPU. brotli compresses better but this box has
+      # two vCPUs that PostgreSQL and the JVM are already sharing.
+      WALG_COMPRESSION_METHOD: lz4
+      # Default is 16, which sizes its buffers for a dedicated backup host rather than a container
+      # sharing 512 MB with the database.
+      WALG_UPLOAD_CONCURRENCY: "2"
     # archive_mode is a postmaster setting, so it can only be turned on by a restart — which is
     # what recreating this container does.
     command:
@@ -46,6 +51,11 @@ services:
       # A single static binary, installed on the VM by vm-setup.sh. Mounting it avoids building
       # and publishing our own PostgreSQL image just to add one file.
       - /opt/interview-prep/bin/wal-g:/usr/local/bin/wal-g:ro
+      # The postgres image ships no CA bundle, so WAL-G cannot verify S3's certificate. It does
+      # not fail usefully either: every TLS handshake fails, the AWS SDK retries with exponential
+      # backoff, and wal-push simply hangs until something times it out. Mounting the host's
+      # bundle is the whole fix.
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     # No ports section on purpose. Postgres is reachable only over the compose network.
     mem_limit: 512m
     shm_size: 128m
