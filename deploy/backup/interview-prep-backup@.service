@@ -1,0 +1,11 @@
+[Unit]
+Description=Interview prep backup job: %i
+Requires=docker.service
+After=docker.service interview-prep.service
+
+[Service]
+Type=oneshot
+# The VM's AWS key, for both WAL-G and the S3 uploads.
+EnvironmentFile=/etc/interview-prep/backup.env
+ExecStart=/opt/interview-prep/src/deploy/backup/backup.sh %i
+TimeoutStartSec=3600

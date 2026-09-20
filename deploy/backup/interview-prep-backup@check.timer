@@ -1,0 +1,12 @@
+[Unit]
+Description=Check that WAL archiving is keeping up
+
+[Timer]
+# Hourly. Broken archiving fills an 8 GB disk quietly, so this is the one that should be noticed
+# early; it fails the unit, which shows up in `systemctl --failed`.
+OnCalendar=hourly
+RandomizedDelaySec=600
+Unit=interview-prep-backup@check.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily WAL-G base backup
+
+[Timer]
+# 00:00 IST. The Lightsail disk snapshot runs at 01:30 IST, so they do not overlap.
+OnCalendar=*-*-* 18:30:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+Unit=interview-prep-backup@base.service
+
+[Install]
+WantedBy=timers.target

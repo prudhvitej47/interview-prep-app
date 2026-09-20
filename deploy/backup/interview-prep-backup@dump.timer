@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly pg_dump to S3
+
+[Timer]
+# 00:30 IST, after the base backup.
+OnCalendar=*-*-* 19:00:00 UTC
+RandomizedDelaySec=300
+# Catches up after the VM has been off, rather than skipping a night silently.
+Persistent=true
+Unit=interview-prep-backup@dump.service
+
+[Install]
+WantedBy=timers.target
