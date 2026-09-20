@@ -1,0 +1,5 @@
+# The build context should be the jar and nothing else. Without this it also carries
+# frontend/node_modules and the Maven-downloaded Node install, which is hundreds of megabytes
+# sent to the builder for no reason.
+*
+!backend/target/*.jar
