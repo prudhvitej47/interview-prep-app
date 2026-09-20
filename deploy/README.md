@@ -41,6 +41,29 @@ units and re-applies the Tailscale configuration. Run it after changing anything
 A rebuilt VM needs this one command and nothing else, which is the point of keeping all of it here
 rather than on the server.
 
+## If the VM is ever replaced
+
+A **reboot** needs nothing. Everything below is persistent state — an installed package, a config
+file, systemd symlinks, a clone on disk, and the Tailscale serve configuration in tailscaled's own
+state — so systemd brings the app back by itself.
+
+A **replacement** is different. `terraform apply` with `replace_vm` destroys the instance and
+creates a new one, and the first-boot script does not know anything about the application. Two
+manual steps are required, in this order:
+
+1. **A fresh Tailscale auth key**, in the infra repository's `TAILSCALE_AUTH_KEY` secret, *before*
+   the apply. The original key was single-use and is spent, so without this the new VM never joins
+   the tailnet and nothing can reach it — including you.
+2. **Run `vm-setup.sh` again** once the new VM is up, exactly as above. The data disk is re-attached
+   rather than reformatted, so the database survives; this only reinstalls the parts that live on
+   the instance's own root disk.
+
+The infra repository's `docs/runbook.md` has the replacement procedure itself. This is the part that
+belongs to the application, which is why it is written down here as well.
+
+Automating step 2 — having the first-boot script fetch and run this one — is worth doing at some
+point. Until then, replacing the VM is a supervised operation, which step 1 makes it anyway.
+
 ## Looking at it
 
 ```bash
