@@ -1,0 +1,12 @@
+[Unit]
+Description=Pull the current app image and restart the app if it changed
+Requires=docker.service
+After=docker.service interview-prep.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/interview-prep
+EnvironmentFile=/etc/interview-prep/backup.env
+EnvironmentFile=/etc/interview-prep/app.env
+ExecStart=/opt/interview-prep/src/deploy/update.sh
+TimeoutStartSec=600

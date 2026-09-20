@@ -4,11 +4,9 @@ name: build
 # Boot app, the module boundaries and the migrations against a real Postgres.
 # Publishing an image is a separate workflow, added with the deploy path.
 
+# Pull requests only. Pushes to main are covered by the publish workflow, which runs the same
+# checks before it publishes anything — so building here as well would just do it twice.
 on:
-  # Pull requests cover every branch, so pushes only need to be checked on main. Triggering on
-  # both for every branch would run the whole build twice on every commit to an open PR.
-  push:
-    branches: [main]
   pull_request:
 
 permissions:

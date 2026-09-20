@@ -1,0 +1,22 @@
+[Unit]
+Description=Interview prep application stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/interview-prep
+# backup.env carries the VM's AWS key, which the ECR credential helper uses to turn into a
+# registry token. app.env carries the image reference and the database password.
+EnvironmentFile=/etc/interview-prep/backup.env
+EnvironmentFile=/etc/interview-prep/app.env
+ExecStart=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml up --detach
+ExecStop=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml stop
+# No `down`, and never `down -v`: the database lives on the mounted disk and must not be at the
+# mercy of a stop command.
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
