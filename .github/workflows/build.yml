@@ -59,11 +59,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Proves the image still builds for the VM's architecture. It is not pushed anywhere;
-      # publishing arrives with the deploy path.
+      # Proves the image still builds for the VM's architecture, and rehearses the publish
+      # workflow's build closely enough to catch its failures here rather than on main. Same
+      # buildx driver and same cache; only the push differs.
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build image for linux/amd64
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
           push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
