@@ -13,6 +13,26 @@ services:
       POSTGRES_DB: interviewprep
       POSTGRES_USER: interviewprep
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      # WAL-G runs as PostgreSQL's archive_command, inside this container, so it reads its
+      # credentials from here. Same key the VM already uses for backups; read-only on ECR and
+      # write-only to the backup bucket.
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?set by /etc/interview-prep/backup.env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set by /etc/interview-prep/backup.env}
+      AWS_REGION: ${AWS_REGION:?set by /etc/interview-prep/backup.env}
+      WALG_S3_PREFIX: ${WALG_S3_PREFIX:?set by /etc/interview-prep/backup.env}
+      WALG_COMPRESSION_METHOD: brotli
+    # archive_mode is a postmaster setting, so it can only be turned on by a restart — which is
+    # what recreating this container does.
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=wal-g wal-push %p
+      - -c
+      # Ships a segment at least every five minutes even when the database is idle, so the worst
+      # case is five minutes of loss rather than however long until 16 MB of WAL accumulates.
+      - archive_timeout=300
     volumes:
       # The dedicated 8 GB disk, mounted by the VM's first-boot script and owned by uid 999,
       # which is why this is the Debian image and not the Alpine one (uid 70).
@@ -23,6 +43,9 @@ services:
       #
       # Bind mount, never a named volume: `docker compose down -v` must not be able to reach it.
       - /data/postgres:/var/lib/postgresql
+      # A single static binary, installed on the VM by vm-setup.sh. Mounting it avoids building
+      # and publishing our own PostgreSQL image just to add one file.
+      - /opt/interview-prep/bin/wal-g:/usr/local/bin/wal-g:ro
     # No ports section on purpose. Postgres is reachable only over the compose network.
     mem_limit: 512m
     shm_size: 128m

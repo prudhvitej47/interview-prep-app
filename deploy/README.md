@@ -87,6 +87,78 @@ HTTPS. Worth recording because two of these were assumptions until then:
 - Memory sits at about 245 MB for the app and 59 MB for PostgreSQL, with 1.1 GB free and no swap
   in use.
 
+## Backups
+
+Four layers, so losing any one of them is survivable:
+
+| Layer | What it gives | Where |
+| --- | --- | --- |
+| The dedicated disk | The database is not in a container layer; stopping or replacing containers cannot touch it. | `/data/postgres` |
+| WAL-G continuous archiving | Restore to any minute, because every write-ahead log segment is shipped to S3 as it fills, and at least every five minutes when idle. | `s3://…/wal-g` |
+| Nightly `pg_dump` | A portable copy that does not depend on WAL-G, or on this PostgreSQL version. | `s3://…/dumps/` |
+| Lightsail snapshots | The whole disk, daily, managed by Terraform. | AWS |
+
+One script runs all of it, with a subcommand per job:
+
+```bash
+sudo systemctl start interview-prep-backup@base          # WAL-G base backup, daily 00:00 IST
+sudo systemctl start interview-prep-backup@dump          # pg_dump to S3, nightly 00:30 IST
+sudo systemctl start interview-prep-backup@check         # is archiving keeping up, hourly
+sudo systemctl start interview-prep-backup@restore-test  # restore and verify, monthly
+```
+
+For a look at the current state, including what is in S3:
+
+```bash
+sudo bash -c 'set -a; . /etc/interview-prep/backup.env; set +a
+  /opt/interview-prep/src/deploy/backup/backup.sh status'
+```
+
+**The check matters more than it looks.** If `archive_command` starts failing, PostgreSQL keeps
+every WAL segment until it succeeds — and this VM has an 8 GB disk. The hourly check exits non-zero
+when archiving has failed in the last day or `pg_wal` passes 1 GB, so a broken archive shows up in
+`systemctl --failed` instead of as a full disk weeks later.
+
+**The restore test is what makes these backups rather than hopeful files.** Monthly it pulls the
+newest dump, restores it into a throwaway PostgreSQL capped at 256 MB, and checks the schema
+actually arrived — at least 2 applied migrations and at least 20 tables — rather than just that
+the restore printed no errors. It never touches `/data`.
+
+### Restoring for real
+
+To a point in time, which is the case WAL-G exists for:
+
+```bash
+sudo systemctl stop interview-prep            # stop the app, leave PostgreSQL's data alone
+# then, in a container with the data directory mounted:
+wal-g backup-fetch /var/lib/postgresql/18/docker LATEST
+# write a recovery.signal and set recovery_target_time, then start PostgreSQL
+```
+
+From last night's dump, which needs nothing but `psql`:
+
+```bash
+gunzip -c dump.sql.gz | docker exec -i interview-prep-postgres \
+  psql -U interviewprep -d interviewprep --set ON_ERROR_STOP=1
+```
+
+The dump is taken with `--clean --if-exists`, so it replaces what is there.
+
+## Troubleshooting
+
+**`docker pull` says "no basic auth credentials".** The ECR credential helper reads its AWS key
+from the environment, and only the systemd units supply it through `EnvironmentFile`. A shell does
+not have it. Load it first:
+
+```bash
+sudo bash -c 'set -a; . /etc/interview-prep/backup.env; set +a; docker pull <image>'
+```
+
+The same applies to `wal-g` and to running `backup.sh` by hand.
+
+**A backup unit failed.** `systemctl --failed` lists it; `journalctl -u interview-prep-backup@dump`
+and friends say why. All of them are safe to re-run.
+
 ## Deliberate choices
 
 **No digest comparison in `update.sh`.** `docker compose pull` does nothing when the image is

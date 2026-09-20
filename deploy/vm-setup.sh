@@ -15,6 +15,7 @@ REPO_REF="${REPO_REF:-main}"
 BASE="${BASE:-/opt/interview-prep}"
 SRC="${BASE}/src"
 APP_ENV="/etc/interview-prep/app.env"
+WALG_VERSION="${WALG_VERSION:-v3.0.9}"
 
 [[ $EUID -eq 0 ]] || { echo "run this as root (sudo)" >&2; exit 1; }
 [[ -n "${ECR_REGISTRY:-}" ]] || {
@@ -33,7 +34,7 @@ log() { printf '\n==> %s\n' "$*"; }
 export LC_ALL=C.UTF-8
 
 # ---------------------------------------------------------------------------
-log "1/6 ECR credential helper"
+log "1/7 ECR credential helper"
 # Turns the VM's existing AWS key into a registry token on demand, and refreshes it when it
 # expires. Avoids both an AWS CLI install and a `docker login` cron job.
 if ! command -v docker-credential-ecr-login >/dev/null; then
@@ -52,7 +53,7 @@ chmod 600 /root/.docker/config.json
 echo "configured for ${ECR_REGISTRY}"
 
 # ---------------------------------------------------------------------------
-log "2/6 Deployment files from ${REPO_URL} (${REPO_REF})"
+log "2/7 Deployment files from ${REPO_URL} (${REPO_REF})"
 install -d -m 755 "${BASE}"
 if [[ -d "${SRC}/.git" ]]; then
   git -C "${SRC}" fetch --quiet origin "${REPO_REF}"
@@ -65,7 +66,7 @@ fi
 chmod +x "${SRC}/deploy/update.sh"
 
 # ---------------------------------------------------------------------------
-log "3/6 Application environment"
+log "3/7 Application environment"
 # The database password is generated once and then left alone, so re-running this never locks the
 # app out of its own database. Never printed.
 if [[ -f "${APP_ENV}" ]] && grep -q '^DB_PASSWORD=' "${APP_ENV}"; then
@@ -85,17 +86,45 @@ umask 022
 unset DB_PASSWORD
 
 # ---------------------------------------------------------------------------
-log "4/6 systemd units"
+log "4/7 WAL-G"
+# A single static binary, mounted into the PostgreSQL container so it can be the archive_command.
+# Installing it here rather than building our own PostgreSQL image keeps one file out of a whole
+# second publishing pipeline.
+install -d -m 755 "${BASE}/bin"
+if [[ "$("${BASE}/bin/wal-g" --version 2>/dev/null | grep -o "v[0-9.]*" | head -1)" == "${WALG_VERSION}" ]]; then
+  echo "${WALG_VERSION} already installed"
+else
+  WALG_TMP="$(mktemp -d)"
+  WALG_ASSET="wal-g-pg-24.04-amd64"
+  WALG_URL="https://github.com/wal-g/wal-g/releases/download/${WALG_VERSION}/${WALG_ASSET}.tar.gz"
+  curl -fsSL "${WALG_URL}" -o "${WALG_TMP}/walg.tar.gz"
+  curl -fsSL "${WALG_URL}.sha256" -o "${WALG_TMP}/walg.sha256"
+  # The published checksum is over the tarball. Verify before anything is unpacked or run.
+  ( cd "${WALG_TMP}" && sed "s|  .*|  walg.tar.gz|" walg.sha256 | sha256sum --check --status ) \
+    || { rm -rf "${WALG_TMP}"; echo "wal-g checksum did not match; refusing to install" >&2; exit 1; }
+  tar -xzf "${WALG_TMP}/walg.tar.gz" -C "${WALG_TMP}"
+  install -m 755 "${WALG_TMP}/${WALG_ASSET}" "${BASE}/bin/wal-g"
+  rm -rf "${WALG_TMP}"
+  echo "installed $("${BASE}/bin/wal-g" --version 2>&1 | head -1)"
+fi
+
+log "5/7 systemd units"
 install -m 644 "${SRC}/deploy/interview-prep.service" /etc/systemd/system/
 install -m 644 "${SRC}/deploy/interview-prep-update.service" /etc/systemd/system/
 install -m 644 "${SRC}/deploy/interview-prep-update.timer" /etc/systemd/system/
+install -m 644 "${SRC}/deploy/backup/interview-prep-backup@.service" /etc/systemd/system/
+install -m 644 "${SRC}"/deploy/backup/interview-prep-backup@*.timer /etc/systemd/system/
+chmod +x "${SRC}/deploy/backup/backup.sh"
 systemctl daemon-reload
 systemctl enable --now interview-prep.service
 systemctl enable --now interview-prep-update.timer
+for job in base dump check restore-test; do
+  systemctl enable --now "interview-prep-backup@${job}.timer"
+done
 echo "enabled"
 
 # ---------------------------------------------------------------------------
-log "5/6 HTTPS on 443 over Tailscale"
+log "6/7 HTTPS on 443 over Tailscale"
 # tailscaled already holds this node's identity and renews the certificate itself, so it
 # terminates TLS and forwards to the app. No reverse proxy, no certificate timer, no extra memory
 # on a machine that has under 2 GB of it.
@@ -103,7 +132,7 @@ tailscale serve --bg --https=443 http://127.0.0.1:8080
 tailscale serve status
 
 # ---------------------------------------------------------------------------
-log "6/6 State"
+log "7/7 State"
 systemctl --no-pager --lines=0 status interview-prep.service || true
 # `docker compose ps` would re-read the database password to interpolate the file it is only
 # reporting on. Asking Docker for the project's containers needs no secret at all.
