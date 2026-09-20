@@ -43,7 +43,8 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-
 
-      # The same checks a pull request runs. Nothing is published that has not passed them.
+      # The same checks a pull request runs, and the jar the image packages. Nothing is
+      # published that has not passed them.
       - name: Build and test
         run: ./mvnw -B verify
         working-directory: backend
@@ -73,6 +74,11 @@ jobs:
           tags: |
             ${{ vars.ECR_REGISTRY }}/interview-prep-app:${{ github.sha }}
             ${{ vars.ECR_REGISTRY }}/interview-prep-app:main
+          # Without this, buildx publishes an image index wrapping the image plus a provenance
+          # attestation. That is three manifests per build in ECR instead of one, which makes
+          # the "keep the last 10 images" rule keep far fewer than ten builds, and it litters
+          # the console with untagged rows. Nothing here consumes the attestation.
+          provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

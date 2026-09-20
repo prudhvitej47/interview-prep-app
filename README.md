@@ -39,6 +39,13 @@ That one command does everything CI does: installs the pinned Node, builds the R
 its tests, compiles the backend, checks the module boundaries, and runs every migration against a
 real PostgreSQL in a container. Docker must be running.
 
+The container image packages the jar that command produces rather than building its own copy, so
+build it second:
+
+```bash
+cd backend && ./mvnw package && cd .. && docker build .
+```
+
 ## How it fits together
 
 The React app is built into `BOOT-INF/classes/static` inside the jar and served by Spring on the
