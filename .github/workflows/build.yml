@@ -5,7 +5,10 @@ name: build
 # Publishing an image is a separate workflow, added with the deploy path.
 
 on:
+  # Pull requests cover every branch, so pushes only need to be checked on main. Triggering on
+  # both for every branch would run the whole build twice on every commit to an open PR.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
