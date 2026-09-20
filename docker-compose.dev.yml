@@ -1,0 +1,27 @@
+# Postgres for local development on the Mac. Run the app itself from your IDE or with
+# `./mvnw spring-boot:run` in backend/, and the front end with `npm run dev` in frontend/.
+#
+# The published port is bound to localhost so nothing on the local network can reach it.
+
+services:
+  postgres:
+    image: postgres:18-trixie
+    container_name: interview-prep-postgres-dev
+    environment:
+      POSTGRES_DB: interviewprep
+      POSTGRES_USER: interviewprep
+      POSTGRES_PASSWORD: interviewprep
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18+ images want one mount at /var/lib/postgresql and place the cluster in a
+      # version-named subdirectory beneath it, so pg_upgrade never crosses a mount boundary.
+      - dev-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interviewprep -d interviewprep"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  dev-pgdata:
