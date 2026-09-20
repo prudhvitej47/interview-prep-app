@@ -1,0 +1,13 @@
+[Unit]
+Description=Check for a new app image every two minutes
+After=interview-prep.service
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+# Spreads the checks so they do not all land on the same second after a reboot.
+RandomizedDelaySec=20
+Unit=interview-prep-update.service
+
+[Install]
+WantedBy=timers.target

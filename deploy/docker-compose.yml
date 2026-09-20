@@ -43,7 +43,6 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/interviewprep
       DB_USER: interviewprep
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
-      SPRING_PROFILES_ACTIVE: vm
     # Bound to localhost: the only way in is `tailscale serve` on the host, which terminates
     # TLS for https://interview-prep.tail82d7a5.ts.net and forwards here.
     ports:

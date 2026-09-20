@@ -1,0 +1,85 @@
+name: publish
+
+# Builds, tests and publishes the app image. Only main publishes, so nothing a pull request does
+# can reach the server. Images are tagged with the commit sha (immutable, so any deploy can be
+# traced back) and with "main", which the VM's update timer watches.
+#
+# The image is built for linux/amd64 because the Lightsail VM is x86_64, while the development
+# Macs are arm64.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: build, test and publish
+    runs-on: ubuntu-latest
+    # Skips cleanly until the ECR variables are set, rather than failing every push to main.
+    if: vars.AWS_ECR_PUSH_ROLE_ARN != '' && vars.ECR_REGISTRY != ''
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      # The same checks a pull request runs. Nothing is published that has not passed them.
+      - name: Build and test
+        run: ./mvnw -B verify
+        working-directory: backend
+
+      - name: Sign in to AWS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          role-session-name: gha-push-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - name: Sign in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.ECR_REGISTRY }}/interview-prep-app:${{ github.sha }}
+            ${{ vars.ECR_REGISTRY }}/interview-prep-app:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo '```'
+            echo "interview-prep-app:${{ github.sha }}"
+            echo "interview-prep-app:main"
+            echo '```'
+            echo
+            echo "The VM checks for a new image every two minutes."
+          } >> "$GITHUB_STEP_SUMMARY"
