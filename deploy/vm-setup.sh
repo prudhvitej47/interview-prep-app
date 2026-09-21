@@ -4,7 +4,11 @@
 # Run it from the Mac, which needs no copy of anything on the server:
 #
 #   ECR_REGISTRY=<account>.dkr.ecr.ap-south-1.amazonaws.com \
-#     tailscale ssh ubuntu@interview-prep "sudo ECR_REGISTRY=\$ECR_REGISTRY bash -s" < deploy/vm-setup.sh
+#   APP_LEARNERS='you@example.com=you:Your Name,them@example.com=them:Their Name' \
+#     tailscale ssh ubuntu@interview-prep \
+#       "sudo ECR_REGISTRY=\$ECR_REGISTRY APP_LEARNERS='\$APP_LEARNERS' bash -s" < deploy/vm-setup.sh
+#
+# APP_LEARNERS is needed on the first run only; later runs keep the value already on the VM.
 #
 # Everything it installs comes from this repository, so a rebuilt VM ends up identical. It never
 # touches /data, and never prints a credential.
@@ -71,6 +75,22 @@ chmod +x "${SRC}/deploy/update.sh"
 log "3/7 Application environment"
 # The database password is generated once and then left alone, so re-running this never locks the
 # app out of its own database. Never printed.
+# Who may use the app: "login=slug:Name" pairs, comma-separated, where login is the account the
+# person signs in to Tailscale with. These are email addresses — personal data — so they live only in
+# app.env on this VM, never in the repository. Kept on re-runs; pass APP_LEARNERS again to change it.
+if [[ -n "${APP_LEARNERS:-}" ]]; then
+  LEARNERS="${APP_LEARNERS}"
+elif [[ -f "${APP_ENV}" ]] && grep -q '^APP_LEARNERS=' "${APP_ENV}"; then
+  LEARNERS="$(grep '^APP_LEARNERS=' "${APP_ENV}" | cut -d= -f2- | sed 's/^"//; s/"$//')"
+else
+  echo "APP_LEARNERS must be set on the first run, e.g. APP_LEARNERS='you@example.com=you:Your Name'" >&2
+  exit 1
+fi
+[[ "${LEARNERS}" != *'"'* && "${LEARNERS}" != *'$'* ]] || {
+  echo "APP_LEARNERS may not contain quotes or dollar signs" >&2
+  exit 1
+}
+
 if [[ -f "${APP_ENV}" ]] && grep -q '^DB_PASSWORD=' "${APP_ENV}"; then
   DB_PASSWORD="$(grep '^DB_PASSWORD=' "${APP_ENV}" | cut -d= -f2-)"
   echo "keeping the existing database password"
@@ -83,10 +103,11 @@ cat > "${APP_ENV}" <<ENV
 APP_IMAGE=${ECR_REGISTRY}/interview-prep-app:main
 CONTENT_IMAGE=${ECR_REGISTRY}/interview-prep-content:main
 DB_PASSWORD=${DB_PASSWORD}
+APP_LEARNERS="${LEARNERS}"
 ENV
 chmod 600 "${APP_ENV}"
 umask 022
-unset DB_PASSWORD
+unset DB_PASSWORD LEARNERS
 
 # ---------------------------------------------------------------------------
 log "4/7 WAL-G"

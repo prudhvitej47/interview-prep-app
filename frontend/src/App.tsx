@@ -1,19 +1,38 @@
 import { useEffect, useState } from "react";
-import { fetchTopics, type TopicSummary } from "./api";
+import { fetchMe, fetchTopics, NotAllowedError, type Me } from "./api";
+import { Onboarding } from "./Onboarding";
 
-type Load =
-  | { state: "loading" }
-  | { state: "ready"; topics: TopicSummary[] }
-  | { state: "failed"; message: string };
+type State =
+  | { kind: "loading" }
+  | { kind: "not-allowed" }
+  | { kind: "failed"; message: string }
+  | { kind: "onboarding"; me: Me }
+  | { kind: "ready"; me: Me; topics: number };
 
 export function App() {
-  const [load, setLoad] = useState<Load>({ state: "loading" });
+  const [state, setState] = useState<State>({ kind: "loading" });
+
+  async function showHome(me: Me) {
+    const topics = await fetchTopics();
+    setState({ kind: "ready", me, topics: topics.length });
+  }
 
   useEffect(() => {
     let live = true;
-    fetchTopics()
-      .then((topics) => live && setLoad({ state: "ready", topics }))
-      .catch((error: Error) => live && setLoad({ state: "failed", message: error.message }));
+    fetchMe()
+      .then((me) => {
+        if (!live) return;
+        if (me.onboarded) return showHome(me);
+        setState({ kind: "onboarding", me });
+      })
+      .catch((error: Error) => {
+        if (!live) return;
+        setState(
+          error instanceof NotAllowedError
+            ? { kind: "not-allowed" }
+            : { kind: "failed", message: error.message },
+        );
+      });
     return () => {
       live = false;
     };
@@ -22,14 +41,29 @@ export function App() {
   return (
     <main>
       <h1>Interview Prep</h1>
-      {load.state === "loading" && <p>Loading the curriculum…</p>}
-      {load.state === "failed" && <p role="alert">{load.message}</p>}
-      {load.state === "ready" && (
-        <p>
-          {load.topics.length === 0
-            ? "Connected. No curriculum loaded yet — that arrives with the content loader."
-            : `${load.topics.length} topics loaded.`}
+      {state.kind === "loading" && <p>Loading…</p>}
+      {state.kind === "failed" && <p role="alert">{state.message}</p>}
+      {state.kind === "not-allowed" && (
+        <p role="alert">
+          You reached the app, but you are not on its list of learners. It recognises you by the
+          account you are signed in to Tailscale with.
         </p>
+      )}
+      {state.kind === "onboarding" && (
+        <Onboarding
+          me={state.me}
+          onDone={(me) => showHome(me).catch((e: Error) => setState({ kind: "failed", message: e.message }))}
+        />
+      )}
+      {state.kind === "ready" && (
+        <>
+          <p>Welcome, {state.me.displayName}.</p>
+          <p>
+            {state.topics === 0
+              ? "No curriculum loaded yet — that arrives with the content loader."
+              : `${state.topics} topics loaded.`}
+          </p>
+        </>
       )}
     </main>
   );

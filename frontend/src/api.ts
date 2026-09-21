@@ -5,10 +5,56 @@ export type TopicSummary = {
   name: string;
 };
 
-export async function fetchTopics(): Promise<TopicSummary[]> {
-  const response = await fetch("/api/topics");
+export type Me = {
+  slug: string;
+  displayName: string;
+  onboarded: boolean;
+  domainRatings: Record<string, number>;
+};
+
+export type Domain = {
+  id: string;
+  name: string;
+  weight: number;
+  examples: string[];
+};
+
+/** The server knows who you are (via Tailscale) and you are not on its list. */
+export class NotAllowedError extends Error {}
+
+async function getJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (response.status === 403) {
+    throw new NotAllowedError(url);
+  }
   if (!response.ok) {
-    throw new Error(`Could not load topics (${response.status})`);
+    throw new Error(`Could not load ${url} (${response.status})`);
+  }
+  return response.json();
+}
+
+export const fetchMe = () => getJson<Me>("/api/me");
+export const fetchDomains = () => getJson<Domain[]>("/api/domains");
+export const fetchTopics = () => getJson<TopicSummary[]>("/api/topics");
+
+/**
+ * The CSRF token the server set as a cookie on an earlier GET. Echoing it in a header proves the
+ * request came from this page: another site's page can make the browser send the cookie, but
+ * cannot read it to copy into the header.
+ */
+function csrfToken(): string {
+  const cookie = document.cookie.split("; ").find((c) => c.startsWith("XSRF-TOKEN="));
+  return cookie ? decodeURIComponent(cookie.slice("XSRF-TOKEN=".length)) : "";
+}
+
+export async function saveDomainRatings(ratings: Record<string, number>): Promise<Me> {
+  const response = await fetch("/api/me/ratings/domains", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ ratings }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not save your ratings (${response.status})`);
   }
   return response.json();
 }

@@ -22,6 +22,16 @@ docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on 127.0.0.1:5432
 cd backend && ./mvnw spring-boot:run             # API and the built UI on :8080
 ```
 
+On the VM, Tailscale tells the app who each request is from. There is no Tailscale in front of it
+on a laptop, so name yourself:
+
+```bash
+APP_LEARNERS='dev@example.com=you:You' APP_IDENTITY_DEV_LOGIN=dev@example.com ./mvnw spring-boot:run
+```
+
+`APP_IDENTITY_DEV_LOGIN` is a development convenience and the app says so loudly at startup. It must
+never be set on the VM.
+
 To load the real curriculum locally, build a bundle in the content repository and point the app
 at it. Without one the app starts with an empty curriculum, which is fine for most work:
 

@@ -28,13 +28,34 @@ release.
 
 `deploy/test-update.sh` checks this logic against a fake `docker`, and CI runs it.
 
+## Who can use the app
+
+Nobody signs in to the app itself. `tailscale serve` adds a `Tailscale-User-Login` header naming the
+person whose device sent the request, and the app maps that to a learner using `APP_LEARNERS` in
+`/etc/interview-prep/app.env`:
+
+```
+APP_LEARNERS="you@example.com=you:Your Name,them@example.com=them:Their Name"
+```
+
+The login is the account each person signs in to **Tailscale** with. Anyone not on the list is
+refused, even from inside the tailnet. It holds email addresses, so it exists only on the VM, never
+in this repository.
+
+This is safe because serve strips any copy of that header the client sends — verified on the VM by
+capturing the traffic that reached the app while sending a forged one — and because the app listens
+only on 127.0.0.1. CSRF protection stays on regardless, since serve adds the identity to every
+request from a learner's browser, including one a malicious page might send.
+
+To change who is allowed, re-run `vm-setup.sh` with a new `APP_LEARNERS`.
+
 ## What runs on the VM
 
 | Path | What it is |
 | --- | --- |
 | `/opt/interview-prep/src` | A shallow clone of this repository's `main`, which is where the running Compose file and units come from. |
 | `/etc/interview-prep/backup.env` | Written at first boot by Terraform. The VM's AWS key, used for backups and now also to pull images. Never print it. |
-| `/etc/interview-prep/app.env` | The image reference and the database password, generated once by `vm-setup.sh`. |
+| `/etc/interview-prep/app.env` | The image references, the database password (generated once) and `APP_LEARNERS`. Written by `vm-setup.sh`. Personal data: never print it. |
 | `/opt/interview-prep/content` | The current curriculum bundle, mounted read-only into the app. Regenerated from ECR, so it needs no backup. |
 | `/data/postgres` | The database, on its own 8 GB disk. Nothing here ever deletes it. |
 
