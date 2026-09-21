@@ -14,8 +14,14 @@ vi.mock("mermaid", () => ({
 
 const URL = "/api/units/ds.transactions.idempotency-keys";
 
-function show(unitBody: object, note = { body: "", updatedAt: null }) {
-  const fetchMock = mockFetch({ [URL]: { body: unitBody }, [`${URL}/note`]: { body: note } });
+const NOT_DONE = { attempts: 0, firstDoneAt: null, lastAt: null, lastRating: null, dueOn: null, reviewDue: false };
+
+function show(unitBody: object, note = { body: "", updatedAt: null }, progress: object = NOT_DONE) {
+  const fetchMock = mockFetch({
+    [URL]: { body: unitBody },
+    [`${URL}/note`]: { body: note },
+    [`${URL}/progress`]: { body: progress },
+  });
   render(
     <MemoryRouter initialEntries={["/units/ds.transactions.idempotency-keys"]}>
       <Routes>
@@ -112,9 +118,54 @@ describe("UnitPage", () => {
       .toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
 
-  it("says when a unit has been retired", async () => {
+  it("says when a unit has been retired, and offers no way to mark it done", async () => {
     show(unit({ state: "retired" }));
     expect(await screen.findByRole("note")).toHaveTextContent(/retired/);
+    expect(screen.queryByRole("group", { name: "How did it go?" })).not.toBeInTheDocument();
+  });
+
+  it("marks a unit done only when told how it went, and can undo it", async () => {
+    const fetchMock = show(unit());
+    const panel = await screen.findByRole("region", { name: "Your progress" });
+    expect(panel).toHaveTextContent("Finished with this unit?");
+    // Opening the page asked for progress but recorded nothing.
+    expect(fetchMock.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: true, status: 200,
+      json: async () => ({ attempts: 1, firstDoneAt: "2026-09-22T10:00:00+05:30", lastAt: "2026-09-22T10:00:00+05:30",
+        lastRating: "good", dueOn: "2026-09-23", reviewDue: false }),
+    }));
+    fireEvent.click(within(panel).getByRole("button", { name: /^Good/ }));
+    expect(await within(panel).findByText(/Next review/)).toHaveTextContent("Last time: good");
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe(`${URL}/attempts`);
+    expect(init?.method).toBe("POST");
+    expect(init?.headers).toMatchObject({ "X-XSRF-TOKEN": "token-from-the-server" });
+    expect(JSON.parse(init?.body as string)).toEqual({ rating: "good" });
+    // Done and not yet due: no rating buttons, only undo.
+    expect(within(panel).queryByRole("group")).not.toBeInTheDocument();
+
+    fetchMock.mockImplementationOnce(async () => ({ ok: true, status: 200, json: async () => NOT_DONE }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Undo: not done after all" }));
+    expect(await within(panel).findByText("Finished with this unit?")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.at(-1)![1]?.method).toBe("DELETE");
+  });
+
+  it("asks how a due review went, with what a review means for the type", async () => {
+    show(unit({ type: "coding", markdown: "## Problem\nSum." }), undefined, {
+      attempts: 2, firstDoneAt: "2026-09-09T19:00:00Z", lastAt: "2026-09-11T10:00:00+05:30",
+      lastRating: "good", dueOn: "2026-09-14", reviewDue: true,
+    });
+    const panel = await screen.findByRole("region", { name: "Your progress" });
+    expect(panel).toHaveTextContent("Review due");
+    expect(panel).toHaveTextContent("reviewed 1×");
+    // 10 September, 00:30 in India is still 9 September in UTC; the page shows the learner's day.
+    expect(panel).toHaveTextContent(new Date("2026-09-09T19:00:00Z").toLocaleDateString(undefined,
+      { weekday: "short", day: "numeric", month: "short" }));
+    expect(panel).toHaveTextContent("Solve it again without notes");
+    expect(within(panel).getByRole("group", { name: "How did it go?" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Undo the last review" })).toBeInTheDocument();
   });
 
   it("says so plainly when there is no such unit", async () => {

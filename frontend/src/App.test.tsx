@@ -29,6 +29,32 @@ describe("App", () => {
     expect(await screen.findByText(/Where are you starting from/i)).toBeInTheDocument();
   });
 
+  it("lists reviews that are due above the curriculum", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+      "/api/reviews": { body: { due: [{ unitId: "ds.transactions.idempotency-keys", title: "Idempotency keys",
+        type: "concept", estMinutes: 30, dueOn: "2026-09-20" }], nextDueOn: "2026-09-25" } },
+    });
+    renderAt("/");
+    const review = await screen.findByRole("link", { name: "Idempotency keys" });
+    expect(review).toHaveAttribute("href", "/units/ds.transactions.idempotency-keys");
+    expect(review.closest("section")).toHaveTextContent("Reviews due 1");
+  });
+
+  it("shows no review section before anything has been done", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+      "/api/reviews": { body: { due: [], nextDueOn: null } },
+    });
+    renderAt("/");
+    await screen.findByRole("link", { name: "Transactions" });
+    expect(screen.queryByText(/Reviews due/)).not.toBeInTheDocument();
+  });
+
   it("shows an onboarded learner the curriculum, opening areas that have something in them", async () => {
     mockFetch({
       "/api/me": { body: me({ onboarded: true }) },

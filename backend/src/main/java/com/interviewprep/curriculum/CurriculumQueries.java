@@ -1,5 +1,6 @@
 package com.interviewprep.curriculum;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -144,6 +145,22 @@ public class CurriculumQueries {
                     rs2.getString("reference_query"), rs2.getBoolean("order_matters")))
                 .stream().findFirst().orElse(null)));
     return found.stream().findFirst();
+  }
+
+  /**
+   * The units among {@code ids} this learner can see and that are still in the curriculum, in no
+   * particular order. Other modules use it to put titles on lists of their own rows.
+   */
+  public List<UnitSummary> summaries(Collection<String> ids, String slug) {
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    return jdbc.query(
+        "select u.id, u.title, u.type, u.difficulty, u.est_minutes from unit u"
+            + " where u.id in (:ids) and u.state <> 'retired' and " + VISIBLE,
+        forLearner(slug).addValue("ids", ids),
+        (rs, i) -> new UnitSummary(rs.getString("id"), rs.getString("title"), rs.getString("type"),
+            rs.getInt("difficulty"), rs.getInt("est_minutes")));
   }
 
   /** Whether this learner may see this unit. Other modules use it before attaching data to one. */

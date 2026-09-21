@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { ReviewsDue } from "./ReviewsDue";
 import { fetchDomains, fetchTopics, type Domain, type Me, type TopicSummary } from "../api";
 
 export function Home({ me }: { me: Me }) {
@@ -22,6 +23,7 @@ export function Home({ me }: { me: Me }) {
         <p>Welcome, {me.displayName}.</p>
         <Link to="/ratings">Change my ratings</Link>
       </div>
+      <ReviewsDue />
       {error && <p role="alert">{error}</p>}
       {!domains && !error && <p>Loading the curriculum…</p>}
       {domains?.length === 0 && <p>No curriculum has been loaded yet.</p>}
