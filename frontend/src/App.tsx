@@ -4,6 +4,7 @@ import { fetchMe, NotAllowedError, type Me } from "./api";
 import { Onboarding } from "./Onboarding";
 import { Home } from "./pages/Home";
 import { TopicPage } from "./pages/TopicPage";
+import { WeekPage } from "./pages/WeekPage";
 import { UnitPage } from "./pages/UnitPage";
 
 type State =
@@ -60,6 +61,7 @@ export function App() {
             path="/ratings"
             element={<Onboarding me={state.me} onDone={saved} title="Change your ratings" />}
           />
+          <Route path="/week" element={<WeekPage />} />
           <Route path="/topics/:topicId" element={<TopicPage />} />
           <Route path="/units/:unitId" element={<UnitPage />} />
           <Route path="*" element={<p role="alert">There is nothing at this address.</p>} />
