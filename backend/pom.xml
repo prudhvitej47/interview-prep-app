@@ -31,9 +31,14 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+    <!--
+      Plain JDBC. Every query in the app is written as SQL — upserts with ON CONFLICT, JSONB, array
+      functions, per-learner visibility — so JPA had no users left, and Hibernate cost startup time
+      and memory on a 2 GB server for nothing.
+    -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-jpa</artifactId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

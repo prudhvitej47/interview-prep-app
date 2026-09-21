@@ -1,7 +1,6 @@
 package com.interviewprep.learner;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -10,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.interviewprep.PostgresTestBase;
+import com.interviewprep.RealCsrf;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -80,6 +80,14 @@ class IdentityAndOnboardingTest extends PostgresTestBase {
     }
 
     @Test
+    void aChangeWithAForgedCsrfTokenIsRefused() throws Exception {
+      mvc.perform(as(put("/api/me/ratings/domains"), "tester@example.com")
+              .header("X-XSRF-TOKEN", "forged").cookie(new jakarta.servlet.http.Cookie("XSRF-TOKEN", "different"))
+              .contentType(MediaType.APPLICATION_JSON).content(ALL_RATED))
+          .andExpect(status().isForbidden());
+    }
+
+    @Test
     void theLoginIsComparedTheWayEmailIs() throws Exception {
       mvc.perform(as(get("/api/me"), "Tester@Example.COM"))
           .andExpect(status().isOk())
@@ -122,7 +130,7 @@ class IdentityAndOnboardingTest extends PostgresTestBase {
 
     private org.springframework.test.web.servlet.ResultActions rate(String login, String body)
         throws Exception {
-      return mvc.perform(as(put("/api/me/ratings/domains"), login).with(csrf())
+      return mvc.perform(as(put("/api/me/ratings/domains"), login).with(RealCsrf.token(mvc, login))
           .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 

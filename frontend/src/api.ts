@@ -3,6 +3,7 @@ export type TopicSummary = {
   domainId: string;
   parentId: string | null;
   name: string;
+  unitCount: number;
 };
 
 export type Me = {
@@ -56,5 +57,69 @@ export async function saveDomainRatings(ratings: Record<string, number>): Promis
   if (!response.ok) {
     throw new Error(`Could not save your ratings (${response.status})`);
   }
+  return response.json();
+}
+
+export type UnitSummary = {
+  id: string;
+  title: string;
+  type: string;
+  difficulty: number;
+  estMinutes: number;
+};
+
+export type TopicDetail = {
+  id: string;
+  name: string;
+  domainId: string;
+  domainName: string;
+  parentId: string | null;
+  parentName: string | null;
+  subtopics: TopicSummary[];
+  units: UnitSummary[];
+};
+
+export type UnitDetail = {
+  id: string;
+  title: string;
+  type: string;
+  difficulty: number;
+  estMinutes: number;
+  rounds: string[];
+  technologies: string[];
+  origin: string;
+  state: string;
+  version: number;
+  markdown: string;
+  topicId: string;
+  topicName: string;
+  domainId: string;
+  domainName: string;
+  sources: { kind: string; title: string; url: string | null; locator: string | null }[];
+  prerequisites: { id: string; title: string }[];
+};
+
+export type Note = { body: string; updatedAt: string | null };
+
+export class NotFoundError extends Error {}
+
+async function getOrNotFound<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (response.status === 404) throw new NotFoundError(url);
+  if (!response.ok) throw new Error(`Could not load ${url} (${response.status})`);
+  return response.json();
+}
+
+export const fetchTopic = (id: string) => getOrNotFound<TopicDetail>(`/api/topics/${encodeURIComponent(id)}`);
+export const fetchUnit = (id: string) => getOrNotFound<UnitDetail>(`/api/units/${encodeURIComponent(id)}`);
+export const fetchNote = (unitId: string) => getJson<Note>(`/api/units/${encodeURIComponent(unitId)}/note`);
+
+export async function saveNote(unitId: string, body: string): Promise<Note> {
+  const response = await fetch(`/api/units/${encodeURIComponent(unitId)}/note`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ body }),
+  });
+  if (!response.ok) throw new Error(`Could not save your note (${response.status})`);
   return response.json();
 }

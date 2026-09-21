@@ -16,14 +16,6 @@ spring:
       # Two vCPUs and one app instance: a large pool would only queue inside Postgres instead.
       maximum-pool-size: 10
 
-  jpa:
-    hibernate:
-      # Flyway owns the schema. Hibernate must never touch it.
-      ddl-auto: none
-    open-in-view: false
-    properties:
-      hibernate.jdbc.time_zone: UTC
-
   flyway:
     enabled: true
     locations: classpath:db/migration

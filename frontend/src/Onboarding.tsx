@@ -11,9 +11,9 @@ const SCALE = [
   "Could teach it",
 ];
 
-type Props = { me: Me; onDone: (me: Me) => void };
+type Props = { me: Me; onDone: (me: Me) => void; title?: string };
 
-export function Onboarding({ me, onDone }: Props) {
+export function Onboarding({ me, onDone, title = "Where are you starting from?" }: Props) {
   const [domains, setDomains] = useState<Domain[] | null>(null);
   const [ratings, setRatings] = useState<Record<string, number>>(me.domainRatings);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export function Onboarding({ me, onDone }: Props) {
 
   return (
     <form onSubmit={submit} className="onboarding">
-      <h2>Where are you starting from?</h2>
+      <h2>{title}</h2>
       <p>
         Rate yourself on each area. It only sets the starting point for your first plans — real
         practice replaces these numbers within a few weeks, and you can change them any time.

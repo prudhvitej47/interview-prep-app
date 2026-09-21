@@ -28,3 +28,39 @@ export const me = (overrides: object = {}) => ({
   domainRatings: {},
   ...overrides,
 });
+
+export const topics = [
+  { id: "ds.transactions", domainId: "distributed", parentId: null, name: "Transactions", unitCount: 1 },
+  { id: "ds.transactions.sagas", domainId: "distributed", parentId: "ds.transactions", name: "Sagas", unitCount: 0 },
+  { id: "hld.payments", domainId: "hld", parentId: null, name: "Payments", unitCount: 0 },
+];
+
+export const homeDomains = [
+  { id: "distributed", name: "Distributed systems", weight: 60, examples: [] },
+  { id: "hld", name: "High-level design", weight: 40, examples: [] },
+];
+
+export const unit = (overrides: object = {}) => ({
+  id: "ds.transactions.idempotency-keys",
+  title: "Idempotency keys for safe retries",
+  type: "concept",
+  difficulty: 3,
+  estMinutes: 30,
+  rounds: ["hld", "scenario"],
+  technologies: ["postgresql"],
+  origin: "synthesized",
+  state: "draft",
+  version: 1,
+  markdown:
+    "## Why it matters\nRetries can charge twice.\n\n## Diagram\n```mermaid\nsequenceDiagram\n  C->>S: pay\n```",
+  topicId: "ds.transactions",
+  topicName: "Transactions",
+  domainId: "distributed",
+  domainName: "Distributed systems",
+  sources: [
+    { kind: "book", title: "System Design Interview Vol. 2", url: null, locator: "Ch. 11" },
+    { kind: "engineering-blog", title: "Stripe on idempotency", url: "https://stripe.com/blog/idempotency", locator: null },
+  ],
+  prerequisites: [],
+  ...overrides,
+});

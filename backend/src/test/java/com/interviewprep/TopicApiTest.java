@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The walking skeleton: browser -> Spring MVC -> JPA -> Flyway-migrated Postgres and back.
+ * The walking skeleton: browser -> Spring MVC -> JDBC -> Flyway-migrated Postgres and back.
  *
  * <p>MockMvc is built from the context by hand because Spring Boot 4 dropped
  * {@code @AutoConfigureMockMvc} from spring-boot-test-autoconfigure. Two lines here beat adding a
