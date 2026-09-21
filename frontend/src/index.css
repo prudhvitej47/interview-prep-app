@@ -105,7 +105,8 @@ a { color: var(--fg); text-underline-offset: 2px; }
 .unit pre { overflow-x: auto; padding: 0.75rem; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .unit table { border-collapse: collapse; }
 .unit td, .unit th { border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); padding: 0.3rem 0.6rem; }
-.diagram { margin: 1rem 0; overflow-x: auto; }
+.diagram { margin: 1rem 0; overflow-x: auto; padding: 1rem; border-radius: 8px;
+  background: color-mix(in srgb, var(--fg) 4%, transparent); }
 .diagram svg { max-width: 100%; height: auto; }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }

@@ -42,8 +42,10 @@ describe("UnitPage", () => {
 
   it("draws a mermaid block as a diagram, not as code", async () => {
     show(unit());
-    expect(await screen.findByTestId("drawn-diagram")).toBeInTheDocument();
+    const diagram = await screen.findByTestId("drawn-diagram");
     expect(screen.queryByText(/C->>S: pay/)).not.toBeInTheDocument();
+    // Not left inside the code block's <pre>, which would frame it as code.
+    expect(diagram.closest("pre")).toBeNull();
   });
 
   it("folds the solution of a coding problem until asked", async () => {

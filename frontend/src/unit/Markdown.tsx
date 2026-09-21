@@ -27,6 +27,9 @@ export function Markdown({ children }: { children: string }) {
   );
 }
 
+// react-markdown hands <pre> the element for its <code> child. That element's type is the code
+// override above, not Mermaid — Mermaid is only what the override returns once rendered — so the
+// fence is recognised by its language instead.
 function isMermaid(node: ReactNode): boolean {
-  return isValidElement(node) && node.type === Mermaid;
+  return isValidElement<{ className?: string }>(node) && node.props.className === "language-mermaid";
 }
