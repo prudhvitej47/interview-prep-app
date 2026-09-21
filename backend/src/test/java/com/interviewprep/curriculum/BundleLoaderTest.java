@@ -35,6 +35,7 @@ class BundleLoaderTest extends PostgresTestBase {
   @Autowired private BundleLoader loader;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JsonMapper json;
+  @Autowired private CurriculumQueries queries;
 
   @TempDir Path dir;
 
@@ -163,6 +164,34 @@ class BundleLoaderTest extends PostgresTestBase {
   }
 
   @Test
+  void practiceFixturesLoadWithTheirUnitAndHiddenCasesStayOnTheServer() {
+    ObjectNode content = withPracticeUnits(base());
+    load(content);
+
+    CurriculumQueries.UnitDetail coding = queries.unit("dsa.window", "t").orElseThrow();
+    assertThat(coding.testCases()).extracting(CurriculumQueries.TestCase::name)
+        .containsExactly("example", "negatives");
+    assertThat(coding.hiddenTestCases()).isEqualTo(1);
+    assertThat(coding.sqlFixture()).isNull();
+
+    CurriculumQueries.SqlFixture sql = queries.unit("db.unsettled", "t").orElseThrow().sqlFixture();
+    assertThat(sql.schema()).isEqualTo("create table p (id int);");
+    assertThat(sql.reference()).isEqualTo("select id from p");
+    assertThat(sql.orderMatters()).isTrue();
+
+    // An edited problem replaces its cases rather than adding to them.
+    for (JsonNode u : content.path("units")) {
+      if (u.path("id").asString().equals("dsa.window")) {
+        ((ObjectNode) u).put("content_hash", "sha256:w2");
+        ((ArrayNode) u.path("tests").path("cases")).remove(2);
+      }
+    }
+    load(content);
+    assertThat(jdbc.queryForObject("select count(*) from test_case", Integer.class)).isEqualTo(2);
+    assertThat(queries.unit("dsa.window", "t").orElseThrow().hiddenTestCases()).isZero();
+  }
+
+  @Test
   void noBundleIsNotAnError() {
     assertThat(loader.load(dir.resolve("missing")).outcome())
         .isEqualTo(BundleLoader.Outcome.NO_BUNDLE);
@@ -210,6 +239,30 @@ class BundleLoaderTest extends PostgresTestBase {
         units.remove(i);
       }
     }
+    return content;
+  }
+
+  private ObjectNode withPracticeUnits(ObjectNode content) {
+    ArrayNode units = (ArrayNode) content.path("units");
+    units.add(json.readTree("""
+        {"id": "dsa.window", "topic": "hld.payments", "type": "coding", "title": "Window",
+         "difficulty": 2, "est_minutes": 25, "rounds": [], "technologies": ["java"],
+         "origin": "original-practice", "state": "draft", "version": 1, "prerequisites": [],
+         "sources": [], "body": {"markdown": "## Problem\\nSum."}, "content_hash": "sha256:w",
+         "tests": {"cases": [
+           {"name": "example", "input": "nums = [2, 1], k = 1", "expected": "2"},
+           {"name": "negatives", "input": "nums = [-3, -1], k = 1", "expected": "-1"},
+           {"name": "at the end", "input": "nums = [1, 5], k = 1", "expected": "5", "hidden": true}]}}
+        """));
+    units.add(json.readTree("""
+        {"id": "db.unsettled", "topic": "hld.payments", "type": "sql", "title": "Unsettled",
+         "difficulty": 2, "est_minutes": 20, "rounds": [], "technologies": ["postgresql"],
+         "origin": "original-practice", "state": "draft", "version": 1, "prerequisites": [],
+         "sources": [], "body": {"markdown": "## Question\\nWhich?"}, "content_hash": "sha256:u",
+         "tests": {"dataset": "payments", "schema": "create table p (id int);",
+                   "seed": "insert into p values (1);", "reference": "select id from p",
+                   "order_matters": true}}
+        """));
     return content;
   }
 

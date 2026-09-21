@@ -97,7 +97,14 @@ export type UnitDetail = {
   domainName: string;
   sources: { kind: string; title: string; url: string | null; locator: string | null }[];
   prerequisites: { id: string; title: string }[];
+  testCases: TestCase[];
+  hiddenTestCases: number;
+  sqlFixture: SqlFixture | null;
 };
+
+export type TestCase = { name: string; input: string; expected: string };
+
+export type SqlFixture = { schema: string; seed: string; reference: string; orderMatters: boolean };
 
 export type Note = { body: string; updatedAt: string | null };
 

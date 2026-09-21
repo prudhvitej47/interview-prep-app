@@ -35,11 +35,21 @@ public class CurriculumQueries {
 
   public record Link(String id, String title) {}
 
+  public record TestCase(String name, String input, String expected) {}
+
+  /** Everything the browser needs to run a SQL problem in PGlite and work out the right answer. */
+  public record SqlFixture(String schema, String seed, String reference, boolean orderMatters) {}
+
+  /**
+   * Hidden test cases are counted, never sent: they are kept for the code runner planned for
+   * phase 2, and sending them would make them visible to anyone who opens the network tab.
+   */
   public record UnitDetail(
       String id, String title, String type, int difficulty, int estMinutes, List<String> rounds,
       List<String> technologies, String origin, String state, int version, String markdown,
       String topicId, String topicName, String domainId, String domainName,
-      List<Source> sources, List<Link> prerequisites) {}
+      List<Source> sources, List<Link> prerequisites, List<TestCase> testCases,
+      int hiddenTestCases, SqlFixture sqlFixture) {}
 
   private static MapSqlParameterSource forLearner(String slug) {
     return new MapSqlParameterSource("private", "learner:" + slug);
@@ -117,7 +127,22 @@ public class CurriculumQueries {
                 "select u.id, u.title from unit_prereq pr join unit u on u.id = pr.prereq_id"
                     + " where pr.unit_id = :id and " + VISIBLE + " order by u.title",
                 p,
-                (rs2, j) -> new Link(rs2.getString("id"), rs2.getString("title")))));
+                (rs2, j) -> new Link(rs2.getString("id"), rs2.getString("title"))),
+            jdbc.query(
+                "select name, input, expected from test_case where unit_id = :id and not hidden"
+                    + " order by sort_order",
+                p,
+                (rs2, j) -> new TestCase(rs2.getString("name"), rs2.getString("input"),
+                    rs2.getString("expected"))),
+            jdbc.queryForObject(
+                "select count(*) from test_case where unit_id = :id and hidden", p, Integer.class),
+            jdbc.query(
+                "select schema_ddl, seed_sql, reference_query, order_matters from sql_fixture"
+                    + " where unit_id = :id",
+                p,
+                (rs2, j) -> new SqlFixture(rs2.getString("schema_ddl"), rs2.getString("seed_sql"),
+                    rs2.getString("reference_query"), rs2.getBoolean("order_matters")))
+                .stream().findFirst().orElse(null)));
     return found.stream().findFirst();
   }
 

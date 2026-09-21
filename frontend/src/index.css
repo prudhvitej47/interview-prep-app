@@ -119,3 +119,13 @@ a { color: var(--fg); text-underline-offset: 2px; }
   background: var(--fg); color: var(--bg); cursor: pointer; }
 .note-actions button:disabled { opacity: 0.45; cursor: default; }
 .note-actions [role="status"] { color: var(--muted); font-size: 0.875rem; }
+
+.practice textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem; padding: 0.6rem; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  background: var(--bg); color: var(--fg); }
+.practice .hint { color: var(--muted); font-size: 0.875rem; }
+.practice .result { overflow-x: auto; margin-top: 0.75rem; }
+.note-actions button.secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
+.verdict { padding: 0.5rem 0.8rem; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.verdict.right { background: color-mix(in srgb, #16a34a 18%, transparent); }
+.verdict.wrong { background: color-mix(in srgb, #dc2626 15%, transparent); white-space: pre-wrap; }

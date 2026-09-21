@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnitPage } from "./UnitPage";
@@ -54,6 +54,55 @@ describe("UnitPage", () => {
     expect(solution.closest("details")).not.toHaveAttribute("open");
     expect(screen.getByText("Show solution")).toBeInTheDocument();
     expect(screen.getByText("Reverse a list.").closest("details")).toBeNull();
+  });
+
+  it("puts a coding problem's cases before its hints, and never shows the hidden ones", async () => {
+    show(unit({
+      type: "coding",
+      markdown: "## Problem\nSum a window.\n\n## Hints\nKeep a running sum.\n\n## Solution\nSlide.",
+      testCases: [
+        { name: "the example", input: "nums = [2, 1, 5], k = 2", expected: "6" },
+        { name: "every value negative", input: "nums = [-3, -1], k = 1", expected: "-1" },
+      ],
+      hiddenTestCases: 1,
+    }));
+    const practice = (await screen.findByRole("heading", { name: "Check your solution" })).closest("section")!;
+    const hints = screen.getByText("Show hints");
+    expect(practice.compareDocumentPosition(hints) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(practice).toHaveTextContent("1 more case is kept back");
+
+    expect(within(practice).getByRole("status")).toHaveTextContent("0 of 2 pass");
+    fireEvent.click(screen.getByLabelText("Passes: the example"));
+    fireEvent.click(screen.getByLabelText("Passes: every value negative"));
+    expect(within(practice).getByRole("status")).toHaveTextContent("Every case passes");
+  });
+
+  it("runs a SQL answer and says whether it is the answer", async () => {
+    // sqlSession.test.ts runs real PGlite; here the page's side of it: lazy start, verdict, errors.
+    const run = vi.fn()
+      .mockResolvedValueOnce({ columns: ["id"], rows: [[2], [4]], verdict: { kind: "row-count", got: 2, want: 1 } })
+      .mockRejectedValueOnce(new Error('column "nope" does not exist'));
+    const openSession = vi.fn(async () => ({ run, close: vi.fn() }));
+    vi.doMock("../practice/sqlSession", () => ({ openSession }));
+
+    const fixture = { schema: "create table p (id int);", seed: "", reference: "select 1", orderMatters: false };
+    show(unit({ type: "sql", markdown: "## Question\nWhich?\n\n## Solution\nThis.", sqlFixture: fixture }));
+    const box = await screen.findByLabelText("Your query");
+    // The attempt comes before the folded solution.
+    expect(box.compareDocumentPosition(screen.getByText("Show solution")) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(openSession).not.toHaveBeenCalled();
+
+    fireEvent.change(box, { target: { value: "select id from p" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText(/returns 2 rows, the answer has 1/)).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "4" })).toBeInTheDocument();
+    expect(openSession).toHaveBeenCalledWith(fixture);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent('column "nope" does not exist');
+    expect(openSession).toHaveBeenCalledTimes(1);
+    vi.doUnmock("../practice/sqlSession");
   });
 
   it("lists sources, linking the ones that have an address", async () => {

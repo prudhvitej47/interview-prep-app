@@ -4,6 +4,8 @@ import { fetchUnit, NotFoundError, type UnitDetail } from "../api";
 import { Markdown } from "../unit/Markdown";
 import { NoteEditor } from "../unit/NoteEditor";
 import { splitSections, TYPE_LABEL } from "../unit/sections";
+import { CodingPractice } from "../practice/CodingPractice";
+import { SqlPractice } from "../practice/SqlPractice";
 
 export function UnitPage() {
   const { unitId = "" } = useParams();
@@ -19,6 +21,16 @@ export function UnitPage() {
 
   if (error) return <p role="alert">{error}</p>;
   if (!unit) return <p>Loading…</p>;
+
+  const sections = splitSections(unit.markdown, unit.type);
+  const practice = unit.sqlFixture ? (
+    <SqlPractice key="practice" fixture={unit.sqlFixture} />
+  ) : unit.testCases.length > 0 ? (
+    <CodingPractice key="practice" cases={unit.testCases} hidden={unit.hiddenTestCases} />
+  ) : null;
+  // Practice goes just before the first spoiler (hints, solution), so the attempt comes first.
+  const firstFolded = sections.findIndex((s) => s.folded);
+  const practiceAt = firstFolded === -1 ? sections.length : firstFolded;
 
   return (
     <article className={`unit unit-${unit.type}`}>
@@ -36,7 +48,8 @@ export function UnitPage() {
         </p>
       )}
 
-      {splitSections(unit.markdown, unit.type).map((section, i) =>
+      {sections.map((section, i) => [
+        i === practiceAt && practice,
         section.heading === null ? (
           <Markdown key={i}>{section.body}</Markdown>
         ) : section.folded ? (
@@ -50,7 +63,8 @@ export function UnitPage() {
             <Markdown>{section.body}</Markdown>
           </section>
         ),
-      )}
+      ])}
+      {practiceAt === sections.length && practice}
 
       {unit.prerequisites.length > 0 && (
         <section>
