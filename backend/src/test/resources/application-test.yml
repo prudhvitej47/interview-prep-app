@@ -4,3 +4,7 @@ spring:
     show-sql: false
   flyway:
     clean-disabled: false
+
+app:
+  # Two learners, so tests can prove one cannot see or affect the other.
+  learners: tester@example.com=tester:Tester,other@example.com=other:Other

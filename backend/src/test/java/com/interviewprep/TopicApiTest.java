@@ -1,5 +1,6 @@
 package com.interviewprep;
 
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,13 +33,14 @@ class TopicApiTest extends PostgresTestBase {
 
   @BeforeEach
   void setUp() {
-    mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+    // Through the real security chain, so these tests see what a browser would.
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
   @Test
   void topicsEndpointAnswersWithJson() throws Exception {
     mockMvc
-        .perform(get("/api/topics"))
+        .perform(get("/api/topics").header("Tailscale-User-Login", "tester@example.com"))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$").isArray());
@@ -74,6 +76,8 @@ class TopicApiTest extends PostgresTestBase {
 
   @Test
   void anUnknownApiPathIsNotFound() throws Exception {
-    mockMvc.perform(get("/api/nope")).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get("/api/nope").header("Tailscale-User-Login", "tester@example.com"))
+        .andExpect(status().isNotFound());
   }
 }

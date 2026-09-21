@@ -77,6 +77,9 @@ services:
       DB_USER: interviewprep
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       APP_CONTENT_BUNDLE_DIR: /bundle
+      # Who may use the app, set only in /etc/interview-prep/app.env on the VM. Required: without
+      # it the app would refuse everyone, so it is better not to start at all.
+      APP_LEARNERS: ${APP_LEARNERS:?APP_LEARNERS must be set; see deploy/README.md}
     volumes:
       # The curriculum bundle, copied out of the content image by update.sh. Read-only: the app
       # loads it at startup and never writes it.
