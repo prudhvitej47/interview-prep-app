@@ -54,7 +54,7 @@ echo "configured for ${ECR_REGISTRY}"
 
 # ---------------------------------------------------------------------------
 log "2/7 Deployment files from ${REPO_URL} (${REPO_REF})"
-install -d -m 755 "${BASE}"
+install -d -m 755 "${BASE}" "${BASE}/content"
 if [[ -d "${SRC}/.git" ]]; then
   # FETCH_HEAD rather than origin/<ref>: the clone is shallow and only tracks main, so a remote
   # tracking branch does not exist for anything else.
@@ -81,6 +81,7 @@ fi
 umask 077
 cat > "${APP_ENV}" <<ENV
 APP_IMAGE=${ECR_REGISTRY}/interview-prep-app:main
+CONTENT_IMAGE=${ECR_REGISTRY}/interview-prep-content:main
 DB_PASSWORD=${DB_PASSWORD}
 ENV
 chmod 600 "${APP_ENV}"
@@ -129,6 +130,9 @@ for job in base dump check restore-test; do
   systemctl enable --now "interview-prep-backup@${job}.timer"
 done
 echo "enabled"
+# Run one update now rather than waiting for the timer, so the curriculum is loaded by the time
+# this script finishes instead of a few minutes later.
+systemctl start interview-prep-update.service && echo "curriculum synced"
 
 # ---------------------------------------------------------------------------
 log "6/7 HTTPS on 443 over Tailscale"

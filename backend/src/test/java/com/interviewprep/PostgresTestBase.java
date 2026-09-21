@@ -11,9 +11,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * exits. It is the same major version the VM runs, because testing migrations against H2 would
  * prove nothing about the ones that matter.
  */
-abstract class PostgresTestBase {
+public abstract class PostgresTestBase {
 
-  static final PostgreSQLContainer<?> POSTGRES =
+  protected static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>("postgres:18-trixie")
           .withDatabaseName("interviewprep")
           .withUsername("interviewprep")

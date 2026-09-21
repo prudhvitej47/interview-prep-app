@@ -35,7 +35,7 @@ class MigrationTest extends PostgresTestBase {
 
     assertThat(jdbc().queryForList("select version from flyway_schema_history order by installed_rank",
             String.class))
-        .containsExactly("1", "2");
+        .containsExactly("1", "2", "3");
   }
 
   @Test
@@ -94,17 +94,23 @@ class MigrationTest extends PostgresTestBase {
   }
 
   @Test
-  void aReleaseCannotBeRecordedTwiceForTheSameBundle() {
+  void aBundleCanBeReleasedAgainAfterARevert() {
+    // V3 dropped V1's unique constraint: reverting a bad change legitimately returns the
+    // curriculum to content it has had before. The loader, not the schema, decides "unchanged".
     jdbc().update(
         "insert into curriculum_release (version, bundle_digest, git_sha)"
-            + " values ('2026.38.1', 'sha256:aaa', 'abc123')");
+            + " values ('2026.38.1', 'sha256:revert-test', 'abc123')");
+    jdbc().update(
+        "insert into curriculum_release (version, bundle_digest, git_sha)"
+            + " values ('2026.38.3', 'sha256:revert-test', 'ghi789')");
 
+    // The version is still unique: two releases can share content, never a number.
     assertThatThrownBy(
             () ->
                 jdbc().update(
                     "insert into curriculum_release (version, bundle_digest, git_sha)"
-                        + " values ('2026.38.2', 'sha256:aaa', 'def456')"))
-        .hasMessageContaining("curriculum_release_bundle_digest_key");
+                        + " values ('2026.38.1', 'sha256:other', 'jkl012')"))
+        .hasMessageContaining("curriculum_release_version_key");
   }
 
   @Test

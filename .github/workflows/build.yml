@@ -43,6 +43,10 @@ jobs:
         run: ./mvnw -B verify
         working-directory: backend
 
+      # The updater's curriculum logic, against a fake docker. Needs nothing real.
+      - name: Check the VM updater
+        run: bash deploy/test-update.sh
+
       # Uses the jar the step above just built, and rehearses the publish workflow's image build
       # closely enough to catch its failures here rather than on main. Only the push differs.
       - name: Set up buildx

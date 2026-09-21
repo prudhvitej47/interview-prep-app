@@ -13,6 +13,21 @@ The app runs on one Lightsail VM in Mumbai, reachable only over Tailscale at
 
 So a merge is live within about three minutes, with no step on anyone's machine.
 
+## How a curriculum change reaches the app
+
+The content repository publishes the curriculum the same way: a merge to its `main` builds a
+bundle and pushes `interview-prep-content:main`. The same timer that checks the app image checks
+this one. When it changes, `update.sh` copies the two bundle files into
+`/opt/interview-prep/content` and restarts the app, whose loader turns them into a new numbered
+curriculum release.
+
+The content image is built deterministically, so an unchanged curriculum has an unchanged image id
+and nothing happens. The loader checks too: it compares the bundle's `content_hash` with the latest
+release and does nothing if they match, so even an unnecessary restart cannot create a spurious
+release.
+
+`deploy/test-update.sh` checks this logic against a fake `docker`, and CI runs it.
+
 ## What runs on the VM
 
 | Path | What it is |
@@ -20,6 +35,7 @@ So a merge is live within about three minutes, with no step on anyone's machine.
 | `/opt/interview-prep/src` | A shallow clone of this repository's `main`, which is where the running Compose file and units come from. |
 | `/etc/interview-prep/backup.env` | Written at first boot by Terraform. The VM's AWS key, used for backups and now also to pull images. Never print it. |
 | `/etc/interview-prep/app.env` | The image reference and the database password, generated once by `vm-setup.sh`. |
+| `/opt/interview-prep/content` | The current curriculum bundle, mounted read-only into the app. Regenerated from ECR, so it needs no backup. |
 | `/data/postgres` | The database, on its own 8 GB disk. Nothing here ever deletes it. |
 
 Two containers: `app` (768 MB) and `postgres` (512 MB), on a machine with 1.9 GB of RAM and 2 GB

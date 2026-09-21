@@ -22,6 +22,14 @@ docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on 127.0.0.1:5432
 cd backend && ./mvnw spring-boot:run             # API and the built UI on :8080
 ```
 
+To load the real curriculum locally, build a bundle in the content repository and point the app
+at it. Without one the app starts with an empty curriculum, which is fine for most work:
+
+```bash
+( cd ../interview-prep-content && python3 scripts/bundle.py --out dist --git-sha local )
+APP_CONTENT_BUNDLE_DIR=../../interview-prep-content/dist ./mvnw spring-boot:run
+```
+
 For front-end work, run Vite's dev server alongside it for hot reload — it proxies `/api` to
 port 8080:
 
