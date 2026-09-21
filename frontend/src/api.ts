@@ -130,3 +130,38 @@ export async function saveNote(unitId: string, body: string): Promise<Note> {
   if (!response.ok) throw new Error(`Could not save your note (${response.status})`);
   return response.json();
 }
+
+export type Rating = "again" | "hard" | "good" | "easy";
+
+export type Progress = {
+  attempts: number;
+  firstDoneAt: string | null;
+  lastAt: string | null;
+  lastRating: Rating | null;
+  dueOn: string | null;
+  reviewDue: boolean;
+};
+
+export type ReviewQueue = {
+  due: { unitId: string; title: string; type: string; estMinutes: number; dueOn: string }[];
+  nextDueOn: string | null;
+};
+
+export const fetchProgress = (unitId: string) =>
+  getJson<Progress>(`/api/units/${encodeURIComponent(unitId)}/progress`);
+export const fetchReviews = () => getJson<ReviewQueue>("/api/reviews");
+
+async function sendForProgress(method: string, url: string, body?: object): Promise<Progress> {
+  const response = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: body && JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`Could not save that (${response.status})`);
+  return response.json();
+}
+
+export const recordAttempt = (unitId: string, rating: Rating) =>
+  sendForProgress("POST", `/api/units/${encodeURIComponent(unitId)}/attempts`, { rating });
+export const undoAttempt = (unitId: string) =>
+  sendForProgress("DELETE", `/api/units/${encodeURIComponent(unitId)}/attempts/latest`);

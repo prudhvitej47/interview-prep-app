@@ -2,11 +2,15 @@ package com.interviewprep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -236,6 +240,98 @@ class CurriculumAndNotesTest extends PostgresTestBase {
     void aNoteOnAnUnknownUnitIsNotFound() throws Exception {
       mvc.perform(as(put("/api/units/no.such.unit/note"), TESTER).with(RealCsrf.token(mvc, TESTER))
               .contentType(MediaType.APPLICATION_JSON).content("{\"body\": \"x\"}"))
+          .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  class Attempts {
+
+    private static final String UNIT = "ds.transactions.idempotency";
+    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+
+    private ResultActions rate(String login, String unit, String rating) throws Exception {
+      return mvc.perform(as(post("/api/units/" + unit + "/attempts"), login)
+          .with(RealCsrf.token(mvc, login))
+          .contentType(MediaType.APPLICATION_JSON).content("{\"rating\": \"" + rating + "\"}"));
+    }
+
+    /** An attempt made some days ago, so the review queue has something due. */
+    private void attemptedDaysAgo(String unit, String rating, int days) {
+      jdbc.update("insert into attempt (learner_id, unit_id, rating, created_at)"
+          + " select id, ?, ?, now() - make_interval(days => ?) from learner where slug = 'tester'",
+          unit, rating, days);
+    }
+
+    @Test
+    void lookingAtAUnitRecordsNothing() throws Exception {
+      mvc.perform(as(get("/api/units/" + UNIT), TESTER)).andExpect(status().isOk());
+      mvc.perform(as(get("/api/units/" + UNIT + "/note"), TESTER)).andExpect(status().isOk());
+      mvc.perform(as(get("/api/units/" + UNIT + "/progress"), TESTER))
+          .andExpect(jsonPath("$.attempts").value(0))
+          .andExpect(jsonPath("$.dueOn").isEmpty());
+      assertThat(jdbc.queryForObject("select count(*) from attempt", Integer.class)).isZero();
+    }
+
+    @Test
+    void markingDoneSchedulesTheFirstReview() throws Exception {
+      rate(TESTER, UNIT, "good")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.attempts").value(1))
+          .andExpect(jsonPath("$.lastRating").value("good"))
+          .andExpect(jsonPath("$.dueOn").value(today.plusDays(1).toString()))
+          .andExpect(jsonPath("$.reviewDue").value(false));
+    }
+
+    @Test
+    void undoTakesBackOnlyTheLatestAttempt() throws Exception {
+      rate(TESTER, UNIT, "good");
+      rate(TESTER, UNIT, "easy");
+      mvc.perform(as(delete("/api/units/" + UNIT + "/attempts/latest"), TESTER)
+              .with(RealCsrf.token(mvc, TESTER)))
+          .andExpect(jsonPath("$.attempts").value(1))
+          .andExpect(jsonPath("$.lastRating").value("good"));
+      mvc.perform(as(delete("/api/units/" + UNIT + "/attempts/latest"), TESTER)
+              .with(RealCsrf.token(mvc, TESTER)))
+          .andExpect(jsonPath("$.attempts").value(0));
+    }
+
+    @Test
+    void theQueueHoldsWhatIsDueOldestFirstAndSaysWhenTheNextOneIs() throws Exception {
+      // A learner's row is created on their first request; the backdated rows below need it.
+      mvc.perform(as(get("/api/reviews"), TESTER)).andExpect(jsonPath("$.due.length()").value(0));
+      attemptedDaysAgo(UNIT, "good", 5);                           // due 4 days ago
+      attemptedDaysAgo("ds.transactions.sagas.intro", "good", 1);  // due today
+      attemptedDaysAgo(PRIVATE_UNIT, "easy", 0);                   // due in 3 days
+      attemptedDaysAgo("ds.transactions.old", "good", 30);         // retired: left out
+
+      mvc.perform(as(get("/api/reviews"), TESTER))
+          .andExpect(jsonPath("$.due.length()").value(2))
+          .andExpect(jsonPath("$.due[0].unitId").value(UNIT))
+          .andExpect(jsonPath("$.due[0].dueOn").value(today.minusDays(4).toString()))
+          .andExpect(jsonPath("$.due[1].unitId").value("ds.transactions.sagas.intro"))
+          .andExpect(jsonPath("$.nextDueOn").value(today.plusDays(3).toString()));
+      mvc.perform(as(get("/api/reviews"), OTHER))
+          .andExpect(jsonPath("$.due.length()").value(0))
+          .andExpect(jsonPath("$.nextDueOn").isEmpty());
+    }
+
+    @Test
+    void onlyTheFourRatingsAreAccepted() throws Exception {
+      rate(TESTER, UNIT, "done").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void recordingNeedsTheCsrfToken() throws Exception {
+      mvc.perform(as(post("/api/units/" + UNIT + "/attempts"), TESTER)
+              .contentType(MediaType.APPLICATION_JSON).content("{\"rating\": \"good\"}"))
+          .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void someoneElsesPrivateUnitCannotBeMarked() throws Exception {
+      rate(OTHER, PRIVATE_UNIT, "good").andExpect(status().isNotFound());
+      mvc.perform(as(get("/api/units/" + PRIVATE_UNIT + "/progress"), OTHER))
           .andExpect(status().isNotFound());
     }
   }
