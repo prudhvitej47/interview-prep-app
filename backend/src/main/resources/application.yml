@@ -47,3 +47,10 @@ server:
 logging:
   level:
     org.flywaydb: INFO
+
+app:
+  content:
+    # Where the curriculum bundle is read from at startup. Empty means "start with whatever is
+    # already loaded", which is what a fresh checkout does. On the VM it is /bundle, mounted
+    # read-only from the directory update.sh keeps current.
+    bundle-dir: ${APP_CONTENT_BUNDLE_DIR:}

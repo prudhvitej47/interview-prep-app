@@ -76,6 +76,11 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/interviewprep
       DB_USER: interviewprep
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      APP_CONTENT_BUNDLE_DIR: /bundle
+    volumes:
+      # The curriculum bundle, copied out of the content image by update.sh. Read-only: the app
+      # loads it at startup and never writes it.
+      - /opt/interview-prep/content:/bundle:ro
     # Bound to localhost: the only way in is `tailscale serve` on the host, which terminates
     # TLS for https://interview-prep.tail82d7a5.ts.net and forwards here.
     ports:
