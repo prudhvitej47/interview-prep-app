@@ -243,6 +243,7 @@ class BundleLoader {
     for (JsonNode u : touched) {
       replacePrerequisites(u);
       replaceSources(u);
+      replaceTests(u);
     }
 
     // Gone from the bundle: retired, not deleted, so history that points at it stays valid.
@@ -311,6 +312,40 @@ class BundleLoader {
           "insert into unit_source (unit_id, source_id) values (:unit, :source)"
               + " on conflict do nothing",
           new MapSqlParameterSource().addValue("unit", id).addValue("source", sourceId));
+    }
+  }
+
+  /**
+   * A coding problem's cases or a SQL problem's fixture. They are part of the unit's content hash,
+   * so they change only when the unit does.
+   */
+  private void replaceTests(JsonNode u) {
+    MapSqlParameterSource id = new MapSqlParameterSource("id", u.path("id").asString());
+    jdbc.update("delete from test_case where unit_id = :id", id);
+    jdbc.update("delete from sql_fixture where unit_id = :id", id);
+    JsonNode tests = u.path("tests");
+    if (tests.has("reference")) {
+      // The bundle has already put the shared dataset in front of the problem's own schema and seed.
+      jdbc.update(
+          "insert into sql_fixture (unit_id, schema_ddl, seed_sql, reference_query, order_matters)"
+              + " values (:id, :schema, :seed, :reference, :ordered)",
+          id.addValue("schema", tests.path("schema").asString())
+              .addValue("seed", tests.path("seed").asString())
+              .addValue("reference", tests.path("reference").asString())
+              .addValue("ordered", tests.path("order_matters").asBoolean(false)));
+    }
+    int order = 0;
+    for (JsonNode c : tests.path("cases")) {
+      jdbc.update(
+          "insert into test_case (unit_id, name, input, expected, hidden, sort_order)"
+              + " values (:id, :name, :input, :expected, :hidden, :order)",
+          new MapSqlParameterSource()
+              .addValue("id", u.path("id").asString())
+              .addValue("name", c.path("name").asString())
+              .addValue("input", c.path("input").asString())
+              .addValue("expected", c.path("expected").asString())
+              .addValue("hidden", c.path("hidden").asBoolean(false))
+              .addValue("order", order++));
     }
   }
 

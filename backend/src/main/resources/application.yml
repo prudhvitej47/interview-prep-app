@@ -32,6 +32,12 @@ management:
 
 server:
   shutdown: graceful
+  # Mostly for the front end's larger lazy chunks: Mermaid, ELK and PGlite (10 MB of WebAssembly,
+  # about 3.4 MB gzipped). Two users on a tailnet make the CPU cost of compressing trivial, and
+  # the hashed assets are cached by the browser, so each file is compressed about once per release.
+  compression:
+    enabled: true
+    mime-types: text/html,text/css,text/javascript,application/javascript,application/json,application/wasm,application/octet-stream
   error:
     whitelabel:
       enabled: false

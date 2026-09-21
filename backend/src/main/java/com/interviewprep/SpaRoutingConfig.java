@@ -1,9 +1,11 @@
 package com.interviewprep;
 
 import java.io.IOException;
+import java.time.Duration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
@@ -22,6 +24,10 @@ import org.springframework.web.servlet.resource.PathResourceResolver;
  *   <li>under {@code api/} or {@code actuator/} and unmatched → 404 as JSON, not the SPA
  *   <li>anything else → {@code index.html}, and the React router decides
  * </ul>
+ *
+ * <p>Files under {@code assets/} are cached for a year: Vite puts a content hash in every name, so
+ * a changed file is a new URL. That matters most for PGlite's 16 MB of WebAssembly, which would
+ * otherwise be fetched again on every visit to a SQL problem.
  */
 @Configuration
 class SpaRoutingConfig implements WebMvcConfigurer {
@@ -30,6 +36,10 @@ class SpaRoutingConfig implements WebMvcConfigurer {
 
   @Override
   public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry
+        .addResourceHandler("/assets/**")
+        .addResourceLocations("classpath:/static/assets/")
+        .setCacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable());
     registry
         .addResourceHandler("/**")
         .addResourceLocations("classpath:/static/")

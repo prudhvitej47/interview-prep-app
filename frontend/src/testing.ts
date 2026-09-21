@@ -62,5 +62,8 @@ export const unit = (overrides: object = {}) => ({
     { kind: "engineering-blog", title: "Stripe on idempotency", url: "https://stripe.com/blog/idempotency", locator: null },
   ],
   prerequisites: [],
+  testCases: [],
+  hiddenTestCases: 0,
+  sqlFixture: null,
   ...overrides,
 });
