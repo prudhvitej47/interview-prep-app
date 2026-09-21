@@ -1,29 +1,47 @@
 package com.interviewprep.curriculum;
 
+import java.security.Principal;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Reads the loaded curriculum. Empty until the content loader runs (PR 6), which is exactly what
- * makes it a useful first endpoint: it proves the browser, Spring MVC, JPA, Flyway and Postgres
- * are wired together before there is any content to confuse the picture.
+ * The curriculum as a learner browses it.
+ *
+ * <p>Takes the plain {@link Principal} rather than the learner module's type: the learner module
+ * already depends on this one for the domain list, and depending back would be a cycle. The
+ * principal's name is the learner's slug, which is all visibility needs.
  */
 @RestController
-@RequestMapping("/api/topics")
 class CurriculumController {
 
-  private final TopicRepository topics;
+  private final CurriculumQueries queries;
 
-  CurriculumController(TopicRepository topics) {
-    this.topics = topics;
+  CurriculumController(CurriculumQueries queries) {
+    this.queries = queries;
   }
 
-  @GetMapping
-  List<TopicSummary> listTopics() {
-    return topics.findAllByOrderByDomainIdAscSortOrderAsc().stream()
-        .map(t -> new TopicSummary(t.getId(), t.getDomainId(), t.getParentId(), t.getName()))
-        .toList();
+  @GetMapping("/api/topics")
+  List<TopicSummary> topics(Principal learner) {
+    return queries.topics(learner.getName());
+  }
+
+  @GetMapping("/api/topics/{id}")
+  CurriculumQueries.TopicDetail topic(@PathVariable String id, Principal learner) {
+    return queries.topic(id, learner.getName()).orElseThrow(CurriculumController::notFound);
+  }
+
+  // A private unit that belongs to someone else is a 404, not a 403: the other learner should not
+  // be able to tell that it exists.
+  @GetMapping("/api/units/{id}")
+  CurriculumQueries.UnitDetail unit(@PathVariable String id, Principal learner) {
+    return queries.unit(id, learner.getName()).orElseThrow(CurriculumController::notFound);
+  }
+
+  private static ResponseStatusException notFound() {
+    return new ResponseStatusException(HttpStatus.NOT_FOUND);
   }
 }

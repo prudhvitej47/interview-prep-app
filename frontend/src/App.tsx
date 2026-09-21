@@ -1,30 +1,25 @@
 import { useEffect, useState } from "react";
-import { fetchMe, fetchTopics, NotAllowedError, type Me } from "./api";
+import { Link, Route, Routes, useNavigate } from "react-router";
+import { fetchMe, NotAllowedError, type Me } from "./api";
 import { Onboarding } from "./Onboarding";
+import { Home } from "./pages/Home";
+import { TopicPage } from "./pages/TopicPage";
+import { UnitPage } from "./pages/UnitPage";
 
 type State =
   | { kind: "loading" }
   | { kind: "not-allowed" }
   | { kind: "failed"; message: string }
-  | { kind: "onboarding"; me: Me }
-  | { kind: "ready"; me: Me; topics: number };
+  | { kind: "ready"; me: Me };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
-
-  async function showHome(me: Me) {
-    const topics = await fetchTopics();
-    setState({ kind: "ready", me, topics: topics.length });
-  }
+  const navigate = useNavigate();
 
   useEffect(() => {
     let live = true;
     fetchMe()
-      .then((me) => {
-        if (!live) return;
-        if (me.onboarded) return showHome(me);
-        setState({ kind: "onboarding", me });
-      })
+      .then((me) => live && setState({ kind: "ready", me }))
       .catch((error: Error) => {
         if (!live) return;
         setState(
@@ -38,9 +33,16 @@ export function App() {
     };
   }, []);
 
+  const saved = (me: Me) => {
+    setState({ kind: "ready", me });
+    navigate("/");
+  };
+
   return (
     <main>
-      <h1>Interview Prep</h1>
+      <h1>
+        <Link to="/">Interview Prep</Link>
+      </h1>
       {state.kind === "loading" && <p>Loading…</p>}
       {state.kind === "failed" && <p role="alert">{state.message}</p>}
       {state.kind === "not-allowed" && (
@@ -49,21 +51,19 @@ export function App() {
           account you are signed in to Tailscale with.
         </p>
       )}
-      {state.kind === "onboarding" && (
-        <Onboarding
-          me={state.me}
-          onDone={(me) => showHome(me).catch((e: Error) => setState({ kind: "failed", message: e.message }))}
-        />
-      )}
-      {state.kind === "ready" && (
-        <>
-          <p>Welcome, {state.me.displayName}.</p>
-          <p>
-            {state.topics === 0
-              ? "No curriculum loaded yet — that arrives with the content loader."
-              : `${state.topics} topics loaded.`}
-          </p>
-        </>
+      {/* Until the starting point is set there is nothing sensible to show, whatever the address. */}
+      {state.kind === "ready" && !state.me.onboarded && <Onboarding me={state.me} onDone={saved} />}
+      {state.kind === "ready" && state.me.onboarded && (
+        <Routes>
+          <Route path="/" element={<Home me={state.me} />} />
+          <Route
+            path="/ratings"
+            element={<Onboarding me={state.me} onDone={saved} title="Change your ratings" />}
+          />
+          <Route path="/topics/:topicId" element={<TopicPage />} />
+          <Route path="/units/:unitId" element={<UnitPage />} />
+          <Route path="*" element={<p role="alert">There is nothing at this address.</p>} />
+        </Routes>
       )}
     </main>
   );
