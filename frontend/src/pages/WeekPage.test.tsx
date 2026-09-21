@@ -26,6 +26,11 @@ const plan = {
 
 const week = (p: object | null, settings: object = SETTINGS) => ({ weekStart: "2026-09-28", settings, plan: p });
 
+// Dates show in the browser's own locale ("Mon, 28 Sept" here, "Mon, Sep 28" on a US machine such
+// as CI), so expected headings are formatted the same way rather than hard-coded.
+const heading = (year: number, month: number, day: number) =>
+  new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
 function show() {
   render(<MemoryRouter><WeekPage /></MemoryRouter>);
 }
@@ -67,10 +72,10 @@ describe("WeekPage", () => {
   it("lays the week out by day, with why each item is there and what is done", async () => {
     mockFetch({ "/api/plan": { body: week(plan) } });
     show();
-    const monday = (await screen.findByRole("heading", { name: /^Mon,? 28 Sept?$/ })).closest("section")!;
+    const monday = (await screen.findByRole("heading", { name: heading(2026, 9, 28) })).closest("section")!;
     expect(within(monday).getByLabelText("done")).toBeInTheDocument();
     expect(monday).toHaveTextContent("Required every week: DSA");
-    const wednesday = screen.getByRole("heading", { name: /^Wed,? 30 Sept?$/ }).closest("section")!;
+    const wednesday = screen.getByRole("heading", { name: heading(2026, 9, 30) }).closest("section")!;
     expect(wednesday).toHaveTextContent("Review · 15 min");
     expect(screen.getByText(/25 of 389 goal minutes done/)).toBeInTheDocument();
     expect(screen.getByText("No system design units to learn yet, so this week has none.")).toBeInTheDocument();
