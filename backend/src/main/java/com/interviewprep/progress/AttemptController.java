@@ -1,11 +1,13 @@
 package com.interviewprep.progress;
 
+import static com.interviewprep.progress.ProgressQueries.STUDY_ZONE;
+
 import com.interviewprep.curriculum.CurriculumQueries;
 import com.interviewprep.curriculum.CurriculumQueries.UnitSummary;
 import com.interviewprep.learner.LearnerPrincipal;
+import com.interviewprep.progress.ProgressQueries.Attempt;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -34,15 +36,16 @@ import org.springframework.web.server.ResponseStatusException;
 class AttemptController {
 
   private static final Set<String> RATINGS = Set.of("again", "hard", "good", "easy");
-  // Days run in India time, the same days the planner and the streak use.
-  private static final ZoneId STUDY_ZONE = ZoneId.of("Asia/Kolkata");
 
   private final NamedParameterJdbcTemplate jdbc;
   private final CurriculumQueries curriculum;
+  private final ProgressQueries progress;
 
-  AttemptController(NamedParameterJdbcTemplate jdbc, CurriculumQueries curriculum) {
+  AttemptController(NamedParameterJdbcTemplate jdbc, CurriculumQueries curriculum,
+      ProgressQueries progress) {
     this.jdbc = jdbc;
     this.curriculum = curriculum;
+    this.progress = progress;
   }
 
   /**
@@ -58,8 +61,6 @@ class AttemptController {
 
   /** What is due today or overdue, oldest first, and when the next one after that falls. */
   record ReviewQueue(List<Due> due, LocalDate nextDueOn) {}
-
-  private record Row(String unitId, String rating, OffsetDateTime at) {}
 
   @GetMapping("/api/units/{unitId}/progress")
   Progress progress(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me) {
@@ -92,9 +93,9 @@ class AttemptController {
 
   @GetMapping("/api/reviews")
   ReviewQueue reviews(@AuthenticationPrincipal LearnerPrincipal me) {
-    Map<String, List<Row>> byUnit = new LinkedHashMap<>();
-    for (Row r : rows("learner_id = :learner", new MapSqlParameterSource("learner", me.id()))) {
-      byUnit.computeIfAbsent(r.unitId(), k -> new ArrayList<>()).add(r);
+    Map<String, List<Attempt>> byUnit = new LinkedHashMap<>();
+    for (Attempt a : progress.attempts(me.id())) {
+      byUnit.computeIfAbsent(a.unitId(), k -> new ArrayList<>()).add(a);
     }
     // Retired units and units no longer visible drop out of the queue; their history stays.
     Map<String, UnitSummary> units = new LinkedHashMap<>();
@@ -108,7 +109,7 @@ class AttemptController {
       if (unit == null) {
         continue;
       }
-      LocalDate dueOn = dueOn(entry.getValue());
+      LocalDate dueOn = ProgressQueries.dueOn(entry.getValue());
       if (!dueOn.isAfter(today)) {
         due.add(new Due(unit.id(), unit.title(), unit.type(), unit.estMinutes(), dueOn));
       } else if (next == null || dueOn.isBefore(next)) {
@@ -120,29 +121,14 @@ class AttemptController {
   }
 
   private Progress progressOf(String unitId, LearnerPrincipal me) {
-    List<Row> attempts = rows("learner_id = :learner and unit_id = :unit", params(unitId, me));
+    List<Attempt> attempts = progress.attempts(me.id(), unitId);
     if (attempts.isEmpty()) {
       return new Progress(0, null, null, null, null, false);
     }
-    Row last = attempts.getLast();
-    LocalDate dueOn = dueOn(attempts);
+    Attempt last = attempts.getLast();
+    LocalDate dueOn = ProgressQueries.dueOn(attempts);
     return new Progress(attempts.size(), attempts.getFirst().at(), last.at(), last.rating(), dueOn,
         !dueOn.isAfter(LocalDate.now(STUDY_ZONE)));
-  }
-
-  private static LocalDate dueOn(List<Row> attempts) {
-    return ReviewSchedule.dueOn(attempts.stream()
-        .map(r -> new ReviewSchedule.Step(r.rating(), r.at().atZoneSameInstant(STUDY_ZONE).toLocalDate()))
-        .toList());
-  }
-
-  /** Oldest first, which is the order the schedule replays them in. */
-  private List<Row> rows(String where, MapSqlParameterSource params) {
-    return jdbc.query(
-        "select unit_id, rating, created_at from attempt where " + where + " order by created_at, id",
-        params,
-        (rs, i) -> new Row(rs.getString("unit_id"), rs.getString("rating"),
-            rs.getObject("created_at", OffsetDateTime.class)));
   }
 
   // Someone else's private unit is a 404 here too, so progress cannot be used to probe for it.

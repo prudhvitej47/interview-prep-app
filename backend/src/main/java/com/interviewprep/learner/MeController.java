@@ -1,5 +1,6 @@
 package com.interviewprep.learner;
 
+import com.interviewprep.curriculum.CurriculumQueries;
 import com.interviewprep.curriculum.DomainCatalog;
 import com.interviewprep.curriculum.DomainSummary;
 import java.util.LinkedHashMap;
@@ -34,11 +35,14 @@ class MeController {
   private final NamedParameterJdbcTemplate jdbc;
   private final DomainCatalog domains;
   private final JsonMapper json;
+  private final CurriculumQueries curriculum;
 
-  MeController(NamedParameterJdbcTemplate jdbc, DomainCatalog domains, JsonMapper json) {
+  MeController(NamedParameterJdbcTemplate jdbc, DomainCatalog domains, JsonMapper json,
+      CurriculumQueries curriculum) {
     this.jdbc = jdbc;
     this.domains = domains;
     this.json = json;
+    this.curriculum = curriculum;
   }
 
   record Me(String slug, String displayName, boolean onboarded, Map<String, Integer> domainRatings) {}
@@ -79,6 +83,35 @@ class MeController {
     jdbc.update(
         "insert into learner_competency (learner_id, scope, scope_id, rating, source)"
             + " select :learner, 'domain', key, value::smallint, 'self-rating'"
+            + " from jsonb_each_text(cast(:ratings as jsonb))"
+            + " on conflict (learner_id, scope, scope_id)"
+            + " do update set rating = excluded.rating, source = excluded.source, rated_at = now()",
+        new MapSqlParameterSource()
+            .addValue("learner", me.id())
+            .addValue("ratings", json.writeValueAsString(ratings)));
+    return describe(me);
+  }
+
+  /**
+   * Sharpens some topics' ratings, typically from the week plan's "how are you with these?" card.
+   * Only the topics sent are touched; the rest keep inheriting from their domain.
+   */
+  @PutMapping("/ratings/topics")
+  Me rateTopics(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody DomainRatings body) {
+    Map<String, Integer> ratings = body == null || body.ratings() == null ? Map.of() : body.ratings();
+    Set<String> known = curriculum.topicPlaces().keySet();
+    ratings.forEach((topic, rating) -> {
+      if (!known.contains(topic)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown topic " + topic);
+      }
+      if (rating == null || rating < 0 || rating > 5) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "ratings are 0 to 5; " + topic + " was " + rating);
+      }
+    });
+    jdbc.update(
+        "insert into learner_competency (learner_id, scope, scope_id, rating, source)"
+            + " select :learner, 'topic', key, value::smallint, 'self-rating'"
             + " from jsonb_each_text(cast(:ratings as jsonb))"
             + " on conflict (learner_id, scope, scope_id)"
             + " do update set rating = excluded.rating, source = excluded.source, rated_at = now()",

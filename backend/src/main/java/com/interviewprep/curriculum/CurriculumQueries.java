@@ -1,7 +1,9 @@
 package com.interviewprep.curriculum;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -145,6 +147,44 @@ public class CurriculumQueries {
                     rs2.getString("reference_query"), rs2.getBoolean("order_matters")))
                 .stream().findFirst().orElse(null)));
     return found.stream().findFirst();
+  }
+
+  /** A unit the planner can choose from, with what it needs to rank and place it. */
+  public record PlannableUnit(String id, String title, String type, String topicId, String topicName,
+      String domainId, int difficulty, int estMinutes, List<String> prerequisites) {}
+
+  /** Where a topic sits: its parent (null at the top) and its domain. */
+  public record TopicPlace(String name, String parentId, String domainId) {}
+
+  /** Every unit this learner can see that is still in the curriculum. */
+  public List<PlannableUnit> plannable(String slug) {
+    return jdbc.query(
+        "select u.id, u.title, u.type, u.topic_id, t.name as topic_name, t.domain_id, u.difficulty,"
+            + " u.est_minutes, coalesce((select array_agg(pr.prereq_id order by pr.prereq_id)"
+            + "   from unit_prereq pr where pr.unit_id = u.id), '{}') as prereqs"
+            + " from unit u join topic t on t.id = u.topic_id"
+            + " where u.state <> 'retired' and " + VISIBLE + " order by u.id",
+        forLearner(slug),
+        (rs, i) -> new PlannableUnit(rs.getString("id"), rs.getString("title"), rs.getString("type"),
+            rs.getString("topic_id"), rs.getString("topic_name"), rs.getString("domain_id"),
+            rs.getInt("difficulty"), rs.getInt("est_minutes"),
+            List.of((String[]) rs.getArray("prereqs").getArray())));
+  }
+
+  /** The newest curriculum release, or null before the first load. */
+  public Long latestReleaseId() {
+    return jdbc.query("select max(id) from curriculum_release",
+        rs -> rs.next() ? (Long) rs.getObject(1) : null);
+  }
+
+  /** Every topic by id. */
+  public Map<String, TopicPlace> topicPlaces() {
+    Map<String, TopicPlace> places = new HashMap<>();
+    jdbc.query("select id, name, parent_id, domain_id from topic", rs -> {
+      places.put(rs.getString("id"),
+          new TopicPlace(rs.getString("name"), rs.getString("parent_id"), rs.getString("domain_id")));
+    });
+    return places;
   }
 
   /**

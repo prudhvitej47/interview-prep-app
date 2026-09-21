@@ -165,3 +165,51 @@ export const recordAttempt = (unitId: string, rating: Rating) =>
   sendForProgress("POST", `/api/units/${encodeURIComponent(unitId)}/attempts`, { rating });
 export const undoAttempt = (unitId: string) =>
   sendForProgress("DELETE", `/api/units/${encodeURIComponent(unitId)}/attempts/latest`);
+
+export type WeekSettings = { hoursPerWeek: number | null; studyDays: number[]; weights: Record<string, number> };
+
+export type PlanItem = {
+  unitId: string;
+  title: string;
+  type: string;
+  day: number;
+  kind: "learn" | "review";
+  minutes: number;
+  reason: string;
+  done: boolean;
+};
+
+export type PlanView = {
+  plannedMinutes: number;
+  goalMinutes: number;
+  doneMinutes: number;
+  items: PlanItem[];
+  shares: { domainId: string; name: string; percent: number }[];
+  notes: string[];
+  topicsToRate: { topicId: string; name: string; domainName: string; currentGuess: number }[];
+};
+
+export type Week = { weekStart: string; settings: WeekSettings; plan: PlanView | null };
+
+export const fetchWeek = () => getJson<Week>("/api/plan");
+
+async function send(method: string, url: string, body?: object): Promise<Response> {
+  const response = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: body && JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`Could not save that (${response.status})`);
+  return response;
+}
+
+/** Saving settings rebuilds this week's plan with them; what is done stays done. */
+export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
+  await send("PUT", "/api/me/week", settings);
+  await send("DELETE", "/api/plan");
+  return fetchWeek();
+}
+
+export async function rateTopics(ratings: Record<string, number>): Promise<void> {
+  await send("PUT", "/api/me/ratings/topics", { ratings });
+}

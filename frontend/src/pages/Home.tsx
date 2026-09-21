@@ -21,7 +21,9 @@ export function Home({ me }: { me: Me }) {
     <>
       <div className="welcome">
         <p>Welcome, {me.displayName}.</p>
-        <Link to="/ratings">Change my ratings</Link>
+        <span>
+          <Link to="/week">This week's plan</Link> · <Link to="/ratings">Change my ratings</Link>
+        </span>
       </div>
       <ReviewsDue />
       {error && <p role="alert">{error}</p>}
