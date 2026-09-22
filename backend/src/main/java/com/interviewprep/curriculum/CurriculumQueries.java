@@ -192,11 +192,15 @@ public class CurriculumQueries {
       int added, int changed, int retired, List<ReleaseUnit> units) {}
 
   /**
-   * The newest release and the units it added or changed that this learner can see. A unit's
-   * {@code release_id} is the release it last changed in, and version 1 means it arrived then.
+   * The newest release that added, changed or retired units, and the units it added or changed
+   * that this learner can see. A release that only touched evidence or the taxonomy has nothing to
+   * place, so it is passed over. A unit's {@code release_id} is the release it last changed in,
+   * and version 1 means it arrived then.
    */
   public Release latestRelease(String slug) {
-    Long id = latestReleaseId();
+    Long id = jdbc.query("select max(id) from curriculum_release"
+            + " where units_added + units_changed + units_retired > 0",
+        rs -> rs.next() ? (Long) rs.getObject(1) : null);
     if (id == null) {
       return null;
     }

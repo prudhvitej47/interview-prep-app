@@ -256,3 +256,70 @@ export type Dashboard = {
 export const fetchDashboard = () => getJson<Dashboard>("/api/dashboard");
 export const placeUnit = async (unitId: string, choice: Placement): Promise<Dashboard> =>
   (await send("PUT", "/api/placements", { unitId, choice })).json();
+
+export type EvidenceSummary = {
+  id: string;
+  companyId: string;
+  company: string;
+  role: string | null;
+  level: string | null;
+  location: string | null;
+  interviewDate: string | null;
+  sourceKind: string;
+  sourceTitle: string;
+  publisher: string | null;
+  tier: string;
+  outcome: string | null;
+  rounds: number;
+  questions: number;
+  topics: string[];
+};
+
+export type EvidenceDetail = {
+  summary: EvidenceSummary;
+  sourceUrl: string | null;
+  accessed: string;
+  notes: string | null;
+  rounds: { type: string; name: string; summary: string | null; questions: { text: string; topics: { id: string; name: string }[] }[] }[];
+};
+
+export type Option = { id: string; name: string };
+
+export type DraftRound = { type: string; summary?: string; questions?: { text: string; topics: string[] }[] };
+
+export type DraftBody = {
+  company?: string;
+  role?: string;
+  level?: string;
+  location?: string;
+  interview_date?: string;
+  outcome?: string;
+  source?: { kind?: string; title?: string; url?: string; publisher?: string };
+  rounds?: DraftRound[];
+  private_notes?: string;
+};
+
+export type Draft = { id: number; kind: "debrief" | "report"; body: DraftBody; createdAt: string; updatedAt: string };
+
+export const fetchEvidence = () => getJson<EvidenceSummary[]>("/api/evidence");
+export const fetchEvidenceDetail = (id: string) =>
+  getOrNotFound<EvidenceDetail>(`/api/evidence/${encodeURIComponent(id)}`);
+export const fetchEvidenceOptions = () => getJson<{ companies: Option[]; rounds: Option[] }>("/api/evidence/options");
+export const fetchDrafts = () => getJson<Draft[]>("/api/evidence/drafts");
+export const fetchDraft = (id: number) => getOrNotFound<Draft>(`/api/evidence/drafts/${id}`);
+
+export async function saveDraft(draft: { id?: number; kind: string; body: DraftBody }): Promise<Draft> {
+  const response = draft.id
+    ? await send("PUT", `/api/evidence/drafts/${draft.id}`, { kind: draft.kind, body: draft.body })
+    : await send("POST", "/api/evidence/drafts", { kind: draft.kind, body: draft.body });
+  return response.json();
+}
+
+export const deleteDraft = (id: number) => send("DELETE", `/api/evidence/drafts/${id}`);
+
+/** The evidence file, or the list of things to fix first. */
+export async function exportDraft(id: number): Promise<{ path: string; yaml: string } | { problems: string[] }> {
+  const response = await fetch(`/api/evidence/drafts/${id}/export`);
+  if (response.ok || response.status === 422) return response.json();
+  throw new Error(`Could not export (${response.status})`);
+}

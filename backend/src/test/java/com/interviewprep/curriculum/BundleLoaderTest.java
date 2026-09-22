@@ -84,6 +84,11 @@ class BundleLoaderTest extends PostgresTestBase {
         .containsExactly("ds.transactions", "hld.payments");
     assertThat(jdbc.queryForObject("select aliases[1] from company where id = 'stripe'",
         String.class)).isEqualTo("stripe-inc");
+    // Round types for the evidence forms, and which round each item came from.
+    assertThat(jdbc.queryForObject("select name from round_type where id = 'hld'", String.class))
+        .isEqualTo("High-level design");
+    assertThat(jdbc.queryForList("select round_index from evidence_item order by sort_order", Integer.class))
+        .containsExactly(0, 1);
   }
 
   @Test
