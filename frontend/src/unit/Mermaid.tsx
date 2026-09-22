@@ -10,7 +10,7 @@ const LIGHT = {
   primaryTextColor: "#0f172a",
   lineColor: "#1e3a8a",
   edgeLabelBackground: "#ffffff",
-  ...scale(["#eef2ff", "#e0e7ff", "#dbeafe", "#e2e8f0"], "#0f172a"),
+  ...scale(["#eef2ff", "#e0e7ff", "#dbeafe", "#e2e8f0", "#ede9fe", "#e0f2fe", "#ecfccb", "#fee2e2"], "#0f172a"),
 };
 
 // Mermaid's own dark theme is right for boxes and lines, but mindmaps and timelines colour their
@@ -21,10 +21,14 @@ const DARK = {
   primaryColor: "#243244",
   primaryBorderColor: "#64748b",
   primaryTextColor: "#e5e7eb",
-  ...scale(["#1f2937", "#243244", "#2b3a2f", "#3a2f3f"], "#e5e7eb"),
+  ...scale(["#1f2937", "#243244", "#2b3a2f", "#3a2f3f", "#263445", "#33302a", "#2a3b3b", "#3b2f34"], "#e5e7eb"),
 };
 
-/** cScale0.. and cScaleLabel0.. are what mindmap, timeline and journey colour their branches from. */
+/**
+ * cScale0.. and cScaleLabel0.. are what mindmap, timeline and journey colour their branches from.
+ * Mermaid cycles through twelve; past the ones named here it falls back to its own bright palette,
+ * so eight are set — more branches than any readable diagram should have.
+ */
 function scale(fills: string[], label: string) {
   return Object.fromEntries(fills.flatMap((fill, i) => [
     [`cScale${i}`, fill],
@@ -62,6 +66,14 @@ export function laidOutByElk(chart: string): boolean {
 }
 
 /**
+ * Mermaid keeps one global configuration, so two diagrams drawing at once fight over it: a page with
+ * a flowchart and a mindmap could hand the mindmap the flowchart's ELK layout, which throws. Every
+ * draw therefore waits for the one before it, and sets the configuration it needs just before its
+ * own render.
+ */
+let drawing: Promise<unknown> = Promise.resolve();
+
+/**
  * Draws a Mermaid diagram. The library is large, so it is imported only when a page actually has a
  * diagram, and never lands in the main bundle.
  */
@@ -73,12 +85,15 @@ export function Mermaid({ chart }: { chart: string }) {
     let live = true;
     const id = `diagram-${++nextId}`;
     const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-    import("mermaid")
+    drawing = drawing
+      .catch(() => undefined)  // one diagram failing must not stop the next
+      .then(() => import("mermaid"))
       .then(async ({ default: mermaid }) => {
         mermaid.initialize(diagramConfig(dark, chart));
         const { svg } = await mermaid.render(id, chart);
         if (live) setSvg(svg);
-      })
+      });
+    drawing
       .catch((e) => {
         // Named in the console: a diagram that parses in CI can still fail to draw here (a layout
         // engine the build does not carry), and the fallback below is otherwise silent.
