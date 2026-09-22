@@ -56,12 +56,34 @@ To change who is allowed, re-run `vm-setup.sh` with a new `APP_LEARNERS`.
 | `/opt/interview-prep/src` | A shallow clone of this repository's `main`, which is where the running Compose file and units come from. |
 | `/etc/interview-prep/backup.env` | Written at first boot by Terraform. The VM's AWS key, used for backups and now also to pull images. Never print it. |
 | `/etc/interview-prep/app.env` | The image references, the database password (generated once) and `APP_LEARNERS`. Written by `vm-setup.sh`. Personal data: never print it. |
+| `/etc/interview-prep/github.env` | Optional. `APP_GITHUB_TOKEN`, for "Send to the curriculum". Written by hand (below), never by `vm-setup.sh`. A secret: never print it. |
 | `/opt/interview-prep/content` | The current curriculum bundle, mounted read-only into the app. Regenerated from ECR, so it needs no backup. |
 | `/data/postgres` | The database, on its own 8 GB disk. Nothing here ever deletes it. |
 
 Two containers: `app` (768 MB) and `postgres` (512 MB), on a machine with 1.9 GB of RAM and 2 GB
 of swap. PostgreSQL publishes no ports and is reachable only on the Compose network; the app is
 bound to `127.0.0.1:8080` and reached only through `tailscale serve`.
+
+## Sending to the curriculum
+
+"Send to the curriculum" (debriefs) and "Add an article" put files on new `proposals/…` and `inbox/…`
+branches of the content repository through GitHub's API. The app needs a token for that:
+
+1. GitHub → Settings → Developer settings → **Fine-grained tokens** → Generate. Repository access:
+   **only `interview-prep-content`**. Permissions: **Contents: read and write** (Metadata: read is
+   added by itself). Expiry: a year at most; note the date.
+2. On the VM, write it without it appearing on screen or in the shell history — paste the token when
+   the command waits, then press Enter:
+
+   ```bash
+   sudo bash -c 'umask 077; read -rs T; printf "APP_GITHUB_TOKEN=%s\n" "$T" > /etc/interview-prep/github.env'
+   sudo systemctl restart interview-prep
+   ```
+
+The token can create branches and files but cannot reach `main`: the repository's rules require a
+reviewed pull request. To rotate it, repeat step 2 with the new one; to turn sending off, delete the
+file and restart. Units installed before this file existed do not read it: re-run `vm-setup.sh`
+once (below) to install the current ones.
 
 ## Setting up, or re-syncing, the VM
 

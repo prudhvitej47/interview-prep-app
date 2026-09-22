@@ -52,3 +52,8 @@ app:
     # already loaded", which is what a fresh checkout does. On the VM it is /bundle, mounted
     # read-only from the directory update.sh keeps current.
     bundle-dir: ${APP_CONTENT_BUNDLE_DIR:}
+    # "Send to the curriculum" puts debriefs and articles on branches of the content repository.
+    # The token (fine-grained: that repository only, contents read and write) lives only in
+    # /etc/interview-prep/github.env on the VM. Unset, the page says sending is not set up.
+    github-token: ${APP_GITHUB_TOKEN:}
+    repo: ${APP_CONTENT_REPO:prudhvitej47/interview-prep-content}

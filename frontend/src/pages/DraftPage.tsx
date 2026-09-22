@@ -1,39 +1,31 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import {
-  deleteDraft, exportDraft, fetchDraft, fetchEvidenceOptions, fetchTopics, saveDraft,
-  type DraftBody, type DraftRound, type Option, type TopicSummary,
+  deleteDraft, exportDraft, fetchDraft, fetchEvidenceOptions, fetchTopics, saveDraft, sendDraft,
+  type Draft, type DraftBody, type DraftRound, type Option, type TopicSummary,
 } from "../api";
+import { formatMoment } from "../unit/ProgressPanel";
 
 const OUTCOMES = ["offer", "no-offer", "downlevelled", "declined", "unknown", "not-applicable"];
-const REPORT_KINDS: [string, string][] = [
-  ["candidate-report", "Candidate report (Medium, Taro, LeetCode, Glassdoor…)"],
-  ["prep-guide", "Prep guide"],
-  ["official-guide", "The company's own guide"],
-  ["curated-bank", "Question bank"],
-  ["news", "News"],
-  ["user-provided", "Something else"],
-];
-
 /**
- * A debrief after a real interview, or a report found elsewhere, written as the content repo's
- * evidence record so it can be exported as a file. Saved as a draft in the app, private to the
- * learner, until they choose to export it.
+ * A debrief after a real interview, written as the content repo's evidence record. Saved as a draft
+ * in the app, private to the learner, until they send it to the curriculum as a proposal. Interviews
+ * someone else wrote up go in through "Add an article" instead.
  */
 export function DraftPage() {
   const { draftId } = useParams();
-  const [params] = useSearchParams();
   const navigate = useNavigate();
   // One route for new and existing drafts ("new" is the id of one not saved yet), so the first save
   // can move the address to the draft's id without remounting the form and losing what it shows.
   const [id, setId] = useState<number | undefined>(draftId && draftId !== "new" ? Number(draftId) : undefined);
-  const [kind, setKind] = useState<"debrief" | "report">(params.get("kind") === "report" ? "report" : "debrief");
   const [body, setBody] = useState<DraftBody>({ rounds: [{ type: "" }] });
   const [options, setOptions] = useState<{ companies: Option[]; rounds: Option[] }>({ companies: [], rounds: [] });
   const [topics, setTopics] = useState<TopicSummary[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [exported, setExported] = useState<{ path: string; yaml: string } | null>(null);
+  const [sent, setSent] = useState<Pick<Draft, "sentAt" | "sentBranch" | "sentUrl"> | null>(null);
+  const [notSetUp, setNotSetUp] = useState(false);
 
   useEffect(() => {
     fetchEvidenceOptions().then(setOptions).catch(() => undefined);
@@ -45,7 +37,7 @@ export function DraftPage() {
     if (draftId && draftId !== "new" && Number(draftId) !== id) {
       fetchDraft(Number(draftId)).then((d) => {
         setId(d.id);
-        setKind(d.kind);
+        if (d.sentAt) setSent(d);
         setBody({ ...d.body, rounds: d.body.rounds?.length ? d.body.rounds : [{ type: "" }] });
       }).catch((e: Error) => setStatus(e.message));
     }
@@ -61,7 +53,7 @@ export function DraftPage() {
     set({ rounds: r === null ? rounds.filter((_, j) => j !== i) : rounds.map((x, j) => (j === i ? r : x)) });
 
   async function save(): Promise<number> {
-    const saved = await saveDraft({ id, kind, body });
+    const saved = await saveDraft({ id, kind: "debrief", body });
     if (!id) {
       setId(saved.id);
       navigate(`/evidence/drafts/${saved.id}`, { replace: true });
@@ -70,12 +62,18 @@ export function DraftPage() {
     return saved.id;
   }
 
-  async function runExport() {
+  async function send() {
     setProblems([]);
+    setStatus(null);
     try {
-      const result = await exportDraft(await save());
+      const savedId = await save();
+      const result = await sendDraft(savedId);
       if ("problems" in result) setProblems(result.problems);
-      else setExported(result);
+      else if ("notSetUp" in result) {
+        setNotSetUp(true);
+        const file = await exportDraft(savedId);
+        if ("yaml" in file) setExported(file);
+      } else setSent({ sentAt: new Date().toISOString(), sentBranch: result.branch, sentUrl: result.url });
     } catch (e) {
       setStatus((e as Error).message);
     }
@@ -94,13 +92,21 @@ export function DraftPage() {
     <article className="evidence draft">
       <nav className="crumbs" aria-label="Breadcrumb">
         <Link to="/">Home</Link> › <Link to="/evidence">Interview evidence</Link> ›{" "}
-        {kind === "debrief" ? "Interview debrief" : "A report you found"}
+        Interview debrief
       </nav>
-      <h2>{kind === "debrief" ? "Log an interview debrief" : "Add a report you found"}</h2>
+      <h2>Log an interview debrief</h2>
       <p className="hint">
         Write questions in your own words, and leave out names and anything you agreed to keep confidential. This stays
-        private to you until you export it.
+        private to you until you send it.
       </p>
+      {sent && (
+        <p className="banner" role="note">
+          Sent to the curriculum {sent.sentAt && formatMoment(sent.sentAt)} as <code>{sent.sentBranch}</code>. A pull
+          request opens by itself within a minute: <a href={sent.sentUrl!} target="_blank" rel="noreferrer noopener">see
+          it on GitHub</a>. Changes from here on belong there.
+        </p>
+      )}
+      <fieldset disabled={!!sent} className="plain">
 
       <fieldset>
         <legend>The interview</legend>
@@ -121,21 +127,6 @@ export function DraftPage() {
           </select>
         </label>
       </fieldset>
-
-      {kind === "report" && (
-        <fieldset>
-          <legend>Where you found it</legend>
-          <label>Kind{" "}
-            <select value={body.source?.kind ?? ""} onChange={(e) => set({ source: { ...body.source, kind: e.target.value } })}>
-              <option value="">Choose…</option>
-              {REPORT_KINDS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-            </select>
-          </label>
-          <label>Title <input value={body.source?.title ?? ""} onChange={(e) => set({ source: { ...body.source, title: e.target.value } })} /></label>
-          <label>Link <input value={body.source?.url ?? ""} onChange={(e) => set({ source: { ...body.source, url: e.target.value } })} placeholder="https://" /></label>
-          <label>Site <input value={body.source?.publisher ?? ""} onChange={(e) => set({ source: { ...body.source, publisher: e.target.value } })} placeholder="Medium" /></label>
-        </fieldset>
-      )}
 
       <h3>Rounds</h3>
       {rounds.map((r, i) => (
@@ -167,18 +158,28 @@ export function DraftPage() {
         <textarea rows={4} value={body.private_notes ?? ""} onChange={(e) => set({ private_notes: e.target.value })} />
       </label>
 
+      </fieldset>
+
       <div className="note-actions">
-        <button onClick={() => save().catch((e: Error) => setStatus(e.message))}>Save draft</button>
-        <button className="secondary" onClick={runExport}>Export as an evidence file</button>
+        {!sent && <button onClick={send}>Send to the curriculum</button>}
+        {!sent && (
+          <button className="secondary" onClick={() => save().catch((e: Error) => setStatus(e.message))}>Save draft</button>
+        )}
         {id && (
           <button className="secondary" onClick={() => deleteDraft(id).then(() => navigate("/evidence"))}>Delete</button>
         )}
         <span role="status">{status}</span>
       </div>
+      {!sent && (
+        <p className="hint">
+          Sending puts it on a <code>proposals/</code> branch of the curriculum, where a pull request opens by itself for
+          review. Your private notes and your name are never sent.
+        </p>
+      )}
 
       {problems.length > 0 && (
         <div role="alert" className="verdict wrong">
-          <p>Before it can be exported:</p>
+          <p>Before it can be sent:</p>
           <ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
         </div>
       )}
@@ -186,8 +187,9 @@ export function DraftPage() {
         <section className="card" aria-label="Evidence file">
           <h3>{exported.path}</h3>
           <p className="hint">
-            Save it into the content repository's <code>inbox/</code>, or add it at this path on a <code>proposals/</code>{" "}
-            branch. It is checked and reviewed like any other change before it reaches a plan.
+            {notSetUp && "Sending is not set up on this server yet (see the deploy README), so here is the file instead. "}
+            Add it at this path on a <code>proposals/</code> branch of the content repository, or put it in{" "}
+            <code>inbox/</code>. It is reviewed like any other change before it reaches a plan.
           </p>
           <pre>{exported.yaml}</pre>
           <div className="note-actions">

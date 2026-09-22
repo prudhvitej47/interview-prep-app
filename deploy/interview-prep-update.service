@@ -8,5 +8,8 @@ Type=oneshot
 WorkingDirectory=/opt/interview-prep
 EnvironmentFile=/etc/interview-prep/backup.env
 EnvironmentFile=/etc/interview-prep/app.env
+# Optional (the leading -): the content-repo token for "Send to the curriculum". A file of its own,
+# so vm-setup.sh, which rewrites app.env, never drops it.
+EnvironmentFile=-/etc/interview-prep/github.env
 ExecStart=/opt/interview-prep/src/deploy/update.sh
 TimeoutStartSec=600

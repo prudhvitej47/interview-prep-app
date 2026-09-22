@@ -12,6 +12,9 @@ WorkingDirectory=/opt/interview-prep
 # registry token. app.env carries the image reference and the database password.
 EnvironmentFile=/etc/interview-prep/backup.env
 EnvironmentFile=/etc/interview-prep/app.env
+# Optional (the leading -): the content-repo token for "Send to the curriculum". A file of its own,
+# so vm-setup.sh, which rewrites app.env, never drops it.
+EnvironmentFile=-/etc/interview-prep/github.env
 ExecStart=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml up --detach
 ExecStop=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml stop
 # No `down`, and never `down -v`: the database lives on the mounted disk and must not be at the
