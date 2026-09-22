@@ -186,6 +186,34 @@ public class CurriculumQueries {
     return types;
   }
 
+  public record ReleaseUnit(String id, String title, String type, boolean added) {}
+
+  public record Release(long id, String version, java.time.OffsetDateTime createdAt, String changelog,
+      int added, int changed, int retired, List<ReleaseUnit> units) {}
+
+  /**
+   * The newest release and the units it added or changed that this learner can see. A unit's
+   * {@code release_id} is the release it last changed in, and version 1 means it arrived then.
+   */
+  public Release latestRelease(String slug) {
+    Long id = latestReleaseId();
+    if (id == null) {
+      return null;
+    }
+    MapSqlParameterSource p = forLearner(slug).addValue("release", id);
+    List<ReleaseUnit> units = jdbc.query(
+        "select u.id, u.title, u.type, u.version from unit u where u.release_id = :release"
+            + " and u.state <> 'retired' and " + VISIBLE + " order by u.version, u.id",
+        p, (rs, i) -> new ReleaseUnit(rs.getString("id"), rs.getString("title"), rs.getString("type"),
+            rs.getInt("version") == 1));
+    return jdbc.queryForObject(
+        "select version, created_at, changelog, units_added, units_changed, units_retired"
+            + " from curriculum_release where id = :release",
+        p, (rs, i) -> new Release(id, rs.getString("version"),
+            rs.getObject("created_at", java.time.OffsetDateTime.class), rs.getString("changelog"),
+            rs.getInt("units_added"), rs.getInt("units_changed"), rs.getInt("units_retired"), units));
+  }
+
   /** The newest curriculum release, or null before the first load. */
   public Long latestReleaseId() {
     return jdbc.query("select max(id) from curriculum_release",

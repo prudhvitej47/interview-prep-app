@@ -33,6 +33,8 @@ import java.util.function.Predicate;
  *       weekend.
  * </ol>
  *
+ * <p>Units a learner placed "now" are taken first; units placed "later" never reach this function.
+ *
  * <p>Not yet, and why: the company factor (no target companies are captured yet), the catch-up
  * factor (needs weeks of plans first), progressive difficulty from solve history (F5), interview
  * mode (F8), and swap/skip/pin (F9). Each arrives when the data it needs exists.
@@ -64,7 +66,7 @@ final class WeekPlanner {
    */
   record Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
       double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
-      List<DueReview> reviews) {}
+      List<DueReview> reviews, Set<String> startNow) {}
 
   record Item(String unitId, int day, String kind, int minutes, String reason) {}
 
@@ -152,6 +154,12 @@ final class WeekPlanner {
     in.candidates().forEach(c -> known.add(c.unitId()));
     Picker picker = new Picker(learnBudget, in.done(), known);
 
+    // New units the learner chose to start now come before everything else (F10).
+    for (Candidate c : ranked) {
+      if (in.startNow().contains(c.unitId()) && picker.canTake(c)) {
+        picker.take(c, DashboardController.NOW_REASON);
+      }
+    }
     for (Group g : REQUIRED) {
       List<Candidate> members = ranked.stream().filter(g.member()).toList();
       if (members.isEmpty()) {

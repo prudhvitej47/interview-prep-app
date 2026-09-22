@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Dashboard } from "./Dashboard";
 import { RewardsStrip } from "./RewardsStrip";
 import { ReviewsDue } from "./ReviewsDue";
 import { fetchDomains, fetchTopics, type Domain, type Me, type TopicSummary } from "../api";
@@ -28,6 +29,8 @@ export function Home({ me }: { me: Me }) {
       </div>
       <RewardsStrip />
       <ReviewsDue />
+      <Dashboard />
+      <h3 className="browse">The curriculum</h3>
       {error && <p role="alert">{error}</p>}
       {!domains && !error && <p>Loading the curriculum…</p>}
       {domains?.length === 0 && <p>No curriculum has been loaded yet.</p>}

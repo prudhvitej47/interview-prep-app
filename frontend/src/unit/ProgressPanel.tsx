@@ -22,7 +22,7 @@ const DAY: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", mont
 export const formatDay = (isoDate: string) => new Date(`${isoDate}T00:00:00`).toLocaleDateString(undefined, DAY);
 
 /** A moment from the server, which arrives in UTC: shown as the day it was where the learner is. */
-const formatMoment = (isoInstant: string) => new Date(isoInstant).toLocaleDateString(undefined, DAY);
+export const formatMoment = (isoInstant: string) => new Date(isoInstant).toLocaleDateString(undefined, DAY);
 
 /**
  * The only place progress is recorded: the learner says how it went. Reading, opening solutions
