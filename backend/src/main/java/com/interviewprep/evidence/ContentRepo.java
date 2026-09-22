@@ -16,10 +16,11 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Puts files on a new branch of the content repository, through GitHub's REST API.
  *
- * <p>It can only create branches and add files to them: the token is a fine-grained one for the
- * content repository alone, and the repository's rules make every change reach {@code main}
- * through a reviewed pull request. It never writes to an existing branch, so it cannot touch
- * {@code main} or anyone's work in progress.
+ * <p>It only creates branches and adds files to them; it never writes to an existing branch, so it
+ * does not touch {@code main} or anyone's work in progress. The token itself (fine-grained, the
+ * content repository only) could write {@code main}, since GitHub's free plan does not enforce
+ * branch protection on private repositories; the content repository's publish workflow therefore
+ * only publishes commits that a pull request was merged as.
  *
  * <p>Unconfigured (no token) on a developer's machine and in tests; the page then says so.
  */
