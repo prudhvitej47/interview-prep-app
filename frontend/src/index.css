@@ -128,7 +128,9 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .unit td, .unit th { border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); padding: 0.3rem 0.6rem; }
 .diagram { margin: 1rem 0; overflow-x: auto; padding: 1rem; border-radius: 8px;
   background: color-mix(in srgb, var(--fg) 4%, transparent); }
-.diagram svg { max-width: 100%; height: auto; }
+/* A wide diagram (a mindmap, a long flowchart) scaled to the page width shrinks its labels until
+   they cannot be read. Below this width it scrolls sideways in its own box instead. */
+.diagram svg { max-width: 100%; min-width: min(640px, 100%); height: auto; }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
 .banner { padding: 0.6rem 0.9rem; border-radius: 6px; background: color-mix(in srgb, #d97706 18%, transparent); color: var(--fg); }
