@@ -33,9 +33,9 @@ export function Home({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
     <>
       <div className="welcome">
         <p>Welcome, {me.displayName}.</p>
+        {/* The sections are in the bar above; what is left here is this learner's own settings. */}
         <span>
-          <Link to="/week">This week's plan</Link> · <Link to="/evidence">Interview evidence</Link> ·{" "}
-          <Link to="/ratings">Change my ratings</Link> · <Link to="/how-it-works">How this works</Link>
+          <Link to="/ratings">Change my ratings</Link>
         </span>
       </div>
       {!me.startGuideClosed && <StartHere onMe={onMe} />}
