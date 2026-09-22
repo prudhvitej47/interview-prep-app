@@ -35,7 +35,7 @@ class MigrationTest extends PostgresTestBase {
 
     assertThat(jdbc().queryForList("select version from flyway_schema_history order by installed_rank",
             String.class))
-        .containsExactly("1", "2", "3", "4", "5", "6", "7");
+        .containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
   }
 
   @Test
@@ -46,7 +46,7 @@ class MigrationTest extends PostgresTestBase {
             "domain", "topic", "unit", "unit_prereq", "source", "unit_source", "visual",
             "test_case", "sql_fixture", "track", "track_unit", "curriculum_release",
             "company", "evidence", "evidence_item", "evidence_item_topic",
-            "change_proposal", "placement", "note", "attempt", "week_plan", "plan_item", "learner_weight");
+            "change_proposal", "placement", "note", "attempt", "week_plan", "plan_item", "learner_weight", "planned_break");
   }
 
   @Test

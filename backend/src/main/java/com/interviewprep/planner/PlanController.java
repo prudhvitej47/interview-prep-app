@@ -18,9 +18,7 @@ import com.interviewprep.planner.WeekPlanner.Item;
 import com.interviewprep.planner.WeekPlanner.Share;
 import com.interviewprep.progress.ProgressQueries;
 import com.interviewprep.progress.ProgressQueries.Attempt;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,10 +61,11 @@ class PlanController {
   private final LearnerProfile profile;
   private final ProgressQueries progress;
   private final EvidenceQueries evidence;
+  private final PlanQueries plans;
 
   PlanController(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
       CurriculumQueries curriculum, DomainCatalog domains, LearnerProfile profile,
-      ProgressQueries progress, EvidenceQueries evidence) {
+      ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans) {
     this.jdbc = jdbc;
     this.transaction = transaction;
     this.json = json;
@@ -75,6 +74,7 @@ class PlanController {
     this.profile = profile;
     this.progress = progress;
     this.evidence = evidence;
+    this.plans = plans;
   }
 
   record ItemView(String unitId, String title, String type, int day, String kind, int minutes,
@@ -85,26 +85,32 @@ class PlanController {
   record PlanView(int plannedMinutes, int goalMinutes, int doneMinutes, List<ItemView> items,
       List<Share> shares, List<String> notes, List<TopicToRate> topicsToRate) {}
 
-  /** {@code plan} is null until the learner has said how much time they have and on which days. */
-  record Week(LocalDate weekStart, WeekSettings settings, PlanView plan) {}
+  /**
+   * {@code plan} is null until the learner has said how much time they have and on which days, and
+   * in a week they declared as a break, which gets no plan at all.
+   */
+  record Week(LocalDate weekStart, WeekSettings settings, PlanView plan, boolean onBreak) {}
 
   @GetMapping("/api/plan")
   Week thisWeek(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = LocalDate.now(STUDY_ZONE).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    LocalDate monday = PlanQueries.thisMonday();
     WeekSettings settings = profile.week(me.id());
+    if (plans.breaks(me.id()).contains(monday)) {
+      return new Week(monday, settings, null, true);
+    }
     if (!settings.complete()) {
-      return new Week(monday, settings, null);
+      return new Week(monday, settings, null, false);
     }
     Long planId = planId(me, monday);
     if (planId == null) {
       planId = generate(me, monday, settings);
     }
-    return new Week(monday, settings, view(me, planId, monday));
+    return new Week(monday, settings, view(me, planId, monday), false);
   }
 
   @DeleteMapping("/api/plan")
   void rebuild(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = LocalDate.now(STUDY_ZONE).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    LocalDate monday = PlanQueries.thisMonday();
     jdbc.update("delete from week_plan where learner_id = :learner and week_start = :week",
         new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday));
   }
@@ -199,25 +205,20 @@ class PlanController {
   }
 
   private double loadFactor(LearnerPrincipal me, LocalDate monday) {
-    List<double[]> recent = new ArrayList<>();  // {load factor, share of planned minutes done}
-    jdbc.query(
-        "select p.week_start, p.load_factor, p.planned_minutes from week_plan p"
-            + " where p.learner_id = :learner and p.week_start < :week order by p.week_start desc limit 2",
-        new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday),
-        rs -> {
-          long id = planId(me, rs.getObject("week_start", LocalDate.class));
-          int planned = rs.getInt("planned_minutes");
-          int done = doneMinutes(me, id, rs.getObject("week_start", LocalDate.class));
-          recent.add(new double[] {rs.getDouble("load_factor"), planned == 0 ? 1 : (double) done / planned});
-        });
-    if (recent.isEmpty()) {
+    List<PlanQueries.WeekResult> before = plans.results(me.id()).stream()
+        .filter(w -> w.weekStart().isBefore(monday)).toList();
+    if (before.isEmpty()) {
       return 1.0;
     }
-    double last = recent.getFirst()[0];
-    if (recent.size() == 2 && recent.stream().allMatch(r -> r[1] < 0.6)) {
+    double last = jdbc.queryForObject(
+        "select load_factor from week_plan where learner_id = :learner and week_start = :week",
+        new MapSqlParameterSource().addValue("learner", me.id())
+            .addValue("week", before.getLast().weekStart()), Double.class);
+    List<PlanQueries.WeekResult> lastTwo = before.subList(Math.max(0, before.size() - 2), before.size());
+    if (lastTwo.size() == 2 && lastTwo.stream().allMatch(w -> w.done() < 0.6 * w.planned())) {
       return Math.max(0.3, last * SHRINK);
     }
-    if (recent.size() == 2 && recent.stream().allMatch(r -> r[1] >= 1.0)) {
+    if (lastTwo.size() == 2 && lastTwo.stream().allMatch(PlanQueries.WeekResult::allDone)) {
       return Math.min(1.0, last * GROW);
     }
     return last;
@@ -288,13 +289,6 @@ class PlanController {
       }
     }
     return out;
-  }
-
-  private int doneMinutes(LearnerPrincipal me, long planId, LocalDate monday) {
-    Set<String> done = doneUnits(me, monday);
-    return jdbc.query("select unit_id, minutes from plan_item where plan_id = :plan",
-        new MapSqlParameterSource("plan", planId),
-        (rs, i) -> done.contains(rs.getString(1)) ? rs.getInt(2) : 0).stream().mapToInt(Integer::intValue).sum();
   }
 
   /** Units the learner recorded an attempt on during the week: that is what "done" means here. */

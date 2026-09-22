@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { fetchDomains, fetchWeek, rateTopics, saveWeekSettings, type Domain, type PlanView, type Week, type WeekSettings } from "../api";
+import {
+  fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, rateTopics, saveWeekSettings, takeBreak,
+  type Breaks, type Domain, type PlanView, type Week, type WeekSettings,
+} from "../api";
 import { formatDay } from "../unit/ProgressPanel";
 import { TYPE_LABEL } from "../unit/sections";
 
@@ -31,7 +34,9 @@ export function WeekPage() {
         <Link to="/">Home</Link> › This week
       </nav>
       <h2>Week of {formatDay(week.weekStart)}</h2>
-      {!week.plan || editing ? (
+      {week.onBreak ? (
+        <p className="banner" role="note">This week is a planned break: no plan, and your streak is safe.</p>
+      ) : !week.plan || editing ? (
         <SettingsForm
           initial={week.settings}
           firstTime={!week.plan}
@@ -50,6 +55,7 @@ export function WeekPage() {
           </p>
         </>
       )}
+      <PlannedBreaks />
     </article>
   );
 }
@@ -61,6 +67,11 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
     <>
       <section className="goal" aria-label="This week's goal">
         <div className="bar"><div style={{ width: `${percent}%` }} /></div>
+        {plan.goalMinutes > 0 && plan.doneMinutes >= plan.goalMinutes && (
+          <p className="verdict right" role="status">
+            ✓ Goal met: this week counts towards your streak{plan.doneMinutes >= plan.plannedMinutes && ", and the whole plan is done"}.
+          </p>
+        )}
         <p className="hint">
           {plan.doneMinutes} of {plan.goalMinutes} goal minutes done ({plan.plannedMinutes} planned; the goal leaves room
           for a bad day). An item counts once you mark it done or record its review.
@@ -220,5 +231,44 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
       {!firstTime && <p className="hint">Rebuilding keeps everything you have done; only the plan is redrawn.</p>}
       {error && <p role="alert">{error}</p>}
     </form>
+  );
+}
+
+/** Up to two weeks a quarter, taken before the week starts (proposal G). */
+function PlannedBreaks() {
+  const [breaks, setBreaks] = useState<Breaks | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchBreaks().then(setBreaks).catch(() => setBreaks(null));
+  }, []);
+
+  if (!breaks) return null;
+  const taken = breaks.upcoming.filter((b) => b.taken).length;
+  const act = (call: Promise<Breaks>) => call.then(setBreaks).catch((e: Error) => setError(e.message));
+  return (
+    <details className="breaks">
+      <summary>Planned breaks{taken > 0 && <span className="count"> {taken} coming up</span>}</summary>
+      <p className="hint">
+        Travelling, or a release crunch? Take a week off before it starts: it gets no plan and neither counts towards
+        nor breaks your streak. Up to two a quarter.
+      </p>
+      <ul>
+        {breaks.upcoming.map((b) => (
+          <li key={b.weekStart}>
+            <span>Week of {formatDay(b.weekStart)}</span>
+            {b.taken ? (
+              <button className="link" onClick={() => act(giveBackBreak(b.weekStart))}>Give it back</button>
+            ) : b.available ? (
+              <button className="link" onClick={() => act(takeBreak(b.weekStart))}>Take it off</button>
+            ) : (
+              <span className="count">two already taken this quarter</span>
+            )}
+            {b.taken && <span className="count"> · break</span>}
+          </li>
+        ))}
+      </ul>
+      {error && <p role="alert">{error}</p>}
+    </details>
   );
 }

@@ -189,7 +189,7 @@ export type PlanView = {
   topicsToRate: { topicId: string; name: string; domainName: string; currentGuess: number }[];
 };
 
-export type Week = { weekStart: string; settings: WeekSettings; plan: PlanView | null };
+export type Week = { weekStart: string; settings: WeekSettings; plan: PlanView | null; onBreak: boolean };
 
 export const fetchWeek = () => getJson<Week>("/api/plan");
 
@@ -213,3 +213,26 @@ export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
 export async function rateTopics(ratings: Record<string, number>): Promise<void> {
   await send("PUT", "/api/me/ratings/topics", { ratings });
 }
+
+export type WeekOutcome = "GOAL_MET" | "BREAK" | "FREEZE_USED" | "MISSED" | "IN_PROGRESS";
+
+export type Rewards = {
+  stars: number;
+  starsThisWeek: number;
+  streak: number;
+  longestStreak: number;
+  freezes: number;
+  thisWeekCounts: boolean;
+  recentWeeks: { weekStart: string; outcome: WeekOutcome }[];
+  milestonesReached: number[];
+  nextMilestone: number | null;
+};
+
+export type Breaks = { thisWeek: boolean; upcoming: { weekStart: string; taken: boolean; available: boolean }[] };
+
+export const fetchRewards = () => getJson<Rewards>("/api/rewards");
+export const fetchBreaks = () => getJson<Breaks>("/api/breaks");
+export const takeBreak = async (weekStart: string): Promise<Breaks> =>
+  (await send("POST", "/api/breaks", { weekStart })).json();
+export const giveBackBreak = async (weekStart: string): Promise<Breaks> =>
+  (await send("DELETE", `/api/breaks/${weekStart}`)).json();

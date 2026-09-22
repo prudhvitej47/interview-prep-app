@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { RewardsStrip } from "./RewardsStrip";
 import { ReviewsDue } from "./ReviewsDue";
 import { fetchDomains, fetchTopics, type Domain, type Me, type TopicSummary } from "../api";
 
@@ -25,6 +26,7 @@ export function Home({ me }: { me: Me }) {
           <Link to="/week">This week's plan</Link> · <Link to="/ratings">Change my ratings</Link>
         </span>
       </div>
+      <RewardsStrip />
       <ReviewsDue />
       {error && <p role="alert">{error}</p>}
       {!domains && !error && <p>Loading the curriculum…</p>}
