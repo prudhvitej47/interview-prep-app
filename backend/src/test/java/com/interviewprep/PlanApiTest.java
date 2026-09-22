@@ -55,8 +55,9 @@ class PlanApiTest extends PostgresTestBase {
         + " ('dsa', 'DSA', 60, 0), ('databases', 'Databases', 40, 1)");
     jdbc.update("insert into topic (id, domain_id, parent_id, name, sort_order) values"
         + " ('dsa.window', 'dsa', null, 'Sliding window', 0), ('db.sql', 'databases', null, 'SQL', 0)");
-    long release = jdbc.queryForObject("insert into curriculum_release (version, bundle_digest, git_sha)"
-        + " values ('2026.39.1', 'sha256:t', 't') returning id", Long.class);
+    // As the loader records it: the four units below arrived in this release.
+    long release = jdbc.queryForObject("insert into curriculum_release (version, bundle_digest, git_sha,"
+        + " units_added) values ('2026.39.1', 'sha256:t', 't', 4) returning id", Long.class);
     unit("dsa.window.concept", "dsa.window", "concept", 30, "shared", release);
     unit("dsa.window.p1", "dsa.window", "coding", 25, "shared", release);
     unit("db.sql.joins", "db.sql", "sql", 20, "shared", release);
@@ -276,6 +277,13 @@ class PlanApiTest extends PostgresTestBase {
     send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"end-of-track\"}");
     mvc.perform(as(get("/api/plan"), TESTER))
         .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isEmpty());
+  }
+
+  @Test
+  void aReleaseThatChangedNoUnitsLeavesTheDashboardOnTheLastOneThatDid() throws Exception {
+    jdbc.update("insert into curriculum_release (version, bundle_digest, git_sha) values ('2026.39.2', 'sha256:e', 'e')");
+    mvc.perform(as(get("/api/dashboard"), TESTER))
+        .andExpect(jsonPath("$.whatChanged.version").value("2026.39.1"));
   }
 
   @Test

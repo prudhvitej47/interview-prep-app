@@ -24,7 +24,8 @@ export function Home({ me }: { me: Me }) {
       <div className="welcome">
         <p>Welcome, {me.displayName}.</p>
         <span>
-          <Link to="/week">This week's plan</Link> · <Link to="/ratings">Change my ratings</Link>
+          <Link to="/week">This week's plan</Link> · <Link to="/evidence">Interview evidence</Link> ·{" "}
+          <Link to="/ratings">Change my ratings</Link>
         </span>
       </div>
       <RewardsStrip />

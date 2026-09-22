@@ -46,6 +46,13 @@ class EvidenceLoader {
               .addValue("aliases", c.path("aliases").isArray() ? c.path("aliases").toString() : "[]"));
     }
 
+    for (JsonNode r : content.path("rounds")) {
+      jdbc.update("insert into round_type (id, name) values (:id, :name)"
+              + " on conflict (id) do update set name = excluded.name",
+          new MapSqlParameterSource().addValue("id", r.path("id").asString())
+              .addValue("name", r.path("name").asString()));
+    }
+
     // Cascades to evidence_item and evidence_item_topic.
     jdbc.update("delete from evidence", new MapSqlParameterSource());
 
@@ -87,16 +94,18 @@ class EvidenceLoader {
   private void insertItems(JsonNode evidence) {
     String evidenceId = evidence.path("id").asString();
     int order = 0;
+    int roundIndex = 0;
     for (JsonNode round : evidence.path("rounds")) {
+      int index = roundIndex++;
       String roundType = round.path("type").asString();
       String summary = text(round.path("summary"));
       JsonNode questions = round.path("questions");
       if (!questions.isArray() || questions.isEmpty()) {
-        insertItem(evidenceId, roundType, summary, null, order++);
+        insertItem(evidenceId, index, roundType, summary, null, order++);
         continue;
       }
       for (JsonNode q : questions) {
-        long itemId = insertItem(evidenceId, roundType, summary, q.path("text").asString(), order++);
+        long itemId = insertItem(evidenceId, index, roundType, summary, q.path("text").asString(), order++);
         for (JsonNode topic : q.path("topics")) {
           jdbc.update(
               "insert into evidence_item_topic (item_id, topic_id, confidence)"
@@ -111,12 +120,14 @@ class EvidenceLoader {
     }
   }
 
-  private long insertItem(String evidenceId, String roundType, String summary, String question, int order) {
+  private long insertItem(String evidenceId, int roundIndex, String roundType, String summary,
+      String question, int order) {
     return jdbc.queryForObject(
-        "insert into evidence_item (evidence_id, round_type, summary, question, sort_order)"
-            + " values (:evidence, :round, :summary, :question, :order) returning id",
+        "insert into evidence_item (evidence_id, round_index, round_type, summary, question, sort_order)"
+            + " values (:evidence, :index, :round, :summary, :question, :order) returning id",
         new MapSqlParameterSource()
             .addValue("evidence", evidenceId)
+            .addValue("index", roundIndex)
             .addValue("round", roundType)
             .addValue("summary", summary)
             .addValue("question", question)

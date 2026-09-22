@@ -70,6 +70,12 @@
       <artifactId>flyway-database-postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- Writes exported evidence files. Already on the classpath through Spring Boot, which reads
+         application.yml with it; declared because the evidence module now uses it directly. -->
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
