@@ -171,29 +171,22 @@ class EvidenceApiTest extends PostgresTestBase {
 
   @Test
   void anIncompleteDraftSaysEverythingMissingAtOnce() throws Exception {
-    long id = draft(TESTER, "{\"kind\": \"report\", \"body\": {\"rounds\": [{\"type\": \"nope\","
-        + " \"questions\": [{\"text\": \"\", \"topics\": [\"no.such\"]}]}], \"source\": {\"url\": \"ftp://x\"}}}");
+    long id = draft(TESTER, "{\"kind\": \"debrief\", \"body\": {\"interview_date\": \"Oct\", \"rounds\":"
+        + " [{\"type\": \"nope\", \"questions\": [{\"text\": \"\", \"topics\": [\"no.such\"]}]}]}}");
     String message = mvc.perform(as(get("/api/evidence/drafts/" + id + "/export"), TESTER))
         .andExpect(status().isUnprocessableContent())
-        .andExpect(jsonPath("$.problems.length()").value(7))
+        .andExpect(jsonPath("$.problems.length()").value(5))
         .andReturn().getResponse().getContentAsString();
-    assertThat(message).contains("Choose the company.", "Choose what kind of source", "Give the report's title.",
-        "must start with http", "Round 1: choose its type.", "write the question", "unknown topic no.such");
+    assertThat(message).contains("Choose the company.", "must look like 2026", "Round 1: choose its type.",
+        "write the question", "unknown topic no.such");
   }
 
   @Test
-  @SuppressWarnings("unchecked")
-  void aReportExportsAsSecondaryAndNeverReusesAnExistingId() throws Exception {
-    long id = draft(TESTER, "{\"kind\": \"report\", \"body\": {\"company\": \"stripe\", \"interview_date\": \"2025-07\","
-        + " \"source\": {\"kind\": \"candidate-report\", \"title\": \"A report\", \"publisher\": \"India Taro\","
-        + " \"url\": \"https://example.com/r\"}, \"rounds\": [{\"type\": \"coding\"}]}}");
-    // ev-2025-07-stripe-india-taro is free, but make the natural id collide.
-    jdbc.update("update evidence set id = 'ev-2025-07-stripe-india-taro' where id = 'ev-wise-guide'");
-    String response = mvc.perform(as(get("/api/evidence/drafts/" + id + "/export"), TESTER))
-        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-    Map<String, Object> record = new Yaml().load(json.readTree(response).path("yaml").asString());
-    assertThat(record).containsEntry("id", "ev-2025-07-stripe-india-taro-2").containsEntry("tier", "secondary");
-    assertThat((Map<String, Object>) record.get("source")).containsEntry("url", "https://example.com/r");
+  void withoutATokenSendingSaysItIsNotSetUp() throws Exception {
+    send(post("/api/evidence/drafts/" + draft(TESTER, DEBRIEF) + "/send"), TESTER, "")
+        .andExpect(status().isServiceUnavailable());
+    send(post("/api/inbox/articles"), TESTER, "{\"title\": \"T\", \"text\": \"x\"}")
+        .andExpect(status().isServiceUnavailable());
   }
 
   @Test

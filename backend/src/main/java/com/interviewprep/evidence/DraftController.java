@@ -2,6 +2,8 @@ package com.interviewprep.evidence;
 
 import com.interviewprep.curriculum.CurriculumQueries;
 import com.interviewprep.learner.LearnerPrincipal;
+import com.interviewprep.progress.ProgressQueries;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,30 +30,35 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A learner's own debriefs and found reports: saved as drafts in Postgres, each learner's alone,
- * and exported as an evidence file for the content repository (proposal D4). The export is the
- * only way any of it leaves the app, and it never carries the learner's name or private notes.
+ * A learner's debriefs of their own interviews: saved as drafts in Postgres, each learner's alone,
+ * then sent to the curriculum as a finished evidence record (proposal D4). Sending is the only way
+ * any of it leaves the app, and it never carries the learner's name or private notes.
+ *
+ * <p>Interviews someone else wrote up go in as articles instead ({@link ArticleController}): raw
+ * text that an ingest run structures, rather than a second form to fill in by hand.
  */
 @RestController
 class DraftController {
 
   static final int MAX_BODY = 50_000;
-  private static final Set<String> REPORT_KINDS =
-      Set.of("candidate-report", "official-guide", "prep-guide", "news", "curated-bank", "user-provided");
   private static final Set<String> OUTCOMES =
       Set.of("offer", "no-offer", "downlevelled", "declined", "unknown", "not-applicable");
 
   private final NamedParameterJdbcTemplate jdbc;
   private final JsonMapper json;
   private final CurriculumQueries curriculum;
+  private final ContentRepo contentRepo;
 
-  DraftController(NamedParameterJdbcTemplate jdbc, JsonMapper json, CurriculumQueries curriculum) {
+  DraftController(NamedParameterJdbcTemplate jdbc, JsonMapper json, CurriculumQueries curriculum,
+      ContentRepo contentRepo) {
     this.jdbc = jdbc;
     this.json = json;
     this.curriculum = curriculum;
+    this.contentRepo = contentRepo;
   }
 
-  record Draft(long id, String kind, JsonNode body, OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
+  record Draft(long id, String kind, JsonNode body, OffsetDateTime createdAt, OffsetDateTime updatedAt,
+      OffsetDateTime sentAt, String sentBranch, String sentUrl) {}
 
   record DraftRequest(String kind, JsonNode body) {}
 
@@ -60,10 +67,16 @@ class DraftController {
   /** Everything that stops a draft exporting, in words the learner can act on. */
   record Problems(List<String> problems) {}
 
+  record Sent(String branch, String url) {}
+
+  /** The evidence record built from a draft, or what stops it being built. */
+  private record Built(List<String> problems, String evidenceId, String path, String yaml,
+      String company, int rounds, List<String> topics) {}
+
   @GetMapping("/api/evidence/drafts")
   List<Draft> mine(@AuthenticationPrincipal LearnerPrincipal me) {
-    return jdbc.query("select id, kind, body::text, created_at, updated_at from evidence_draft"
-        + " where learner_id = :learner order by updated_at desc",
+    return jdbc.query("select id, kind, body::text, created_at, updated_at, sent_at, sent_branch"
+        + " from evidence_draft where learner_id = :learner order by updated_at desc",
         new MapSqlParameterSource("learner", me.id()), (rs, i) -> draft(rs));
   }
 
@@ -75,8 +88,8 @@ class DraftController {
   /** Drafts may be incomplete; completeness is checked when exporting. */
   @PostMapping("/api/evidence/drafts")
   Draft create(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody DraftRequest request) {
-    if (request == null || !Set.of("debrief", "report").contains(request.kind())) {
-      throw bad("kind must be debrief or report");
+    if (request == null || !"debrief".equals(request.kind())) {
+      throw bad("kind must be debrief");
     }
     long id = jdbc.queryForObject("insert into evidence_draft (learner_id, kind, body)"
         + " values (:learner, :kind, cast(:body as jsonb)) returning id",
@@ -88,7 +101,9 @@ class DraftController {
   @PutMapping("/api/evidence/drafts/{id}")
   Draft save(@PathVariable long id, @AuthenticationPrincipal LearnerPrincipal me,
       @RequestBody DraftRequest request) {
-    find(id, me);
+    if (find(id, me).sentAt() != null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "sent drafts are changed in their pull request");
+    }
     jdbc.update("update evidence_draft set body = cast(:body as jsonb), updated_at = now()"
         + " where id = :id and learner_id = :learner",
         new MapSqlParameterSource().addValue("id", id).addValue("learner", me.id())
@@ -105,11 +120,65 @@ class DraftController {
   /**
    * The draft as an evidence file that passes the content repository's validator: the same
    * required fields, known company, round types and topic ids, questions each mapped to a topic.
-   * Problems come back as one list, so the learner can fix them all at once.
+   * Problems come back as one list, so the learner can fix them all at once. Also offered as a
+   * download, for when sending is not set up.
    */
   @GetMapping("/api/evidence/drafts/{id}/export")
   ResponseEntity<?> export(@PathVariable long id, @AuthenticationPrincipal LearnerPrincipal me) {
+    Built built = build(find(id, me));
+    return built.problems().isEmpty() ? ResponseEntity.ok(new Export(built.path(), built.yaml()))
+        : ResponseEntity.unprocessableContent().body(new Problems(built.problems()));
+  }
+
+  /**
+   * Sends the draft to the curriculum: a {@code proposals/} branch holding the evidence file and a
+   * {@code changes/} summary, which the content repository turns into a pull request by itself.
+   * A finished record needs no further processing, so it can be reviewed and merged as it is.
+   */
+  @PostMapping("/api/evidence/drafts/{id}/send")
+  ResponseEntity<?> send(@PathVariable long id, @AuthenticationPrincipal LearnerPrincipal me) {
     Draft draft = find(id, me);
+    if (draft.sentAt() != null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "already sent");
+    }
+    if (!contentRepo.configured()) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "sending is not set up");
+    }
+    Built built = build(draft);
+    if (!built.problems().isEmpty()) {
+      return ResponseEntity.unprocessableContent().body(new Problems(built.problems()));
+    }
+    String name = LocalDate.now(ProgressQueries.STUDY_ZONE) + "-" + built.evidenceId().substring(3);
+    String branch;
+    try {
+      branch = contentRepo.send("proposals/" + name, Map.of(
+              built.path(), built.yaml(),
+              "changes/" + name + ".md", summary(built)),
+          "Add a debrief of a " + companyName(built.company()) + " interview");
+    } catch (ContentRepo.Failed e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+    jdbc.update("update evidence_draft set sent_at = now(), sent_branch = :branch where id = :id",
+        new MapSqlParameterSource().addValue("branch", branch).addValue("id", id));
+    return ResponseEntity.ok(new Sent(branch, contentRepo.pullRequestsFor(branch)));
+  }
+
+  /** The proposal's summary: it becomes the pull request's description (changes/README.md). */
+  private String summary(Built built) {
+    return "# A first-hand debrief: " + companyName(built.company()) + "\n\n"
+        + "**Sources:** `" + built.evidenceId() + "`, sent from the app\n"
+        + "**Learners affected:** both\n\n"
+        + "## What changed\n"
+        + "- New evidence: `" + built.path() + "`, " + built.rounds() + " round(s)"
+        + (built.topics().isEmpty() ? "" : ", questions mapped to " + String.join(", ", built.topics())) + ".\n\n"
+        + "## Why\n"
+        + "Adds to how often these topics come up in interviews. It changes no weights: those move only on"
+        + " recurring evidence. An ingest run can add units for any topic here that has none yet.\n\n"
+        + "## Suggested placement\n"
+        + "No new units in this proposal.\n";
+  }
+
+  private Built build(Draft draft) {
     JsonNode b = draft.body();
     List<String> problems = new ArrayList<>();
 
@@ -129,34 +198,11 @@ class DraftController {
     }
 
     Map<String, Object> source = new LinkedHashMap<>();
-    String tier;
     String accessed = draft.createdAt().toLocalDate().toString();
-    if (draft.kind().equals("debrief")) {
-      source.put("kind", "first-hand");
-      source.put("title", "Debrief of a " + companyName(company) + " interview"
-          + (text(b, "level") == null ? "" : " (" + text(b, "level") + ")"));
-      source.put("accessed", accessed);
-      tier = "primary";
-    } else {
-      JsonNode s = b.path("source");
-      String kind = text(s, "kind");
-      if (kind == null || !REPORT_KINDS.contains(kind)) {
-        problems.add("Choose what kind of source the report is.");
-      }
-      if (text(s, "title") == null) {
-        problems.add("Give the report's title.");
-      }
-      String url = text(s, "url");
-      if (url != null && !url.matches("https?://\\S+")) {
-        problems.add("The link must start with http:// or https://.");
-      }
-      source.put("kind", kind);
-      source.put("title", text(s, "title"));
-      putIfPresent(source, "url", url);
-      putIfPresent(source, "publisher", text(s, "publisher"));
-      source.put("accessed", accessed);
-      tier = "official-guide".equals(kind) ? "primary" : "secondary";
-    }
+    source.put("kind", "first-hand");
+    source.put("title", "Debrief of a " + companyName(company) + " interview"
+        + (text(b, "level") == null ? "" : " (" + text(b, "level") + ")"));
+    source.put("accessed", accessed);
 
     Set<String> roundTypes = Set.copyOf(jdbc.queryForList("select id from round_type",
         new MapSqlParameterSource(), String.class));
@@ -204,13 +250,11 @@ class DraftController {
       problems.add("Add at least one round.");
     }
     if (!problems.isEmpty()) {
-      return ResponseEntity.unprocessableContent().body(new Problems(problems));
+      return new Built(problems, null, null, null, company, rounds.size(), List.of());
     }
 
     String month = date != null && date.length() >= 7 ? date.substring(0, 7) : accessed.substring(0, 7);
-    String suffix = draft.kind().equals("debrief")
-        ? (text(b, "level") == null ? "" : slug(text(b, "level")) + "-") + "debrief"
-        : slug(text(b.path("source"), "publisher") == null ? "report" : text(b.path("source"), "publisher"));
+    String suffix = (text(b, "level") == null ? "" : slug(text(b, "level")) + "-") + "debrief";
     String evidenceId = uniqueId("ev-" + month + "-" + company + "-" + suffix);
 
     Map<String, Object> record = new LinkedHashMap<>();
@@ -221,7 +265,7 @@ class DraftController {
     putIfPresent(record, "location", text(b, "location"));
     putIfPresent(record, "interview_date", date);
     record.put("source", source);
-    record.put("tier", tier);
+    record.put("tier", "primary");
     record.put("rounds", rounds);
     putIfPresent(record, "outcome", outcome);
     record.put("state", "proposed");
@@ -231,8 +275,18 @@ class DraftController {
     options.setIndicatorIndent(0);
     options.setWidth(100);
     String year = date == null ? "undated" : date.substring(0, 4);
-    return ResponseEntity.ok(
-        new Export("evidence/" + year + "/" + evidenceId + ".yaml", new Yaml(options).dump(record)));
+    List<String> allTopics = new ArrayList<>();
+    for (Map<String, Object> round : rounds) {
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> qs = (List<Map<String, Object>>) round.getOrDefault("questions", List.of());
+      for (Map<String, Object> question : qs) {
+        @SuppressWarnings("unchecked")
+        List<String> ts = (List<String>) question.get("topics");
+        ts.stream().filter(t -> !allTopics.contains(t)).forEach(allTopics::add);
+      }
+    }
+    return new Built(List.of(), evidenceId, "evidence/" + year + "/" + evidenceId + ".yaml",
+        new Yaml(options).dump(record), company, rounds.size(), allTopics);
   }
 
   private String uniqueId(String base) {
@@ -257,16 +311,19 @@ class DraftController {
 
   private Draft find(long id, LearnerPrincipal me) {
     // Someone else's draft is a 404, the same as one that does not exist.
-    return jdbc.query("select id, kind, body::text, created_at, updated_at from evidence_draft"
-            + " where id = :id and learner_id = :learner",
+    return jdbc.query("select id, kind, body::text, created_at, updated_at, sent_at, sent_branch"
+            + " from evidence_draft where id = :id and learner_id = :learner",
         new MapSqlParameterSource().addValue("id", id).addValue("learner", me.id()),
         (rs, i) -> draft(rs)).stream().findFirst()
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
   }
 
   private Draft draft(java.sql.ResultSet rs) throws java.sql.SQLException {
+    String branch = rs.getString(7);
     return new Draft(rs.getLong(1), rs.getString(2), json.readTree(rs.getString(3)),
-        rs.getObject(4, OffsetDateTime.class), rs.getObject(5, OffsetDateTime.class));
+        rs.getObject(4, OffsetDateTime.class), rs.getObject(5, OffsetDateTime.class),
+        rs.getObject(6, OffsetDateTime.class), branch,
+        branch == null ? null : contentRepo.pullRequestsFor(branch));
   }
 
   private String bodyText(DraftRequest request) {

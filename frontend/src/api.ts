@@ -294,12 +294,38 @@ export type DraftBody = {
   location?: string;
   interview_date?: string;
   outcome?: string;
-  source?: { kind?: string; title?: string; url?: string; publisher?: string };
   rounds?: DraftRound[];
   private_notes?: string;
 };
 
-export type Draft = { id: number; kind: "debrief" | "report"; body: DraftBody; createdAt: string; updatedAt: string };
+export type Draft = {
+  id: number;
+  kind: "debrief";
+  body: DraftBody;
+  createdAt: string;
+  updatedAt: string;
+  sentAt: string | null;
+  sentBranch: string | null;
+  sentUrl: string | null;
+};
+
+export type SendResult = { branch: string; url: string } | { problems: string[] } | { notSetUp: true };
+
+/** 422 lists what to fix; 503 means the server has no GitHub token, so the file can be downloaded instead. */
+async function sendTo(url: string, body?: object): Promise<SendResult> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (response.status === 503) return { notSetUp: true };
+  if (response.ok || response.status === 422) return response.json();
+  throw new Error(`Could not send it (${response.status}). Nothing was sent; try again.`);
+}
+
+export const sendDraft = (id: number) => sendTo(`/api/evidence/drafts/${id}/send`);
+export const sendArticle = (article: { title: string; url: string; company: string; text: string }) =>
+  sendTo("/api/inbox/articles", article);
 
 export const fetchEvidence = () => getJson<EvidenceSummary[]>("/api/evidence");
 export const fetchEvidenceDetail = (id: string) =>

@@ -38,25 +38,27 @@ export function EvidencePage() {
         The reports the curriculum is built on. Questions are paraphrased; each maps to the topics it tests.
       </p>
 
-      <section className="card" aria-label="Your debriefs and reports">
-        <h3>Your debriefs and reports</h3>
+      <section className="card" aria-label="Add to the evidence">
+        <h3>Add to the evidence</h3>
         <p className="hint">
-          Private to you until you export one as an evidence file for the curriculum, where it is reviewed like any
-          other change.
+          Your own interview: log a debrief, private to you until you send it. Something you read: add the article, and
+          an ingest run structures it. Either way it reaches the curriculum as a proposal you review.
         </p>
         <p>
-          <Link to="/evidence/drafts/new?kind=debrief">Log an interview debrief</Link> ·{" "}
-          <Link to="/evidence/drafts/new?kind=report">Add a report you found</Link>
+          <Link to="/evidence/drafts/new">Log an interview debrief</Link> ·{" "}
+          <Link to="/evidence/articles/new">Add an article or experience</Link>
         </p>
         {drafts.length > 0 && (
           <ul className="units">
             {drafts.map((d) => (
               <li key={d.id}>
                 <Link to={`/evidence/drafts/${d.id}`}>
-                  {d.kind === "debrief" ? "Debrief" : "Report"}: {d.body.company ?? "company not chosen"}
+                  Debrief: {d.body.company ?? "company not chosen"}
                   {d.body.interview_date ? `, ${d.body.interview_date}` : ""}
                 </Link>
-                <span className="count">edited {formatMoment(d.updatedAt)}</span>
+                <span className="count">
+                  {d.sentAt ? `sent ${formatMoment(d.sentAt)}` : `draft, edited ${formatMoment(d.updatedAt)}`}
+                </span>
               </li>
             ))}
           </ul>

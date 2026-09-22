@@ -8,6 +8,7 @@ import { WeekPage } from "./pages/WeekPage";
 import { EvidencePage } from "./pages/EvidencePage";
 import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { DraftPage } from "./pages/DraftPage";
+import { ArticlePage } from "./pages/ArticlePage";
 import { UnitPage } from "./pages/UnitPage";
 
 type State =
@@ -67,6 +68,7 @@ export function App() {
           <Route path="/week" element={<WeekPage />} />
           <Route path="/evidence" element={<EvidencePage />} />
           <Route path="/evidence/drafts/:draftId" element={<DraftPage />} />
+          <Route path="/evidence/articles/new" element={<ArticlePage />} />
           <Route path="/evidence/:evidenceId" element={<EvidenceDetailPage />} />
           <Route path="/topics/:topicId" element={<TopicPage />} />
           <Route path="/units/:unitId" element={<UnitPage />} />
