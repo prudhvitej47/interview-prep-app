@@ -171,6 +171,21 @@ public class CurriculumQueries {
             List.of((String[]) rs.getArray("prereqs").getArray())));
   }
 
+  /**
+   * The type of each unit among {@code ids}, retired ones included: stars earned on a unit stay
+   * earned after it leaves the curriculum.
+   */
+  public Map<String, String> typesOf(Collection<String> ids) {
+    Map<String, String> types = new HashMap<>();
+    if (!ids.isEmpty()) {
+      jdbc.query("select id, type from unit where id in (:ids)", new MapSqlParameterSource("ids", ids),
+          rs -> {
+            types.put(rs.getString(1), rs.getString(2));
+          });
+    }
+    return types;
+  }
+
   /** The newest curriculum release, or null before the first load. */
   public Long latestReleaseId() {
     return jdbc.query("select max(id) from curriculum_release",

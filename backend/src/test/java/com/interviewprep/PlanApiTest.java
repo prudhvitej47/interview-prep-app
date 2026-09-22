@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.time.temporal.TemporalAdjusters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,5 +166,63 @@ class PlanApiTest extends PostgresTestBase {
   @Test
   void rebuildingNeedsTheCsrfToken() throws Exception {
     mvc.perform(as(delete("/api/plan"), TESTER)).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void breaksAreTakenAheadUpToTwoAQuarterAndGiveNoPlan() throws Exception {
+    // Not this week, and only Mondays.
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + monday + "\"}").andExpect(status().isBadRequest());
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + monday.plusDays(8) + "\"}").andExpect(status().isBadRequest());
+
+    // Next week is fine.
+    LocalDate next = monday.plusWeeks(1);
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + next + "\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.upcoming[0].taken").value(true));
+
+    // This week, declared as a break (as if taken last week): no plan is made for it.
+    jdbc.update("insert into planned_break (learner_id, week_start) select id, ? from learner where slug = 'tester'",
+        monday);
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.onBreak").value(true))
+        .andExpect(jsonPath("$.plan").isEmpty());
+    assertThat(plans()).isZero();
+
+    mvc.perform(as(delete("/api/breaks/" + next), TESTER).with(RealCsrf.token(mvc, TESTER)))
+        .andExpect(jsonPath("$.upcoming[0].taken").value(false));
+  }
+
+  @Test
+  void aThirdBreakInOneQuarterIsRefused() throws Exception {
+    mvc.perform(as(get("/api/me"), TESTER));
+    // Three Mondays in one quarter within the 12 weeks offered; a quarter spans 13, so there always are.
+    LocalDate target = monday.plusWeeks(8);
+    List<LocalDate> sameQuarter = new java.util.ArrayList<>();
+    for (LocalDate w = monday.plusWeeks(1); w.isBefore(monday.plusWeeks(13)) && sameQuarter.size() < 3; w = w.plusWeeks(1)) {
+      if (w.get(java.time.temporal.IsoFields.QUARTER_OF_YEAR) == target.get(java.time.temporal.IsoFields.QUARTER_OF_YEAR)
+          && w.getYear() == target.getYear()) {
+        sameQuarter.add(w);
+      }
+    }
+    assertThat(sameQuarter).hasSizeGreaterThanOrEqualTo(3);
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + sameQuarter.get(0) + "\"}").andExpect(status().isOk());
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + sameQuarter.get(1) + "\"}").andExpect(status().isOk());
+    send(post("/api/breaks"), TESTER, "{\"weekStart\": \"" + sameQuarter.get(2) + "\"}").andExpect(status().isConflict());
+  }
+
+  @Test
+  void rewardsFollowWhatWasDoneAndUndoTakesTheStarBack() throws Exception {
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    mvc.perform(as(get("/api/plan"), TESTER));
+    mvc.perform(as(get("/api/rewards"), TESTER))
+        .andExpect(jsonPath("$.stars").value(0))
+        .andExpect(jsonPath("$.freezes").value(1));
+    send(post("/api/units/db.sql.joins/attempts"), TESTER, "{\"rating\": \"easy\"}");
+    mvc.perform(as(get("/api/rewards"), TESTER))
+        .andExpect(jsonPath("$.stars").value(2))
+        .andExpect(jsonPath("$.starsThisWeek").value(2));
+    mvc.perform(as(delete("/api/units/db.sql.joins/attempts/latest"), TESTER).with(RealCsrf.token(mvc, TESTER)));
+    mvc.perform(as(get("/api/rewards"), TESTER)).andExpect(jsonPath("$.stars").value(0));
   }
 }

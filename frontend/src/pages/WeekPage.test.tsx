@@ -24,7 +24,8 @@ const plan = {
   topicsToRate: [{ topicId: "db.sql", name: "SQL", domainName: "Databases", currentGuess: 3 }],
 };
 
-const week = (p: object | null, settings: object = SETTINGS) => ({ weekStart: "2026-09-28", settings, plan: p });
+const week = (p: object | null, settings: object = SETTINGS, onBreak = false) =>
+  ({ weekStart: "2026-09-28", settings, plan: p, onBreak });
 
 // Dates show in the browser's own locale ("Mon, 28 Sept" here, "Mon, Sep 28" on a US machine such
 // as CI), so expected headings are formatted the same way rather than hard-coded.
@@ -91,5 +92,36 @@ describe("WeekPage", () => {
     expect(await screen.findByText(/Next week's plan will use these/)).toBeInTheDocument();
     const [, init] = fetchMock.mock.calls.at(-1)!;
     expect(JSON.parse(init!.body as string)).toEqual({ ratings: { "db.sql": 1 } });
+  });
+
+  it("says so on a planned break, and plans nothing", async () => {
+    mockFetch({ "/api/plan": { body: week(null, SETTINGS, true) } });
+    show();
+    expect(await screen.findByRole("note")).toHaveTextContent("planned break");
+    expect(screen.queryByRole("button", { name: "Plan my week" })).not.toBeInTheDocument();
+  });
+
+  it("says when the goal is met", async () => {
+    mockFetch({ "/api/plan": { body: week({ ...plan, doneMinutes: 400 }) } });
+    show();
+    expect(await screen.findByText(/Goal met: this week counts towards your streak/)).toBeInTheDocument();
+  });
+
+  it("takes a future week off", async () => {
+    const breaks = { thisWeek: false, upcoming: [
+      { weekStart: "2026-10-05", taken: false, available: true },
+      { weekStart: "2026-10-12", taken: false, available: false },
+    ] };
+    const fetchMock = mockFetch({ "/api/plan": { body: week(plan) }, "/api/breaks": { body: breaks } });
+    show();
+    const section = (await screen.findByText("Planned breaks")).closest("details")!;
+    expect(within(section as HTMLElement).getByText("two already taken this quarter")).toBeInTheDocument();
+    fetchMock.mockImplementationOnce(async () => ({ ok: true, status: 200, json: async () => ({
+      ...breaks, upcoming: [{ ...breaks.upcoming[0], taken: true }, breaks.upcoming[1]] }) }));
+    fireEvent.click(within(section as HTMLElement).getByRole("button", { name: "Take it off" }));
+    expect(await within(section as HTMLElement).findByRole("button", { name: "Give it back" })).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe("/api/breaks");
+    expect(JSON.parse(init!.body as string)).toEqual({ weekStart: "2026-10-05" });
   });
 });
