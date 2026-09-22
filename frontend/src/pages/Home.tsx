@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { Dashboard } from "./Dashboard";
 import { RewardsStrip } from "./RewardsStrip";
 import { ReviewsDue } from "./ReviewsDue";
@@ -9,6 +9,7 @@ export function Home({ me }: { me: Me }) {
   const [domains, setDomains] = useState<Domain[] | null>(null);
   const [topics, setTopics] = useState<TopicSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     Promise.all([fetchDomains(), fetchTopics()])
@@ -18,6 +19,14 @@ export function Home({ me }: { me: Me }) {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // A breadcrumb's domain link lands here as /#domain-<id>; the list loads after the page, so the
+  // browser's own jump to the anchor has nothing to jump to yet. Scroll once the domains are drawn.
+  useEffect(() => {
+    if (domains && location.hash.startsWith("#domain-")) {
+      document.getElementById(location.hash.slice(1))?.scrollIntoView?.({ block: "start" });
+    }
+  }, [domains, location.hash]);
 
   return (
     <>
@@ -40,7 +49,8 @@ export function Home({ me }: { me: Me }) {
         const top = topics.filter((t) => t.domainId === domain.id && t.parentId === null);
         const units = top.reduce((sum, t) => sum + t.unitCount, 0);
         return (
-          <details key={domain.id} className="domain" open={units > 0}>
+          <details key={domain.id} id={`domain-${domain.id}`} className="domain"
+            open={units > 0 || location.hash === `#domain-${domain.id}`}>
             <summary>
               {domain.name} <span className="count">{units === 1 ? "1 unit" : `${units} units`}</span>
             </summary>

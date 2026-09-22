@@ -21,7 +21,7 @@ export function TopicPage() {
   return (
     <>
       <nav className="crumbs" aria-label="Breadcrumb">
-        <Link to="/">Home</Link> › {topic.domainName}
+        <Link to="/">Home</Link> › <Link to={`/#domain-${topic.domainId}`}>{topic.domainName}</Link>
         {topic.parentId && (
           <>
             {" › "}

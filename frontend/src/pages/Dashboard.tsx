@@ -71,9 +71,12 @@ export function Dashboard() {
           <ul className="placements">
             {data.whatChanged.units.map((u) => (
               <li key={u.unitId}>
-                <span>
-                  <Link to={`/units/${u.unitId}`}>{u.title}</Link>{" "}
-                  <span className="count">{TYPE_LABEL[u.type] ?? u.type} · {u.added ? "new" : "updated"}</span>
+                <span className="placement-unit">
+                  <Link to={`/units/${u.unitId}`}>{u.title}</Link>
+                  <span className="count">
+                    {TYPE_LABEL[u.type] ?? u.type} · {u.added ? "new" : "updated"}
+                    {!u.chosen && <> · suggested: {PLACEMENT[u.suggested]}</>}
+                  </span>
                 </span>
                 <span role="group" aria-label={`When to start ${u.title}`} className="choices">
                   {(Object.keys(PLACEMENT) as Placement[]).map((p) => (
@@ -82,7 +85,6 @@ export function Dashboard() {
                       {PLACEMENT[p]}
                     </button>
                   ))}
-                  {!u.chosen && <span className="count">suggested</span>}
                 </span>
               </li>
             ))}

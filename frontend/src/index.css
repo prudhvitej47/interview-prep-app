@@ -169,6 +169,7 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .rewards { margin: 0.8rem 0 1.2rem; }
 .rewards p { margin: 0.2rem 0; }
 .rewards .weeks { letter-spacing: 0.35rem; color: var(--muted); }
+.rewards .weeks-row { display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; align-items: baseline; }
 .breaks { margin: 1.5rem 0; }
 .breaks summary { cursor: pointer; font-weight: 600; }
 .breaks ul { list-style: none; padding: 0; }
@@ -180,9 +181,13 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .card h3 { margin: 0 0 0.5rem; }
 .card > p { margin: 0.4rem 0; }
 .placements { list-style: none; padding: 0; margin: 0.5rem 0; }
-.placements li { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center;
-  padding: 0.4rem 0; border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent); }
-.choices { display: flex; gap: 0.3rem; align-items: center; }
+/* Title and its details on the left, the three choices in their own column: a long title wraps in its
+   column instead of pushing the buttons onto a line of their own. Stacked on a phone. */
+.placements li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.3rem 1rem; align-items: center;
+  padding: 0.5rem 0; border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent); }
+.placement-unit { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.choices { display: flex; gap: 0.3rem; align-items: center; white-space: nowrap; }
+@media (max-width: 560px) { .placements li { grid-template-columns: 1fr; } }
 .choices button { font: inherit; font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 999px; cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
 .choices button.chosen { background: var(--fg); color: var(--bg); }
