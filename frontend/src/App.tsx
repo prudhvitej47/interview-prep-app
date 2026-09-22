@@ -10,6 +10,7 @@ import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { DraftPage } from "./pages/DraftPage";
 import { ArticlePage } from "./pages/ArticlePage";
 import { UnitPage } from "./pages/UnitPage";
+import { HowItWorks } from "./pages/HowItWorks";
 
 type State =
   | { kind: "loading" }
@@ -60,7 +61,9 @@ export function App() {
       {state.kind === "ready" && !state.me.onboarded && <Onboarding me={state.me} onDone={saved} />}
       {state.kind === "ready" && state.me.onboarded && (
         <Routes>
-          <Route path="/" element={<Home me={state.me} />} />
+          <Route path="/" element={<Home me={state.me} onMe={(me) => setState({ kind: "ready", me })} />} />
+          <Route path="/how-it-works"
+            element={<HowItWorks me={state.me} onMe={(me) => setState({ kind: "ready", me })} />} />
           <Route
             path="/ratings"
             element={<Onboarding me={state.me} onDone={saved} title="Change your ratings" />}

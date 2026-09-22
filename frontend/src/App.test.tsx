@@ -72,6 +72,28 @@ describe("App", () => {
     expect(screen.getByText("Payments").closest("details")).not.toHaveAttribute("open");
   });
 
+  it("shows the start guide on the home page until it is closed", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true, startGuideClosed: false }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+    });
+    renderAt("/");
+    expect(await screen.findByRole("region", { name: "Start here" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "How this works" })[0]).toHaveAttribute("href", "/how-it-works");
+  });
+
+  it("leaves the start guide out once it has been closed", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true, startGuideClosed: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+    });
+    renderAt("/");
+    expect(await screen.findByText("Welcome, Tester.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Start here" })).toBeNull();
+  });
+
   it("lets an onboarded learner change their ratings, starting from what they said before", async () => {
     const fetchMock = mockFetch({
       "/api/me": { body: me({ onboarded: true, domainRatings: { dsa: 2, databases: 4 } }) },

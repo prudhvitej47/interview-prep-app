@@ -192,6 +192,17 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
 .choices button.chosen { background: var(--fg); color: var(--bg); }
 .browse { margin-top: 1.5rem; }
+.start-here { margin: 0.8rem 0 1rem; }
+.start-here ol { padding-left: 1.2rem; margin: 0.5rem 0; }
+.start-here li { margin: 0.4rem 0; }
+.start-here .tick { display: inline-block; width: 1.3rem; color: var(--muted); }
+.start-here li.done > span:last-child { color: var(--muted); }
+.how-it-works section { margin: 1.4rem 0; }
+/* A page to read, like a unit: body text at full contrast, not the muted default for paragraphs. */
+.how-it-works p:not(.hint) { color: var(--fg); }
+.how-it-works table { border-collapse: collapse; margin: 0.5rem 0; }
+.how-it-works td, .how-it-works th { padding: 0.3rem 0.6rem; text-align: left; vertical-align: top;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
 .card details h1, .card details h2 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
 .card details summary { cursor: pointer; }
 

@@ -27,6 +27,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Onboarding asks for one 0–5 rating per domain — twelve questions, not the 174 topics. Only what
  * a learner actually said is stored; topics inherit their domain's rating when read, so topics added
  * by a later curriculum release need no new questions and no backfill.
+ *
+ * <p>It also remembers whether the learner closed the home page's "Start here" guide, so the guide
+ * shows until then and never again after, whichever device they sign in from.
  */
 @RestController
 @RequestMapping("/api/me")
@@ -45,9 +48,12 @@ class MeController {
     this.curriculum = curriculum;
   }
 
-  record Me(String slug, String displayName, boolean onboarded, Map<String, Integer> domainRatings) {}
+  record Me(String slug, String displayName, boolean onboarded, Map<String, Integer> domainRatings,
+      boolean startGuideClosed) {}
 
   record DomainRatings(Map<String, Integer> ratings) {}
+
+  record StartGuide(boolean closed) {}
 
   @GetMapping
   Me me(@AuthenticationPrincipal LearnerPrincipal me) {
@@ -121,6 +127,19 @@ class MeController {
     return describe(me);
   }
 
+  /** Closes the "Start here" guide, or brings it back (from the "How this works" page). */
+  @PutMapping("/start-guide")
+  Me startGuide(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody StartGuide body) {
+    if (body == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "say whether the guide is closed");
+    }
+    // Closing twice keeps the first time; reopening clears it.
+    jdbc.update("update learner set start_guide_closed_at = case when :closed"
+            + " then coalesce(start_guide_closed_at, now()) end where id = :learner",
+        new MapSqlParameterSource().addValue("learner", me.id()).addValue("closed", body.closed()));
+    return describe(me);
+  }
+
   private Me describe(LearnerPrincipal me) {
     Map<String, Integer> ratings = new LinkedHashMap<>();
     jdbc.query(
@@ -133,7 +152,10 @@ class MeController {
     Set<String> expected = domainIds();
     // Nothing to be onboarded against until a curriculum is loaded.
     boolean onboarded = !expected.isEmpty() && ratings.keySet().containsAll(expected);
-    return new Me(me.slug(), me.displayName(), onboarded, ratings);
+    Boolean closed = jdbc.queryForObject(
+        "select start_guide_closed_at is not null from learner where id = :learner",
+        new MapSqlParameterSource("learner", me.id()), Boolean.class);
+    return new Me(me.slug(), me.displayName(), onboarded, ratings, Boolean.TRUE.equals(closed));
   }
 
   private Set<String> domainIds() {

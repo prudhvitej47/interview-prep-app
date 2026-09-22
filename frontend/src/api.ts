@@ -11,6 +11,8 @@ export type Me = {
   displayName: string;
   onboarded: boolean;
   domainRatings: Record<string, number>;
+  /** Closed "Start here" guides stay closed on every device; the server remembers. */
+  startGuideClosed: boolean;
 };
 
 export type Domain = {
@@ -208,6 +210,11 @@ export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
   await send("PUT", "/api/me/week", settings);
   await send("DELETE", "/api/plan");
   return fetchWeek();
+}
+
+/** Closes the home page's "Start here" guide, or brings it back. */
+export async function setStartGuideClosed(closed: boolean): Promise<Me> {
+  return (await send("PUT", "/api/me/start-guide", { closed })).json();
 }
 
 export async function rateTopics(ratings: Record<string, number>): Promise<void> {
