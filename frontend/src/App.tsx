@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Route, Routes, useNavigate } from "react-router";
+import { Link, NavLink, Route, Routes, useNavigate } from "react-router";
 import { fetchMe, NotAllowedError, type Me } from "./api";
 import { Onboarding } from "./Onboarding";
 import { Home } from "./pages/Home";
@@ -10,6 +10,8 @@ import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { DraftPage } from "./pages/DraftPage";
 import { ArticlePage } from "./pages/ArticlePage";
 import { UnitPage } from "./pages/UnitPage";
+import { HowItWorks } from "./pages/HowItWorks";
+import { useHeadingFocus, useScrollRestoration } from "./navigation";
 
 type State =
   | { kind: "loading" }
@@ -20,6 +22,8 @@ type State =
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const navigate = useNavigate();
+  useScrollRestoration();
+  useHeadingFocus();
 
   useEffect(() => {
     let live = true;
@@ -48,6 +52,15 @@ export function App() {
       <h1>
         <Link to="/">Interview Prep</Link>
       </h1>
+      {/* On every page, so no trip goes through the home page to reach another section. */}
+      {state.kind === "ready" && state.me.onboarded && (
+        <nav className="sections" aria-label="Sections">
+          <NavLink to="/" end>Home</NavLink>
+          <NavLink to="/week">This week</NavLink>
+          <NavLink to="/evidence">Interview evidence</NavLink>
+          <NavLink to="/how-it-works">How this works</NavLink>
+        </nav>
+      )}
       {state.kind === "loading" && <p>Loading…</p>}
       {state.kind === "failed" && <p role="alert">{state.message}</p>}
       {state.kind === "not-allowed" && (
@@ -60,7 +73,9 @@ export function App() {
       {state.kind === "ready" && !state.me.onboarded && <Onboarding me={state.me} onDone={saved} />}
       {state.kind === "ready" && state.me.onboarded && (
         <Routes>
-          <Route path="/" element={<Home me={state.me} />} />
+          <Route path="/" element={<Home me={state.me} onMe={(me) => setState({ kind: "ready", me })} />} />
+          <Route path="/how-it-works"
+            element={<HowItWorks me={state.me} onMe={(me) => setState({ kind: "ready", me })} />} />
           <Route
             path="/ratings"
             element={<Onboarding me={state.me} onDone={saved} title="Change your ratings" />}

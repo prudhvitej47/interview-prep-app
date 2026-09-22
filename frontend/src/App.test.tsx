@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -70,6 +70,43 @@ describe("App", () => {
     // An empty topic is shown, so the shape of the curriculum is visible, but not as a link.
     expect(screen.getByText("Payments").closest("a")).toBeNull();
     expect(screen.getByText("Payments").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("keeps the sections one click away from every page", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+    });
+    renderAt("/");
+    const sections = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(sections).getByRole("link", { name: "This week" })).toHaveAttribute("href", "/week");
+    expect(within(sections).getByRole("link", { name: "Interview evidence" })).toHaveAttribute("href", "/evidence");
+    expect(within(sections).getByRole("link", { name: "How this works" })).toHaveAttribute("href", "/how-it-works");
+    // The page you are on is marked, not just underlined on hover.
+    expect(within(sections).getByRole("link", { name: "Home" })).toHaveClass("active");
+  });
+
+  it("shows the start guide on the home page until it is closed", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true, startGuideClosed: false }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+    });
+    renderAt("/");
+    expect(await screen.findByRole("region", { name: "Start here" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "How this works" })[0]).toHaveAttribute("href", "/how-it-works");
+  });
+
+  it("leaves the start guide out once it has been closed", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true, startGuideClosed: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+    });
+    renderAt("/");
+    expect(await screen.findByText("Welcome, Tester.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Start here" })).toBeNull();
   });
 
   it("lets an onboarded learner change their ratings, starting from what they said before", async () => {

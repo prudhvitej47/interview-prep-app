@@ -26,6 +26,8 @@ export const me = (overrides: object = {}) => ({
   displayName: "Tester",
   onboarded: false,
   domainRatings: {},
+  // Most tests are not about the guide; the ones that are open it.
+  startGuideClosed: true,
   ...overrides,
 });
 

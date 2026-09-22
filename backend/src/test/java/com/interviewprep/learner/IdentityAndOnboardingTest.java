@@ -208,4 +208,49 @@ class IdentityAndOnboardingTest extends PostgresTestBase {
           .andExpect(jsonPath("$.onboarded").value(false));
     }
   }
+
+  @Nested
+  class StartGuide {
+
+    private org.springframework.test.web.servlet.ResultActions close(String login, boolean closed)
+        throws Exception {
+      return mvc.perform(as(put("/api/me/start-guide"), login).with(RealCsrf.token(mvc, login))
+          .contentType(MediaType.APPLICATION_JSON).content("{\"closed\": " + closed + "}"));
+    }
+
+    @Test
+    void aNewLearnerSeesTheGuide() throws Exception {
+      mvc.perform(as(get("/api/me"), "tester@example.com"))
+          .andExpect(jsonPath("$.startGuideClosed").value(false));
+    }
+
+    @Test
+    void onceClosedItStaysClosedOnLaterVisits() throws Exception {
+      close("tester@example.com", true).andExpect(jsonPath("$.startGuideClosed").value(true));
+      mvc.perform(as(get("/api/me"), "tester@example.com"))
+          .andExpect(jsonPath("$.startGuideClosed").value(true));
+    }
+
+    @Test
+    void closingAgainKeepsTheFirstTime() throws Exception {
+      close("tester@example.com", true).andExpect(status().isOk());
+      jdbc.update("update learner set start_guide_closed_at = timestamptz '2026-01-01' where slug = 'tester'");
+      close("tester@example.com", true).andExpect(status().isOk());
+      assertThat(jdbc.queryForObject("select start_guide_closed_at::date::text from learner where slug = 'tester'",
+          String.class)).isEqualTo("2026-01-01");
+    }
+
+    @Test
+    void itCanBeBroughtBack() throws Exception {
+      close("tester@example.com", true).andExpect(status().isOk());
+      close("tester@example.com", false).andExpect(jsonPath("$.startGuideClosed").value(false));
+    }
+
+    @Test
+    void oneLearnerClosingItLeavesTheOtherAlone() throws Exception {
+      close("tester@example.com", true).andExpect(status().isOk());
+      mvc.perform(as(get("/api/me"), "other@example.com"))
+          .andExpect(jsonPath("$.startGuideClosed").value(false));
+    }
+  }
 }

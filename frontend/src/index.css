@@ -13,6 +13,10 @@
   }
 }
 
+/* Scroll anchoring shifts the page as data arrives above the fold, which fights the restored
+   position after Back (navigation.ts). Pages here render before their data, so it costs nothing. */
+html, body { overflow-anchor: none; }
+
 body {
   margin: 0;
   padding: 2rem 1rem;
@@ -91,6 +95,23 @@ h1 a { color: inherit; text-decoration: none; }
 a { color: var(--fg); text-underline-offset: 2px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
+nav.sections { display: flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; margin: -0.3rem 0 1.2rem; }
+nav.sections a { padding: 0.2rem 0.6rem; border-radius: 999px; text-decoration: none; color: var(--muted);
+  border: 1px solid transparent; }
+nav.sections a:hover { text-decoration: underline; }
+nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(--fg) 25%, transparent); }
+/* Previous, the plan, next: three columns, so a long unit title shortens instead of wrapping the
+   row. One under the other on a phone. */
+.plan-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.4rem 1rem;
+  align-items: baseline; margin: 1.2rem 0 0; padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); font-size: 0.9rem; }
+.plan-nav > span:last-child { text-align: right; }
+.plan-nav a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; vertical-align: bottom; }
+@media (max-width: 560px) {
+  .plan-nav { grid-template-columns: 1fr; }
+  .plan-nav > span:last-child { text-align: left; }
+}
 .welcome { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
 .count, .meta, .hint, .crumbs { color: var(--muted); font-size: 0.875rem; }
 .empty { color: var(--muted); }
@@ -192,6 +213,17 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
 .choices button.chosen { background: var(--fg); color: var(--bg); }
 .browse { margin-top: 1.5rem; }
+.start-here { margin: 0.8rem 0 1rem; }
+.start-here ol { padding-left: 1.2rem; margin: 0.5rem 0; }
+.start-here li { margin: 0.4rem 0; }
+.start-here .tick { display: inline-block; width: 1.3rem; color: var(--muted); }
+.start-here li.done > span:last-child { color: var(--muted); }
+.how-it-works section { margin: 1.4rem 0; }
+/* A page to read, like a unit: body text at full contrast, not the muted default for paragraphs. */
+.how-it-works p:not(.hint) { color: var(--fg); }
+.how-it-works table { border-collapse: collapse; margin: 0.5rem 0; }
+.how-it-works td, .how-it-works th { padding: 0.3rem 0.6rem; text-align: left; vertical-align: top;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
 .card details h1, .card details h2 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
 .card details summary { cursor: pointer; }
 

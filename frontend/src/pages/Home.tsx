@@ -3,9 +3,10 @@ import { Link, useLocation } from "react-router";
 import { Dashboard } from "./Dashboard";
 import { RewardsStrip } from "./RewardsStrip";
 import { ReviewsDue } from "./ReviewsDue";
+import { StartHere } from "./StartHere";
 import { fetchDomains, fetchTopics, type Domain, type Me, type TopicSummary } from "../api";
 
-export function Home({ me }: { me: Me }) {
+export function Home({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
   const [domains, setDomains] = useState<Domain[] | null>(null);
   const [topics, setTopics] = useState<TopicSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +33,12 @@ export function Home({ me }: { me: Me }) {
     <>
       <div className="welcome">
         <p>Welcome, {me.displayName}.</p>
+        {/* The sections are in the bar above; what is left here is this learner's own settings. */}
         <span>
-          <Link to="/week">This week's plan</Link> · <Link to="/evidence">Interview evidence</Link> ·{" "}
           <Link to="/ratings">Change my ratings</Link>
         </span>
       </div>
+      {!me.startGuideClosed && <StartHere onMe={onMe} />}
       <RewardsStrip />
       <ReviewsDue />
       <Dashboard />
