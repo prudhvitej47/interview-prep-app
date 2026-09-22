@@ -161,7 +161,8 @@ class PlanController {
     double load = loadFactor(me, monday);
     int fromDay = LocalDate.now(STUDY_ZONE).getDayOfWeek().getValue();
     WeekPlanner.Plan plan = WeekPlanner.plan(new WeekPlanner.Input(monday, fromDay, settings.studyDays(),
-        settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews, startNow));
+        settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews, startNow,
+        carryOver(me, monday)));
 
     try {
       return transaction.execute(status -> {
@@ -193,6 +194,35 @@ class PlanController {
       // Two tabs opened the new week at once; the other one's plan stands.
       return planId(me, monday);
     }
+  }
+
+  /**
+   * Learning items from the learner's most recent earlier plan, in the order they were planned. It is
+   * the most recent plan, not strictly last week's, so a break or a missed week does not lose them.
+   * An item that has already been carried over twice is left to the normal ranking, so one skipped
+   * unit cannot hold a place in every plan. Items done since are filtered out by the planner, which
+   * only sees units with no attempt.
+   */
+  private List<String> carryOver(LearnerPrincipal me, LocalDate monday) {
+    List<Long> earlier = jdbc.queryForList(
+        "select id from week_plan where learner_id = :learner and week_start < :week"
+            + " order by week_start desc limit 2",
+        new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday), Long.class);
+    if (earlier.isEmpty()) {
+      return List.of();
+    }
+    Map<String, Integer> timesCarried = new HashMap<>();
+    jdbc.query("select unit_id from plan_item where plan_id in (:plans) and kind = 'learn'"
+            + " and reason like :carried",
+        new MapSqlParameterSource().addValue("plans", earlier)
+            .addValue("carried", WeekPlanner.CARRIED + "%"),
+        rs -> {
+          timesCarried.merge(rs.getString(1), 1, Integer::sum);
+        });
+    return jdbc.queryForList(
+            "select unit_id from plan_item where plan_id = :plan and kind = 'learn' order by day, sort_order",
+            new MapSqlParameterSource("plan", earlier.getFirst()), String.class)
+        .stream().filter(u -> timesCarried.getOrDefault(u, 0) < 2).toList();
   }
 
   private Proficiency proficiency(LearnerPrincipal me, List<PlannableUnit> units,

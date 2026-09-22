@@ -33,7 +33,9 @@ import java.util.function.Predicate;
  *       weekend.
  * </ol>
  *
- * <p>Units a learner placed "now" are taken first; units placed "later" never reach this function.
+ * <p>Units a learner placed "now" are taken first; then last week's unfinished learning, up to
+ * {@link #CARRY_SHARE} of the week (the caller stops carrying an item after two carry-overs); units
+ * placed "later" never reach this function.
  *
  * <p>Not yet, and why: the company factor (no target companies are captured yet), the catch-up
  * factor (needs weeks of plans first), progressive difficulty from solve history (F5), interview
@@ -47,6 +49,9 @@ final class WeekPlanner {
   static final double GOAL_SHARE = 0.8;
   static final int HEAVY_MINUTES = 75;
   static final int MAX_HEAVY = 2;
+  /** Last week's unfinished learning takes at most this share of the new week's learning time. */
+  static final double CARRY_SHARE = 0.3;
+  static final String CARRIED = "Carried over from last week";
 
   record Candidate(String unitId, String title, String type, String topicId, String topicName,
       String domainId, int difficulty, int minutes, List<String> prerequisites, double strength,
@@ -66,7 +71,7 @@ final class WeekPlanner {
    */
   record Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
       double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
-      List<DueReview> reviews, Set<String> startNow) {}
+      List<DueReview> reviews, Set<String> startNow, List<String> carryOver) {}
 
   record Item(String unitId, int day, String kind, int minutes, String reason) {}
 
@@ -159,6 +164,28 @@ final class WeekPlanner {
       if (in.startNow().contains(c.unitId()) && picker.canTake(c)) {
         picker.take(c, DashboardController.NOW_REASON);
       }
+    }
+    // Then last week's unfinished learning, oldest first, so a started topic gets finished. Capped,
+    // so one bad week cannot crowd out the next; what doesn't fit stays in the pool below.
+    Map<String, Candidate> byId = new HashMap<>();
+    ranked.forEach(c -> byId.put(c.unitId(), c));
+    int carryBudget = (int) (learnBudget * CARRY_SHARE);
+    int carriedOut = 0;
+    for (String id : in.carryOver()) {
+      Candidate c = byId.get(id);
+      if (c == null) {
+        continue;  // done since, retired, or placed "later"
+      }
+      if (c.minutes() <= carryBudget && picker.canTake(c)) {
+        picker.take(c, CARRIED);
+        carryBudget -= c.minutes();
+      } else {
+        carriedOut++;
+      }
+    }
+    if (carriedOut > 0) {
+      notes.add(carriedOut + " unfinished item" + (carriedOut == 1 ? "" : "s") + " from last week did not"
+          + " fit in the carry-over share; they compete with everything else this week.");
     }
     for (Group g : REQUIRED) {
       List<Candidate> members = ranked.stream().filter(g.member()).toList();

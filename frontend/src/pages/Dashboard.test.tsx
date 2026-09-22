@@ -37,7 +37,7 @@ it("shows this week, coverage, weak areas and what changed", async () => {
   const changed = screen.getByRole("region", { name: "What changed" });
   expect(changed).toHaveTextContent("What changed in 2026.40.1");
   expect(within(changed).getByRole("button", { name: "Next week" })).toHaveAttribute("aria-pressed", "true");
-  expect(changed).toHaveTextContent("suggested");
+  expect(changed).toHaveTextContent("System design · new · suggested: Next week");
   // 20:00 UTC on the 27th is already the 28th in India, where the tests run.
   expect(changed).toHaveTextContent(new Date("2026-09-27T20:00:00Z").toLocaleDateString(undefined,
     { weekday: "short", day: "numeric", month: "short" }));

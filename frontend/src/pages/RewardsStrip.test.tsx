@@ -20,6 +20,8 @@ it("shows stars, the streak, freezes and a quiet mark per week", async () => {
   const strip = await screen.findByRole("region", { name: "Stars and streak" });
   expect(strip).toHaveTextContent("★ 52 stars (+3 this week) · 2-week streak · 1 freeze banked");
   expect(screen.getByLabelText("Recent weeks")).toHaveTextContent("●❄–◌");
+  // Each mark shown is explained in words, so the in-progress mark never stands alone.
+  expect(strip).toHaveTextContent("◌ this week, in progress");
   expect(screen.getByLabelText(/: missed, a freeze kept the streak$/)).toBeInTheDocument();
   expect(strip).toHaveTextContent("You have passed 50 stars.");
 });

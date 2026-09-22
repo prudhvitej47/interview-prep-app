@@ -36,7 +36,7 @@ export function UnitPage() {
   return (
     <article className={`unit unit-${unit.type}`}>
       <nav className="crumbs" aria-label="Breadcrumb">
-        <Link to="/">Home</Link> › {unit.domainName} › <Link to={`/topics/${unit.topicId}`}>{unit.topicName}</Link>
+        <Link to="/">Home</Link> › <Link to={`/#domain-${unit.domainId}`}>{unit.domainName}</Link> › <Link to={`/topics/${unit.topicId}`}>{unit.topicName}</Link>
       </nav>
       <h2>{unit.title}</h2>
       <p className="meta">

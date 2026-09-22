@@ -293,4 +293,38 @@ class PlanApiTest extends PostgresTestBase {
     send(put("/api/placements"), OTHER, "{\"unitId\": \"db.sql.tester-only\", \"choice\": \"now\"}")
         .andExpect(status().isNotFound());
   }
+
+  /** An earlier week's plan, written as the planner would have: one learn item per unit. */
+  private long earlierPlan(LocalDate week, String... itemsAndReasons) {
+    long plan = jdbc.queryForObject("insert into week_plan (learner_id, week_start, planned_minutes, goal_minutes,"
+        + " planner_version) select id, ?, 100, 80, 1 from learner where slug = 'tester' returning id", Long.class, week);
+    for (int i = 0; i < itemsAndReasons.length; i += 2) {
+      jdbc.update("insert into plan_item (plan_id, unit_id, day, kind, minutes, reason, sort_order)"
+          + " values (?, ?, 1, 'learn', 20, ?, ?)", plan, itemsAndReasons[i], itemsAndReasons[i + 1], i);
+    }
+    return plan;
+  }
+
+  @Test
+  void unfinishedItemsFromTheLastPlanAreCarriedAndAtMostTwice() throws Exception {
+    // Plenty of time, so every unit is planned: the test is about which ones are marked as carried over.
+    send(put("/api/me/week"), TESTER, "{\"hoursPerWeek\": 40, \"studyDays\": [1, 2, 3, 4, 5, 6, 7], \"weights\": {}}");
+    // Two weeks ago: db.sql.joins planned; last week carried once already. dsa.window.concept was done since.
+    earlierPlan(monday.minusWeeks(2), "db.sql.joins", "Databases is 40% of this week.",
+        "dsa.window.p1", "Carried over from last week; DSA is 60% of this week.");
+    earlierPlan(monday.minusWeeks(1), "db.sql.joins", "Carried over from last week; Databases is 40%.",
+        "dsa.window.concept", "DSA is 60% of this week.",
+        "dsa.window.p1", "Carried over from last week; DSA is 60% of this week.");
+    send(post("/api/units/dsa.window.concept/attempts"), TESTER, "{\"rating\": \"good\"}");
+
+    mvc.perform(as(get("/api/plan"), TESTER))
+        // Carried once so far: carried again.
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')].reason",
+            hasItem(startsWith("Carried over from last week"))))
+        // Carried twice already: back to the normal ranking (still planned, but not as a carry-over).
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'dsa.window.p1')].reason",
+            org.hamcrest.Matchers.not(hasItem(startsWith("Carried over")))))
+        // Done since: now a review, not carried learning.
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'dsa.window.concept' && @.kind == 'learn')]").isEmpty());
+  }
 }

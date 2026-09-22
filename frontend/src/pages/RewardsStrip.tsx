@@ -30,14 +30,24 @@ export function RewardsStrip() {
         {" · "}
         {rewards.freezes} freeze{rewards.freezes === 1 ? "" : "s"} banked
       </p>
-      <p className="weeks" aria-label="Recent weeks">
-        {rewards.recentWeeks.map((w) => (
-          <span key={w.weekStart} title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
-            aria-label={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}>
-            {MARK[w.outcome].mark}
+      {rewards.recentWeeks.length > 0 && (
+        <p className="weeks-row">
+          <span className="count">Recent weeks</span>{" "}
+          <span className="weeks" aria-label="Recent weeks">
+            {rewards.recentWeeks.map((w) => (
+              <span key={w.weekStart} title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
+                aria-label={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}>
+                {MARK[w.outcome].mark}
+              </span>
+            ))}
+          </span>{" "}
+          {/* A key for the marks actually shown, so a lone mark is never a mystery. */}
+          <span className="count">
+            {[...new Set(rewards.recentWeeks.map((w) => w.outcome))]
+              .map((o) => `${MARK[o].mark} ${MARK[o].label}`).join(" · ")}
           </span>
-        ))}
-      </p>
+        </p>
+      )}
       {milestone && <p className="hint">You have passed {milestone} stars.</p>}
     </section>
   );

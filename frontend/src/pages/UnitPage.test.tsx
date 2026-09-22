@@ -43,6 +43,8 @@ describe("UnitPage", () => {
     expect(await screen.findByRole("heading", { name: "Idempotency keys for safe retries" })).toBeInTheDocument();
     expect(screen.getByText(/Concept · difficulty 3\/5 · 30 min/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/topics/ds.transactions");
+    // The domain links to its section of the curriculum on the home page.
+    expect(screen.getByRole("link", { name: "Distributed systems" })).toHaveAttribute("href", "/#domain-distributed");
     expect(screen.getByText("Retries can charge twice.")).toBeInTheDocument();
   });
 
