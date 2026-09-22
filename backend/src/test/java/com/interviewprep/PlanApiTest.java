@@ -1,6 +1,8 @@
 package com.interviewprep;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -224,5 +226,63 @@ class PlanApiTest extends PostgresTestBase {
         .andExpect(jsonPath("$.starsThisWeek").value(2));
     mvc.perform(as(delete("/api/units/db.sql.joins/attempts/latest"), TESTER).with(RealCsrf.token(mvc, TESTER)));
     mvc.perform(as(get("/api/rewards"), TESTER)).andExpect(jsonPath("$.stars").value(0));
+  }
+
+  private static final String CHANGELOG = "# Test release\n\n## Suggested placement\n"
+      + "| Unit | Tester | Other |\n| --- | --- | --- |\n| db.sql.joins | end of track | now |\n";
+
+  @Test
+  void theDashboardShowsCoverageWeakAreasAndTheReleaseWithSuggestedPlacements() throws Exception {
+    jdbc.update("update curriculum_release set changelog = ?", CHANGELOG);
+    send(post("/api/units/dsa.window.concept/attempts"), TESTER, "{\"rating\": \"good\"}");
+    mvc.perform(as(get("/api/dashboard"), TESTER))
+        .andExpect(jsonPath("$.coverage[?(@.domainId == 'dsa')].done").value(1))
+        .andExpect(jsonPath("$.coverage[?(@.domainId == 'dsa')].total").value(2))
+        .andExpect(jsonPath("$.weakAreas[0].unitsLeft").isNumber())
+        .andExpect(jsonPath("$.whatChanged.version").value("2026.39.1"))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].placement").value("end-of-track"))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].chosen").value(false));
+    mvc.perform(as(get("/api/dashboard"), OTHER))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].placement").value("now"))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.tester-only')]").isEmpty());
+  }
+
+  @Test
+  void laterKeepsAUnitOutOfPlansAndNowPutsItInThisWeek() throws Exception {
+    jdbc.update("update curriculum_release set changelog = ?", CHANGELOG);
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    // Suggested "end of track" for tester: left out of the plan.
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isEmpty());
+
+    // Changing it to "now" adds it to this week's plan straight away...
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"now\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].chosen").value(true));
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')].reason").value("You chose to start it now"));
+
+    // ...and back to "next week" takes it out again.
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"next-week\"}");
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isEmpty());
+
+    // A rebuilt week keeps honouring the choice: "now" goes first, and can still be taken back out.
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"now\"}");
+    mvc.perform(as(delete("/api/plan"), TESTER).with(RealCsrf.token(mvc, TESTER)));
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')].reason",
+            hasItem(startsWith("You chose to start it now; Databases is"))));
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"end-of-track\"}");
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isEmpty());
+  }
+
+  @Test
+  void placementsAreChecked() throws Exception {
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"someday\"}")
+        .andExpect(status().isBadRequest());
+    send(put("/api/placements"), OTHER, "{\"unitId\": \"db.sql.tester-only\", \"choice\": \"now\"}")
+        .andExpect(status().isNotFound());
   }
 }

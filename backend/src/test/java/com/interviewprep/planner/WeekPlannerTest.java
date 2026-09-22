@@ -65,7 +65,7 @@ class WeekPlannerTest {
 
   private static Plan plan(double hours, List<Candidate> units, List<DueReview> reviews) {
     return WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, hours, 1.0, domains(2.5), units, Set.of(),
-        reviews));
+        reviews, Set.of()));
   }
 
   private static Set<String> units(Plan p) {
@@ -134,7 +134,7 @@ class WeekPlannerTest {
   void aDonePrerequisiteUnlocksItsProblems() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 2, 1.0, domains(2.5),
         List.of(unit("dsa.window.p1", "dsa", "coding", 25, "dsa.window.concept")),
-        Set.of("dsa.window.concept"), List.of()));
+        Set.of("dsa.window.concept"), List.of(), Set.of()));
     assertThat(units(p)).containsExactly("dsa.window.p1");
   }
 
@@ -167,7 +167,7 @@ class WeekPlannerTest {
     List<Domain> ds = new ArrayList<>(domains(2.5));
     ds.replaceAll(d -> d.id().equals("lld") ? new Domain("lld", "LLD", 10, 1.0)
         : d.id().equals("databases") ? new Domain("databases", "DB", 10, 4.5) : d);
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of()));
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of()));
     int lld = share(p, "lld");
     int db = share(p, "databases");
     assertThat(lld).isGreaterThan(db);
@@ -179,7 +179,7 @@ class WeekPlannerTest {
   void aWeightOfZeroRemovesADomainEvenFromTheRequiredGroups() {
     List<Domain> ds = new ArrayList<>(domains(2.5));
     ds.replaceAll(d -> d.id().equals("hld") ? new Domain("hld", "HLD", 0, 2.5) : d);
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of()));
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of()));
     assertThat(p.items()).noneMatch(i -> i.unitId().startsWith("hld."));
     assertThat(p.shares()).noneMatch(s -> s.domainId().equals("hld"));
   }
@@ -221,14 +221,14 @@ class WeekPlannerTest {
   @Test
   void onlyTheStudyDaysAreUsed() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 1, List.of(2, 4, 6), 6, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of()));
+        Set.of(), List.of(), Set.of()));
     assertThat(p.items()).allMatch(i -> Set.of(2, 4, 6).contains(i.day()));
   }
 
   @Test
   void aWeekFirstOpenedMidweekUsesOnlyTheDaysLeftAndShrinksToMatch() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 3, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(new DueReview("done.x", "concept", 30, MONDAY.minusDays(2)))));
+        Set.of(), List.of(new DueReview("done.x", "concept", 30, MONDAY.minusDays(2))), Set.of()));
     assertThat(p.items()).allMatch(i -> i.day() >= 3);
     assertThat(p.plannedMinutes()).isEqualTo((int) Math.round(486 * 5 / 7.0));
     assertThat(p.notes()).contains("Made mid-week, so it covers the 5 study days left.");
@@ -237,9 +237,16 @@ class WeekPlannerTest {
   @Test
   void aWeekWithNoStudyDaysLeftIsEmptyAndSaysSo() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 7, List.of(1, 2, 3), 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of()));
+        Set.of(), List.of(), Set.of()));
     assertThat(p.items()).isEmpty();
     assertThat(p.notes()).containsExactly("No study days are left this week; the next plan starts on Monday.");
+  }
+
+  @Test
+  void aUnitPlacedNowComesFirstWhateverItsArea() {
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(),
+        Set.of(), List.of(), Set.of("agentic.u4")));
+    assertThat(item(p, "agentic.u4").reason()).startsWith("You chose to start it now");
   }
 
   private static int share(Plan p, String domain) {

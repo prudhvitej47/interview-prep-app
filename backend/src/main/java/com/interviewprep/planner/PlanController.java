@@ -62,10 +62,12 @@ class PlanController {
   private final ProgressQueries progress;
   private final EvidenceQueries evidence;
   private final PlanQueries plans;
+  private final PlacementService placements;
 
   PlanController(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
       CurriculumQueries curriculum, DomainCatalog domains, LearnerProfile profile,
-      ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans) {
+      ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans,
+      PlacementService placements) {
     this.jdbc = jdbc;
     this.transaction = transaction;
     this.json = json;
@@ -75,6 +77,7 @@ class PlanController {
     this.progress = progress;
     this.evidence = evidence;
     this.plans = plans;
+    this.placements = placements;
   }
 
   record ItemView(String unitId, String title, String type, int day, String kind, int minutes,
@@ -130,6 +133,13 @@ class PlanController {
 
     Map<String, List<Attempt>> byUnit = new LinkedHashMap<>();
     attempts.forEach(a -> byUnit.computeIfAbsent(a.unitId(), k -> new ArrayList<>()).add(a));
+    Map<String, String> placed = placements.effective(me);
+    Set<String> startNow = new HashSet<>();
+    placed.forEach((unit, choice) -> {
+      if (Placements.NOW.equals(choice)) {
+        startNow.add(unit);
+      }
+    });
     List<Candidate> candidates = new ArrayList<>();
     List<DueReview> reviews = new ArrayList<>();
     for (PlannableUnit u : units) {
@@ -138,7 +148,7 @@ class PlanController {
         if (!due.isAfter(monday.plusDays(6))) {
           reviews.add(new DueReview(u.id(), u.type(), u.estMinutes(), due));
         }
-      } else {
+      } else if (!Placements.LATER.equals(placed.get(u.id()))) {
         candidates.add(new Candidate(u.id(), u.title(), u.type(), u.topicId(), u.topicName(),
             u.domainId(), u.difficulty(), u.estMinutes(), u.prerequisites(),
             strength.of(u.topicId()).value(), reportsFor(u.topicId(), topics, reports)));
@@ -151,7 +161,7 @@ class PlanController {
     double load = loadFactor(me, monday);
     int fromDay = LocalDate.now(STUDY_ZONE).getDayOfWeek().getValue();
     WeekPlanner.Plan plan = WeekPlanner.plan(new WeekPlanner.Input(monday, fromDay, settings.studyDays(),
-        settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews));
+        settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews, startNow));
 
     try {
       return transaction.execute(status -> {

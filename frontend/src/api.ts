@@ -236,3 +236,23 @@ export const takeBreak = async (weekStart: string): Promise<Breaks> =>
   (await send("POST", "/api/breaks", { weekStart })).json();
 export const giveBackBreak = async (weekStart: string): Promise<Breaks> =>
   (await send("DELETE", `/api/breaks/${weekStart}`)).json();
+
+export type Placement = "now" | "next-week" | "end-of-track";
+
+export type Dashboard = {
+  coverage: { domainId: string; name: string; done: number; total: number }[];
+  weakAreas: { topicId: string; name: string; domainName: string; strength: number; unitsLeft: number }[];
+  whatChanged: {
+    version: string;
+    releasedAt: string;
+    changelog: string | null;
+    added: number;
+    changed: number;
+    retired: number;
+    units: { unitId: string; title: string; type: string; added: boolean; placement: Placement; suggested: Placement; chosen: boolean }[];
+  } | null;
+};
+
+export const fetchDashboard = () => getJson<Dashboard>("/api/dashboard");
+export const placeUnit = async (unitId: string, choice: Placement): Promise<Dashboard> =>
+  (await send("PUT", "/api/placements", { unitId, choice })).json();
