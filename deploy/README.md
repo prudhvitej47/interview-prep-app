@@ -80,8 +80,12 @@ branches of the content repository through GitHub's API. The app needs a token f
    sudo systemctl restart interview-prep
    ```
 
-The token can create branches and files but cannot reach `main`: the repository's rules require a
-reviewed pull request. To rotate it, repeat step 2 with the new one; to turn sending off, delete the
+What the token could do, and what stops it: GitHub's free plan does not enforce branch protection
+on private repositories, so a contents-write token *can* push to the content repository's `main`.
+Two things keep that from mattering: the app only ever creates new branches (never writes an
+existing one), and the content repository's `publish.yml` publishes only a commit that a pull
+request was merged as, so a direct push to `main` never reaches this server. Treat the token as a
+secret that could write the curriculum repository. To rotate it, repeat step 2 with the new one; to turn sending off, delete the
 file and restart. Units installed before this file existed do not read it: re-run `vm-setup.sh`
 once (below) to install the current ones.
 
