@@ -64,6 +64,33 @@ build it second:
 cd backend && ./mvnw package && cd .. && docker build .
 ```
 
+## Checking that curriculum pages lay out
+
+`./mvnw verify` runs the components in jsdom, which has no layout at all, and the content
+repository's `check_mermaid.mjs` only *parses* diagrams. Neither can see a diagram that draws as
+unreadable four-pixel text, a table that pushes a phone screen sideways, or a diagram that failed to
+draw and left its source behind. `tools/layout-check.mjs` opens the real pages in headless Chrome and
+measures them.
+
+Run the app against the bundle you want to check, then:
+
+```bash
+node tools/layout-check.mjs --bundle ../interview-prep-content/dist/content.json
+```
+
+Every unit is loaded at 390px and at 1000px, in dark and light, and each page must satisfy:
+
+- no diagram showing its source instead of a picture, and none still drawing;
+- no element wider than its column, and no sideways scroll on the page itself;
+- every diagram's **drawn** text at 8.5px or larger, measured after the page scales the SVG down;
+- no error banner, and headings actually rendered.
+
+Useful flags: `--only` takes unit ids (or a file of them) to check just a slice, `--scheme dark`
+halves the run, and `--base` points at another host. It exits non-zero when anything fails.
+
+A whole-curriculum run is a few hundred page loads and takes several minutes; a slice takes
+seconds. Run the slice during review and the whole curriculum before a batch lands.
+
 ## How it fits together
 
 The React app is built into `BOOT-INF/classes/static` inside the jar and served by Spring on the
