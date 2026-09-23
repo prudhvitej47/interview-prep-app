@@ -129,8 +129,14 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .diagram { margin: 1rem 0; overflow-x: auto; padding: 1rem; border-radius: 8px;
   background: color-mix(in srgb, var(--fg) 4%, transparent); }
 /* A wide diagram (a mindmap, a long flowchart) scaled to the page width shrinks its labels until
-   they cannot be read. Below this width it scrolls sideways in its own box instead. */
-.diagram svg { max-width: 100%; min-width: min(640px, 100%); height: auto; }
+   they cannot be read - on a phone Mermaid's text landed at four or five pixels. Below this width the
+   diagram scrolls sideways in its own box instead, at every screen size: scrolling a picture beats
+   squinting at one. tools/layout-check.mjs measures the drawn text and fails under 8.5px. */
+.diagram svg { max-width: 100%; min-width: 640px; height: auto; }
+
+/* Long unbroken tokens - a Java generic, an email address, a URL - must wrap rather than push the
+   whole page sideways. */
+.unit code, .unit td, .unit th { overflow-wrap: anywhere; }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
 .banner { padding: 0.6rem 0.9rem; border-radius: 6px; background: color-mix(in srgb, #d97706 18%, transparent); color: var(--fg); }
