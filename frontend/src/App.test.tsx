@@ -128,6 +128,30 @@ describe("App", () => {
     );
   });
 
+  // A unit or a topic is the curriculum, and the curriculum is the home page: without this the
+  // section row had no pill at all on those pages and read as though it had shifted.
+  it("keeps Home marked as the current section while reading a unit", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/units/ds.transactions.idempotency-keys": { status: 404 },
+    });
+    renderAt("/units/ds.transactions.idempotency-keys");
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Home" })).toHaveClass("active");
+    expect(within(nav).getByRole("link", { name: "This week" })).not.toHaveClass("active");
+  });
+
+  it("marks only the section the reader is actually in", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/evidence": { body: [] },
+    });
+    renderAt("/evidence");
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Home" })).not.toHaveClass("active");
+    expect(within(nav).getByRole("link", { name: "Interview evidence" })).toHaveClass("active");
+  });
+
   it("shows the problem when the API is unreachable", async () => {
     mockFetch({ "/api/me": { status: 503 } });
     renderAt("/");

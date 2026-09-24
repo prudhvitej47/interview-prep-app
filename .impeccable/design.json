@@ -272,9 +272,9 @@
       "name": "Rating Buttons",
       "kind": "custom",
       "refersTo": "rating-group",
-      "description": "The four self-ratings that close a unit and schedule its reviews.",
+      "description": "The four self-ratings that close a unit and schedule its reviews. Each is a flex column so the labels sit on one line however long the captions run.",
       "html": "<div class=\"ds-ratings\"><button class=\"ds-rating\">Again<small>I couldn't do it; show it again tomorrow</small></button><button class=\"ds-rating\">Hard<small>Got there, with effort or a peek</small></button><button class=\"ds-rating\">Good<small>Did it, with some thought</small></button><button class=\"ds-rating\">Easy<small>Straightforward</small></button></div>",
-      "css": ".ds-ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.5rem 0; } .ds-rating { font: inherit; font-weight: 600; padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left; border: 1px solid color-mix(in srgb, var(--fg, #232321) 25%, transparent); background: var(--bg, #fbfaf8); color: var(--fg, #232321); } .ds-rating small { display: block; font-weight: 400; color: var(--muted, #6b6a66); font-size: 0.75rem; } .ds-rating:hover { border-color: color-mix(in srgb, var(--fg, #232321) 50%, transparent); background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-rating:active { background: color-mix(in srgb, var(--fg, #232321) 12%, transparent); } .ds-rating:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
+      "css": ".ds-ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.5rem 0; } .ds-rating { font: inherit; font-weight: 600; padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0.2rem; border: 1px solid color-mix(in srgb, var(--fg, #232321) 25%, transparent); background: var(--bg, #fbfaf8); color: var(--fg, #232321); } .ds-rating small { display: block; font-weight: 400; color: var(--muted, #6b6a66); font-size: 0.75rem; } .ds-rating:hover { border-color: color-mix(in srgb, var(--fg, #232321) 50%, transparent); background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-rating:active { background: color-mix(in srgb, var(--fg, #232321) 12%, transparent); } .ds-rating:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
     },
     {
       "name": "Folded Spoiler",
@@ -299,6 +299,14 @@
       "description": "The answer to a practice attempt: green when right, red when wrong, neutral otherwise.",
       "html": "<p class=\"ds-verdict ds-verdict-right\">✓ Goal met: this week counts towards your streak.</p>",
       "css": ".ds-verdict { padding: 0.5rem 0.8rem; border-radius: 6px; background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-verdict-right { background: color-mix(in srgb, #16a34a 18%, transparent); } .ds-verdict-wrong { background: color-mix(in srgb, #dc2626 15%, transparent); white-space: pre-wrap; }"
+    },
+    {
+      "name": "Highlighted Code",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "A fenced unit code block, marked up by lowlight on highlight.js core with only the grammars the curriculum uses (Java, SQL, YAML, properties). Comments drop to the muted voice, keywords and configuration keys take weight rather than a hue, and Literal Blue - the one colour in the system that reports no state - marks strings, numbers and literals. A text fence stays plain.",
+      "html": "<pre class=\"ds-code\"><code class=\"language-java\"><span class=\"hljs-comment\">// one row per retry, keyed by the request</span>\n<span class=\"hljs-keyword\">public</span> <span class=\"hljs-type\">Receipt</span> <span class=\"hljs-title function_\">charge</span>(<span class=\"hljs-type\">String</span> key) {\n  <span class=\"hljs-keyword\">if</span> (seen.contains(key)) <span class=\"hljs-keyword\">return</span> <span class=\"hljs-literal\">null</span>;\n  <span class=\"hljs-keyword\">return</span> gateway.charge(key, <span class=\"hljs-number\">4200</span>, <span class=\"hljs-string\">\"INR\"</span>);\n}</code></pre>",
+      "css": ".ds-code { display: block; overflow-x: auto; padding: 0.75rem; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); color: var(--fg, #232321); } .ds-code .hljs-comment, .ds-code .hljs-quote, .ds-code .hljs-doctag { color: var(--muted, #6b6a66); font-style: italic; } .ds-code .hljs-string, .ds-code .hljs-number, .ds-code .hljs-literal, .ds-code .hljs-regexp, .ds-code .hljs-symbol { color: var(--code-literal, #2f5d8a); } .ds-code .hljs-keyword, .ds-code .hljs-built_in, .ds-code .hljs-meta, .ds-code .hljs-attr, .ds-code .hljs-section, .ds-code .hljs-selector-tag { font-weight: 600; } .ds-code .hljs-type, .ds-code .hljs-title { color: var(--fg, #232321); } @media (prefers-color-scheme: dark) { :root { --code-literal: #9fbcdd; } }"
     }
   ],
   "narrative": {
@@ -337,6 +345,11 @@
         "name": "The Flat Bench Rule",
         "body": "Surfaces never lift. If something needs to stand out, it gets a rule, a tonal step or a state colour - never elevation, and never a gradient.",
         "section": "elevation"
+      },
+      {
+        "name": "The Quiet Highlighter Rule",
+        "body": "A code block is marked up with weight and quietness before colour. Comments drop to --muted and italic; keywords, annotations and configuration keys take font-weight 600 and keep the ink they already had; only literal values take Literal Blue, and that hue exists nowhere outside a <pre>. An off-the-shelf highlighter theme is never used, because its green keyword and red error would read as this app’s \"done\" and \"wrong\".",
+        "section": "colors"
       }
     ],
     "dos": [
@@ -356,7 +369,8 @@
       "Don't add an icon beside a heading, a coloured stat tile, or a sidebar. Those are the SaaS dashboard this interface is deliberately not.",
       "Don't animate. There is no transition or keyframe in the system: a control answers by changing weight, not by moving, and motion needs a reason stronger than polish.",
       "Don't leave a long token to push the page sideways - inline code wraps anywhere, table cells break only when a word genuinely does not fit.",
-      "Don't let a bare <p> carry important prose on a reading page without opting back into full contrast; muted is the default for a reason."
+      "Don't let a bare <p> carry important prose on a reading page without opting back into full contrast; muted is the default for a reason.",
+      "Don’t drop in a highlighter’s stock theme, or treat Literal Blue as permission for a second decorative colour: it is confined to code blocks and it is not a precedent."
     ]
   }
 }

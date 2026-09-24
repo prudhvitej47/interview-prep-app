@@ -72,3 +72,39 @@ it("treats following a link as a new visit, not a return", () => {
   fireEvent.click(screen.getByRole("link", { name: "Back home" }));
   expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
 });
+
+// The focus above is deliberate and stays; only the ring it draws is in question. Browsers
+// disagree about whether a heading focused by script after a click counts as "keyboard", so the
+// app records which device the reader used and marks the heading when it was the mouse.
+it("lands the heading without a ring when the reader clicked with the mouse", () => {
+  show();
+  const link = screen.getByRole("link", { name: "Go on" });
+  fireEvent.pointerDown(link);
+  fireEvent.click(link);
+  const heading = screen.getByRole("heading", { name: "Second" });
+  expect(document.activeElement).toBe(heading);
+  expect(heading).toHaveAttribute("data-pointer-nav");
+});
+
+it("keeps the ring when the reader followed the link from the keyboard", () => {
+  show();
+  const link = screen.getByRole("link", { name: "Go on" });
+  fireEvent.pointerDown(link);
+  fireEvent.click(link);
+  const second = screen.getByRole("link", { name: "Back home" });
+  fireEvent.keyDown(second, { key: "Enter" });
+  fireEvent.click(second);
+  const heading = screen.getByRole("heading", { name: "Home" });
+  expect(document.activeElement).toBe(heading);
+  expect(heading).not.toHaveAttribute("data-pointer-nav");
+});
+
+it("drops the mark once the heading loses focus, so a later ring is never silenced", () => {
+  show();
+  const link = screen.getByRole("link", { name: "Go on" });
+  fireEvent.pointerDown(link);
+  fireEvent.click(link);
+  const heading = screen.getByRole("heading", { name: "Second" });
+  fireEvent.blur(heading);
+  expect(heading).not.toHaveAttribute("data-pointer-nav");
+});

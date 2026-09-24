@@ -79,10 +79,20 @@ export function StartHere({ onMe }: { onMe: (me: Me) => void }) {
   );
 }
 
+/**
+ * One numbered step. The list already numbers every step, so a second marker on every line read as
+ * a stray bullet: only a step that is actually done shows anything, and what it shows is a tick.
+ * The column is reserved on all four rows so the text lines up whether or not a tick is in it, and
+ * the two informational steps - which can never be ticked - put nothing in it and say nothing about
+ * being outstanding, which is what tells them apart from a step still waiting.
+ */
 function Step({ done, children }: { done?: boolean; children: React.ReactNode }) {
   return (
     <li className={done ? "done" : undefined}>
-      {done !== undefined && <span className="tick" aria-label={done ? "done" : "to do"}>{done ? "✓" : "○"}</span>}
+      <span className="tick">
+        {done === true && <span aria-label="done">✓</span>}
+        {done === false && <span className="visually-hidden">to do</span>}
+      </span>
       <span>{children}</span>
     </li>
   );
