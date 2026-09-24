@@ -79,9 +79,27 @@ export function useScrollRestoration() {
 }
 
 /**
+ * Which device the reader last reached for. A heading focused by script wears the focus ring or
+ * not according to each browser's own guess about that, and the guesses disagree: Chrome reads a
+ * script focus after a click as "mouse" and stays quiet, WebKit reads it as "keyboard" and draws
+ * the ring. Recording it ourselves makes the answer the same everywhere.
+ */
+let lastInputWasPointer = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", () => (lastInputWasPointer = true), true);
+  window.addEventListener("mousedown", () => (lastInputWasPointer = true), true);
+  window.addEventListener("keydown", () => (lastInputWasPointer = false), true);
+}
+
+/**
  * Moves the keyboard's place to the new page's heading. Without it, Tab after following a link
  * starts again from the top of the window, and a screen reader says nothing about where it landed.
  * The heading arrives with the page's data, so this waits for it the same way.
+ *
+ * <p>The focus always happens; only the ring is conditional. A reader who clicked with the mouse
+ * gets the heading marked `data-pointer-nav`, which index.css uses to hold the ring back for that
+ * one element; a reader who pressed Enter on the link gets the ring as usual. The mark is dropped
+ * when the heading loses focus, so it can never silence a later keyboard focus.
  */
 export function useHeadingFocus() {
   const location = useLocation();
@@ -93,6 +111,12 @@ export function useHeadingFocus() {
       const heading = document.querySelector<HTMLElement>("main h2");
       if (!heading) return false;
       heading.tabIndex = -1;
+      if (lastInputWasPointer) {
+        heading.setAttribute("data-pointer-nav", "");
+        heading.addEventListener("blur", () => heading.removeAttribute("data-pointer-nav"), { once: true });
+      } else {
+        heading.removeAttribute("data-pointer-nav");
+      }
       heading.focus({ preventScroll: true });
       return true;
     });

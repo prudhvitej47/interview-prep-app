@@ -11,6 +11,8 @@ colors:
   progress: "#16a34a"
   attention: "#d97706"
   wrong: "#dc2626"
+  code-literal: "#2f5d8a"
+  code-literal-dark: "#9fbcdd"
 typography:
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
@@ -143,6 +145,10 @@ about state.
 - **Attention Amber** (`#d97706`, at 12–18% mix): the "how are you with these?" rating card, and the
   banner on a retired unit. It asks for a moment of attention; it never signals an error.
 - **Wrong Red** (`#dc2626`, at 15% mix): one use only, the verdict on an incorrect practice answer.
+- **Literal Blue** (`#2f5d8a` light / `#9fbcdd` dark): the one hue in the system that does not report
+  state, and the only one confined to a single surface. It colours literal values — strings,
+  numbers, `true`/`false`/`null` — inside a highlighted code block, and appears nowhere else. It is
+  blue precisely so it cannot be mistaken for progress, attention or wrong.
 
 ### Neutral
 
@@ -156,6 +162,12 @@ about state.
 **The State-Only Rule.** Saturated colour reports state and nothing else: green for progress and
 correct, amber for attention wanted, red for wrong. There is no brand hue, no fourth colour, and no
 colour used because a section needed livening up.
+
+**The Quiet Highlighter Rule.** A code block is marked up with weight and quietness before colour.
+Comments drop to `--muted` and italic; keywords, annotations and configuration keys take
+`font-weight: 600` and keep the ink they already had; only literal values take Literal Blue, and
+that hue exists nowhere outside a `<pre>`. An off-the-shelf highlighter theme is never used, because
+its green keyword and red error would read as this app's "done" and "wrong".
 
 **The One Ink Rule.** Surfaces, borders, rules, bars and code blocks are all `color-mix` of the
 foreground into the background — 4% for a diagram frame, 5% for a card, 6% for code, 10–12% for a
@@ -263,6 +275,29 @@ reader is meant to open looks different from one that is simply grouped.
 - **Padding:** 0.8rem × 1rem; heading flush to the top (`h3 { margin: 0 0 0.5rem }`).
 - Used for the dashboard's cards, the rewards strip, reviews due, and the start-here guide.
 
+### Highlighted code
+
+A fenced block in a language the curriculum uses is marked up at build time by `lowlight` on
+highlight.js's bare core, with four grammars registered by hand — **Java, SQL, YAML and
+properties** — and nothing else, so no unused language and no outside request ships with the app. A
+` ```text ` fence stays plain: it holds output and prose, which has no grammar to show. Rendering
+produces React elements, never `innerHTML`.
+
+The palette is deliberately almost colourless, against the highlighter convention:
+
+| Token | Treatment | Why |
+| --- | --- | --- |
+| comment, quote, doctag | `var(--muted)`, italic | the one thing in a block a reader may skip, in the app's existing recessive voice |
+| keyword, built-in, annotation, config key, section | `font-weight: 600`, ink unchanged | structure carried by weight, which costs no colour |
+| string, number, literal, regexp, symbol | Literal Blue | the values are what a reader scans for, and they are the only thing worth a hue |
+| type, class and method names | full ink | already the loudest thing on the surface |
+| everything else | inherits | operators, punctuation and identifiers are the body text of code |
+
+Contrast over the 6% code surface: 4.6:1 light / 5.2:1 dark for a comment, 5.9:1 / 7.5:1 for a
+literal. Adding a language means registering its grammar *and* checking what token classes it emits
+against this table — a grammar that emits something unlisted falls back to plain ink, which is
+correct but dull.
+
 ### Inputs and fields
 
 - **Style:** 6px, page background, 1px ink-at-20–25% border, `font: inherit` (monospace and 0.9rem in
@@ -275,6 +310,10 @@ reader is meant to open looks different from one that is simply grouped.
 - A row of pills under the title: muted by default, underline on hover, and the current section in
   full-contrast ink with a 1px ink-at-25% border. Identical at every width — it wraps rather than
   collapsing into a menu.
+- Every link carries that 1px border, transparent when it is not current, so marking a pill never
+  moves the row. **Every address belongs to exactly one pill**: a unit or a topic page is the
+  curriculum, which lives on the home page, so Home stays marked while one is open. A row with no
+  pill at all reads as broken, not as neutral.
 - Breadcrumbs are muted 0.875rem, `›`-separated, with the domain linking back to its section of the
   home page.
 
@@ -286,6 +325,12 @@ The parts nobody draws still belong to the system, and browser defaults match no
   transparent)` at `outline-offset: 2px`, on `:focus-visible` only, so it appears for the keyboard and
   not for the mouse. `tools/layout-check.mjs` tabs through the first four controls of every page and
   fails any that shows no ring.
+- **The page heading** is focused by script after every navigation, so the keyboard and a screen
+  reader land on the new page rather than at the top of the window. Browsers disagree about whether
+  a script focus counts as "keyboard" — WebKit draws the ring after a mouse click, Chrome does not —
+  so the app records which device the reader used and marks the heading `data-pointer-nav` when it
+  was the mouse; only that one element, and only then, goes without the ring. The focus itself
+  always happens.
 - **Selection:** ink at 18%, so selected text stays legible in both schemes.
 - **Caret:** the foreground colour. **Scrollbar:** ink at 30% on a transparent track.
 
@@ -325,6 +370,9 @@ goal bar above is the only green on the page.
 
 - **Don't** add a `box-shadow`, a gradient, or any lift. This system has none, by decision.
 - **Don't** introduce a fourth colour, a brand hue, or colour used for decoration rather than state.
+  Literal Blue is the single exception, it is confined to code blocks, and it is not a precedent.
+- **Don't** drop in a highlighter's stock theme. Its green keyword and red error mean "done" and
+  "wrong" here; mark code up with weight and quietness first, and give the one hue to literals.
 - **Don't** load a web font, an icon font, or any third-party asset: the app must render fully on a
   private network with no outside requests.
 - **Don't** add an icon beside a heading, a coloured stat tile, or a sidebar. Those are the SaaS

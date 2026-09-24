@@ -11,6 +11,13 @@ const MARK: Record<WeekOutcome, { mark: string; label: string }> = {
   IN_PROGRESS: { mark: "◌", label: "this week, in progress" },
 };
 
+// The same five outcomes as a sentence, for when there is only one week to report.
+function inWords(week: { weekStart: string; outcome: WeekOutcome }): string {
+  return week.outcome === "IN_PROGRESS"
+    ? "This week: in progress"
+    : `Week of ${formatDay(week.weekStart)}: ${MARK[week.outcome].label}`;
+}
+
 export function RewardsStrip() {
   const [rewards, setRewards] = useState<Rewards | null>(null);
 
@@ -30,23 +37,30 @@ export function RewardsStrip() {
         {" · "}
         {rewards.freezes} freeze{rewards.freezes === 1 ? "" : "s"} banked
       </p>
-      {rewards.recentWeeks.length > 0 && (
-        <p className="weeks-row">
-          <span className="count">Recent weeks</span>{" "}
-          <span className="weeks" aria-label="Recent weeks">
-            {rewards.recentWeeks.map((w) => (
-              <span key={w.weekStart} title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
-                aria-label={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}>
-                {MARK[w.outcome].mark}
-              </span>
-            ))}
-          </span>{" "}
-          {/* A key for the marks actually shown, so a lone mark is never a mystery. */}
-          <span className="count">
+      {/* One week is not a row, and a single mark followed by a key explaining that one mark read
+          as a stammer ("Recent weeks ◌ ◌ this week, in progress"). Below two weeks there is nothing
+          to compare, so the week says what it is in plain words. */}
+      {rewards.recentWeeks.length === 1 && <p className="count">{inWords(rewards.recentWeeks[0])}</p>}
+      {rewards.recentWeeks.length > 1 && (
+        <>
+          <p className="weeks-row">
+            <span className="count">Recent weeks</span>{" "}
+            <span className="weeks" aria-label="Recent weeks">
+              {rewards.recentWeeks.map((w) => (
+                <span key={w.weekStart} title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
+                  aria-label={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}>
+                  {MARK[w.outcome].mark}
+                </span>
+              ))}
+            </span>
+          </p>
+          {/* A key for the marks actually shown, so no mark is a mystery - on its own line, because
+              at twelve weeks it is longer than the row it explains. */}
+          <p className="count">
             {[...new Set(rewards.recentWeeks.map((w) => w.outcome))]
               .map((o) => `${MARK[o].mark} ${MARK[o].label}`).join(" · ")}
-          </span>
-        </p>
+          </p>
+        </>
       )}
       {milestone && <p className="hint">You have passed {milestone} stars.</p>}
     </section>

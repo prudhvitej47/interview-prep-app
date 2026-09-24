@@ -27,7 +27,11 @@ it("walks a new learner through the first week, nothing ticked yet", async () =>
   const card = await screen.findByRole("region", { name: "Start here" });
   expect(card).toHaveTextContent("Set up your week");
   expect(card).toHaveTextContent("Again, Hard, Good or Easy");
-  await waitFor(() => expect(screen.getAllByLabelText("to do")).toHaveLength(2));
+  // The <ol> numbers the steps; only a step that is done shows a mark, so nothing stray sits
+  // before a step still waiting - but it still says "to do" to a screen reader.
+  await waitFor(() => expect(screen.getAllByText("to do")).toHaveLength(2));
+  expect(card).not.toHaveTextContent("○");
+  expect(screen.queryByLabelText("done")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "How this works" })).toHaveAttribute("href", "/how-it-works");
 });
 
@@ -35,7 +39,7 @@ it("ticks the week once hours and days are set", async () => {
   mockFetch({ "/api/plan": { body: SET_UP_WEEK }, "/api/rewards": { body: rewards(0) } });
   show();
   expect(await screen.findByLabelText("done")).toBeInTheDocument();
-  expect(screen.getByLabelText("to do")).toBeInTheDocument();
+  expect(screen.getByText("to do")).toBeInTheDocument();
 });
 
 it("closes for good when asked, and tells the app", async () => {

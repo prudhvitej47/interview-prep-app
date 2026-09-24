@@ -102,6 +102,13 @@ a { color: var(--fg); text-underline-offset: 2px; }
   outline: 2px solid color-mix(in srgb, var(--fg) 55%, transparent);
   outline-offset: 2px;
 }
+/* Following a link moves the keyboard's place to the new page's heading (navigation.ts), which is
+   the right thing to do and stays. But a heading focused by script inherits whatever each browser
+   guesses about the reader's last input, and WebKit guesses "keyboard" - so a mouse click landed
+   the new page wearing a ring nobody asked for. navigation.ts marks the heading when the
+   navigation came from a pointer, and only that heading goes quiet. The ring itself is untouched,
+   and a keyboard navigation still carries it. */
+main h2[data-pointer-nav]:focus-visible { outline: none; }
 ::selection { background: color-mix(in srgb, var(--fg) 18%, transparent); }
 html { scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent; caret-color: var(--fg); }
 
@@ -142,12 +149,34 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 
 .domain { border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); padding: 0.6rem 0; }
 .domain summary { cursor: pointer; font-weight: 600; }
-.domain ul, .units { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.domain ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+/* A `.units` row is a flex column, which drops `display: list-item`, so no bullet is ever drawn -
+   the 1.2rem gutter these lists used to share with `.domain ul` reserved space for a marker that
+   does not exist, and pushed the weak-areas card's text 19px right of every neighbouring card's. */
+.units { margin: 0.5rem 0 0; padding-left: 0; list-style: none; }
 .domain li, .units li { margin: 0.2rem 0; }
 .units li { display: flex; flex-direction: column; }
 
 .unit h3 { margin-top: 1.6rem; }
 .unit pre { overflow-x: auto; padding: 0.75rem; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+/* Syntax highlighting, under the house rules. A default highlighter theme paints keywords green
+   and errors red, which in this app are already the words for "progress" and "wrong" - a green
+   `class` keyword would be a lie. So colour does almost nothing here: a comment drops to the same
+   muted voice as every other skippable thing on the page, keywords and declarations carry weight
+   instead of a hue, and exactly one hue - a desaturated blue, used nowhere else in the app and
+   never to report state - marks the literal values, the part of a block a reader scans for.
+   Contrast over the 6% code surface: 4.6/5.2 for a comment, 5.9/7.5 for a literal. */
+:root { --code-literal: #2f5d8a; }
+@media (prefers-color-scheme: dark) { :root { --code-literal: #9fbcdd; } }
+.unit pre code .hljs-comment, .unit pre code .hljs-quote, .unit pre code .hljs-doctag {
+  color: var(--muted); font-style: italic; }
+.unit pre code .hljs-string, .unit pre code .hljs-number, .unit pre code .hljs-literal,
+.unit pre code .hljs-regexp, .unit pre code .hljs-symbol { color: var(--code-literal); }
+.unit pre code .hljs-keyword, .unit pre code .hljs-built_in, .unit pre code .hljs-meta,
+.unit pre code .hljs-attr, .unit pre code .hljs-section, .unit pre code .hljs-selector-tag {
+  font-weight: 600; }
+.unit pre code .hljs-type, .unit pre code .hljs-title { color: var(--fg); }
 .unit table { border-collapse: collapse; }
 .unit td, .unit th { border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); padding: 0.3rem 0.6rem; }
 .diagram { margin: 1rem 0; overflow-x: auto; padding: 1rem; border-radius: 8px;
@@ -196,7 +225,11 @@ summary:hover { text-decoration: underline; }
 .progress h3, .reviews-due h3 { margin-top: 0; }
 .progress .hint, .reviews-due .hint { color: var(--muted); font-size: 0.875rem; }
 .ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.5rem 0; }
+/* A button centres its content, so the four equal-height boxes put "Easy" - whose caption is one
+   line where the others take two - ten pixels lower than its neighbours. A column that starts at
+   the top puts all four labels on the same line whatever their captions do. */
 .ratings button { font: inherit; font-weight: 600; padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0.2rem;
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
 .ratings button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--fg) 50%, transparent);
   background: color-mix(in srgb, var(--fg) 6%, transparent); }
