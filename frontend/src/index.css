@@ -135,8 +135,11 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .diagram svg { max-width: 100%; min-width: 640px; height: auto; }
 
 /* Long unbroken tokens - a Java generic, an email address, a URL - must wrap rather than push the
-   whole page sideways. */
-.unit code, .unit td, .unit th { overflow-wrap: anywhere; }
+   whole page sideways. `break-word` breaks one only when it genuinely does not fit; `anywhere` also
+   shrinks a table column to its narrowest word and hyphenates ordinary prose, which reads as gibberish
+   ("Commu nication"). Inline code keeps `anywhere`, since those tokens have no break points at all. */
+.unit td, .unit th { overflow-wrap: break-word; }
+.unit code { overflow-wrap: anywhere; }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
 .banner { padding: 0.6rem 0.9rem; border-radius: 6px; background: color-mix(in srgb, #d97706 18%, transparent); color: var(--fg); }
