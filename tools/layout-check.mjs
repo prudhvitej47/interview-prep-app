@@ -28,6 +28,9 @@ const VIEWPORTS = [
 // scales the SVG down to fit, so the number that matters is the size after scaling.
 const MIN_DIAGRAM_TEXT_PX = 8.5;
 
+// How many controls to tab through per page, checking that keyboard focus is actually visible.
+const FOCUS_STOPS = 4;
+
 function arg(name, fallback = null) {
   const at = process.argv.indexOf(`--${name}`);
   return at === -1 ? fallback : process.argv[at + 1];
@@ -129,6 +132,17 @@ const INSPECT = `(() => {
   });
 })()`;
 
+// Runs after a Tab press. Returns a description only when the focused control has no visible ring.
+const FOCUS_RING = `(() => {
+  const el = document.activeElement;
+  if (!el || el === document.body) return null;
+  const style = getComputedStyle(el);
+  const ringed = style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0;
+  if (ringed || style.boxShadow !== 'none') return null;
+  const name = el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).split(' ')[0] : '');
+  return name + ' ("' + (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30) + '")';
+})()`;
+
 async function main() {
   const ids = unitIds();
   const schemes = scheme === "both" ? ["dark", "light"] : [scheme];
@@ -157,6 +171,13 @@ async function main() {
         }
         await sleep(150);
         const report = JSON.parse(await evaluate(INSPECT));
+        report.unfocusable = [];
+        for (let stop = 0; stop < FOCUS_STOPS; stop++) {
+          await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+          await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+          const focused = await evaluate(FOCUS_RING);
+          if (focused) report.unfocusable.push(focused);
+        }
         checked++;
         const where = `${id} [${viewport.name}/${colours}]`;
         if (report.sourceFallbacks > 0) problems.push(`${where}: ${report.sourceFallbacks} diagram(s) showed source instead of a picture`);
@@ -170,6 +191,7 @@ async function main() {
           }
         });
         if (report.headings === 0) problems.push(`${where}: no headings rendered - did the page load?`);
+        for (const control of report.unfocusable) problems.push(`${where}: ${control} shows no ring when tabbed to`);
       }
     }
   }

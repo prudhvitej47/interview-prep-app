@@ -95,6 +95,30 @@ h1 a { color: inherit; text-decoration: none; }
 a { color: var(--fg); text-underline-offset: 2px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
+/* The parts we did not draw still belong to the design: the ring, the caret, the selection and the
+   scrollbar all ship with browser defaults that match nothing. One ring for every control, built from
+   the same ink as everything else, and offset so it never sits on the border it is describing. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--fg) 55%, transparent);
+  outline-offset: 2px;
+}
+::selection { background: color-mix(in srgb, var(--fg) 18%, transparent); }
+html { scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent; caret-color: var(--fg); }
+
+/* Tactile, without motion: a control answers by changing weight, not by moving. Hover lightens the
+   solid fill or strengthens an outline; the pressed state goes one step further in the same
+   direction. No transition - the feedback should be as immediate as the key press. */
+.onboarding button:hover:not(:disabled),
+.note-actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 86%, var(--bg)); }
+.onboarding button:active:not(:disabled),
+.note-actions button:active:not(:disabled) { background: color-mix(in srgb, var(--fg) 74%, var(--bg)); }
+.note-actions button.secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.note-actions button.secondary:active:not(:disabled) { background: color-mix(in srgb, var(--fg) 14%, transparent); }
+button.link:hover { color: var(--fg); }
+
 nav.sections { display: flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; margin: -0.3rem 0 1.2rem; }
 nav.sections a { padding: 0.2rem 0.6rem; border-radius: 999px; text-decoration: none; color: var(--muted);
   border: 1px solid transparent; }
@@ -142,10 +166,15 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .unit code { overflow-wrap: anywhere; }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
+.folded:hover { border-color: color-mix(in srgb, var(--fg) 40%, transparent); }
+summary:hover { text-decoration: underline; }
 .banner { padding: 0.6rem 0.9rem; border-radius: 6px; background: color-mix(in srgb, #d97706 18%, transparent); color: var(--fg); }
 
 .notes textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 0.6rem; border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); background: var(--bg); color: var(--fg); }
+.notes textarea:focus-visible, .practice textarea:focus-visible,
+.settings input:focus-visible, .draft input:focus-visible, .draft select:focus-visible,
+.draft textarea:focus-visible { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
 .note-actions { display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; }
 .note-actions button, .onboarding button { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; border: 0;
   background: var(--fg); color: var(--bg); cursor: pointer; }
@@ -167,8 +196,11 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .progress h3, .reviews-due h3 { margin-top: 0; }
 .progress .hint, .reviews-due .hint { color: var(--muted); font-size: 0.875rem; }
 .ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.5rem 0; }
-.ratings button { font: inherit; font-weight: 600; padding: 0.5rem; border-radius: 6px; cursor: pointer; text-align: left;
+.ratings button { font: inherit; font-weight: 600; padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left;
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
+.ratings button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--fg) 50%, transparent);
+  background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.ratings button:active:not(:disabled) { background: color-mix(in srgb, var(--fg) 12%, transparent); }
 .ratings button small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 .ratings button:disabled { opacity: 0.5; cursor: default; }
 button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; padding: 0; color: var(--muted);
@@ -220,9 +252,12 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .placement-unit { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .choices { display: flex; gap: 0.3rem; align-items: center; white-space: nowrap; }
 @media (max-width: 560px) { .placements li { grid-template-columns: 1fr; } }
-.choices button { font: inherit; font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 999px; cursor: pointer;
+.choices button { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 999px; cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
+.choices button:hover { border-color: color-mix(in srgb, var(--fg) 50%, transparent);
+  background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .choices button.chosen { background: var(--fg); color: var(--bg); }
+.choices button.chosen:hover { background: color-mix(in srgb, var(--fg) 86%, var(--bg)); }
 .browse { margin-top: 1.5rem; }
 .start-here { margin: 0.8rem 0 1rem; }
 .start-here ol { padding-left: 1.2rem; margin: 0.5rem 0; }
