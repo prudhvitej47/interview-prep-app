@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-24T03:40:00Z",
+  "title": "Design System: Interview Prep",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "#232321",
+        "darkValue": "#eceae5",
+        "tonalRamp": [
+          "#0d0d0c",
+          "#1c1c1a",
+          "#232321",
+          "#3b3b38",
+          "#5c5b57",
+          "#8a8983",
+          "#b9b8b1",
+          "#e6e5df"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#fbfaf8",
+        "darkValue": "#1c1c1a",
+        "tonalRamp": [
+          "#1c1c1a",
+          "#33322f",
+          "#4f4e4a",
+          "#6f6e69",
+          "#96958f",
+          "#c2c1ba",
+          "#e8e7e1",
+          "#fbfaf8"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#6b6a66",
+        "darkValue": "#9b998f",
+        "tonalRamp": [
+          "#1f1f1d",
+          "#343330",
+          "#4b4a47",
+          "#6b6a66",
+          "#8a8983",
+          "#a9a8a1",
+          "#c9c8c1",
+          "#e9e8e2"
+        ]
+      },
+      "progress": {
+        "role": "secondary",
+        "displayName": "Progress Green",
+        "canonical": "#16a34a",
+        "tonalRamp": [
+          "#052e16",
+          "#14532d",
+          "#166534",
+          "#15803d",
+          "#16a34a",
+          "#4ade80",
+          "#86efac",
+          "#dcfce7"
+        ]
+      },
+      "attention": {
+        "role": "tertiary",
+        "displayName": "Attention Amber",
+        "canonical": "#d97706",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#f59e0b",
+          "#fcd34d",
+          "#fef3c7"
+        ]
+      },
+      "wrong": {
+        "role": "tertiary",
+        "displayName": "Wrong Red",
+        "canonical": "#dc2626",
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#dc2626",
+          "#f87171",
+          "#fca5a5",
+          "#fee2e2"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The app title in the header, and nothing else."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings inside a unit, and card headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose, held near 70 characters by the 44rem column."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Hints, metadata, breadcrumbs, counts, status lines. Muted."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Code and SQL the learner reads or types. Monospace, never for emphasis."
+      }
+    },
+    "surfaceLadder": [
+      {
+        "name": "diagram-frame",
+        "value": "color-mix(in srgb, var(--fg) 4%, transparent)",
+        "purpose": "The frame around a rendered diagram."
+      },
+      {
+        "name": "card",
+        "value": "color-mix(in srgb, var(--fg) 5%, transparent)",
+        "purpose": "Dashboard cards, rewards strip, reviews due, start-here."
+      },
+      {
+        "name": "code",
+        "value": "color-mix(in srgb, var(--fg) 6%, transparent)",
+        "purpose": "Code blocks and verdict panels."
+      },
+      {
+        "name": "rule-list",
+        "value": "color-mix(in srgb, var(--fg) 10%, transparent)",
+        "purpose": "Rules between list items; bar tracks."
+      },
+      {
+        "name": "rule-section",
+        "value": "color-mix(in srgb, var(--fg) 12%, transparent)",
+        "purpose": "Section rules and domain dividers."
+      },
+      {
+        "name": "border-table",
+        "value": "color-mix(in srgb, var(--fg) 15%, transparent)",
+        "purpose": "Table cell borders, fieldset borders."
+      },
+      {
+        "name": "border-input",
+        "value": "color-mix(in srgb, var(--fg) 20%, transparent)",
+        "purpose": "Text inputs and textareas."
+      },
+      {
+        "name": "border-control",
+        "value": "color-mix(in srgb, var(--fg) 25%, transparent)",
+        "purpose": "Choice pills, rating buttons, active nav."
+      },
+      {
+        "name": "border-ghost",
+        "value": "color-mix(in srgb, var(--fg) 30%, transparent)",
+        "purpose": "Secondary button outline."
+      }
+    ],
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "stack",
+        "value": "560px"
+      },
+      {
+        "name": "diagram-floor",
+        "value": "640px"
+      }
+    ],
+    "diagramTheme": {
+      "light": {
+        "primaryColor": "#eef2ff",
+        "primaryBorderColor": "#1e3a8a",
+        "primaryTextColor": "#0f172a",
+        "lineColor": "#1e3a8a"
+      },
+      "dark": {
+        "primaryColor": "#243244",
+        "primaryBorderColor": "#64748b",
+        "primaryTextColor": "#e5e7eb"
+      },
+      "branchScale": [
+        "#1f2937",
+        "#243244",
+        "#2b3a2f",
+        "#3a2f3f",
+        "#263445",
+        "#33302a",
+        "#2a3b3b",
+        "#3b2f34"
+      ],
+      "purpose": "Mermaid theme variables set in frontend/src/unit/Mermaid.tsx. Flowcharts use ELK; every other diagram type uses Mermaid's own layout, and diagrams draw one at a time because Mermaid keeps one global config."
+    },
+    "browserSurfaces": {
+      "focusRing": "2px solid color-mix(in srgb, var(--fg) 55%, transparent) at outline-offset 2px, on :focus-visible only",
+      "selection": "color-mix(in srgb, var(--fg) 18%, transparent)",
+      "caret": "var(--fg)",
+      "scrollbar": "scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent",
+      "purpose": "The surfaces the browser would otherwise style for us. tools/layout-check.mjs tabs through the first four controls of every page and fails any that shows no ring."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid button per view: save, run, submit.",
+      "html": "<button class=\"ds-btn-primary\">Save note</button>",
+      "css": ".ds-btn-primary { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; border: 0; background: var(--fg, #232321); color: var(--bg, #fbfaf8); cursor: pointer; } .ds-btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--fg, #232321) 86%, var(--bg, #fbfaf8)); } .ds-btn-primary:active:not(:disabled) { background: color-mix(in srgb, var(--fg, #232321) 74%, var(--bg, #fbfaf8)); } .ds-btn-primary:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.45; cursor: default; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action beside the primary one: reset, cancel.",
+      "html": "<button class=\"ds-btn-ghost\">Reset data</button>",
+      "css": ".ds-btn-ghost { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; background: transparent; color: var(--fg, #232321); border: 1px solid color-mix(in srgb, var(--fg, #232321) 30%, transparent); cursor: pointer; } .ds-btn-ghost:hover { background: color-mix(in srgb, var(--fg, #232321) 8%, transparent); border-color: color-mix(in srgb, var(--fg, #232321) 45%, transparent); } .ds-btn-ghost:active { background: color-mix(in srgb, var(--fg, #232321) 14%, transparent); } .ds-btn-ghost:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Link Button",
+      "kind": "button",
+      "refersTo": "button-link",
+      "description": "An in-flow action that is not the page's main verb.",
+      "html": "<button class=\"ds-btn-link\">Change my hours, days or weights</button>",
+      "css": ".ds-btn-link { font: inherit; font-size: 0.875rem; background: none; border: 0; padding: 0; color: var(--muted, #6b6a66); text-decoration: underline; cursor: pointer; } .ds-btn-link:hover { color: var(--fg, #232321); } .ds-btn-link:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Choice Pill",
+      "kind": "chip",
+      "refersTo": "choice-pill",
+      "description": "Now / Next week / Later on the what-changed card; selected inverts to solid ink.",
+      "html": "<span class=\"ds-choices\"><button class=\"ds-pill\">Now</button><button class=\"ds-pill ds-pill-chosen\">Next week</button><button class=\"ds-pill\">Later</button></span>",
+      "css": ".ds-choices { display: flex; gap: 0.3rem; align-items: center; white-space: nowrap; } .ds-pill { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 999px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--fg, #232321) 25%, transparent); background: transparent; color: var(--fg, #232321); } .ds-pill:hover { border-color: color-mix(in srgb, var(--fg, #232321) 50%, transparent); background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-pill:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; } .ds-pill-chosen { background: var(--fg, #232321); color: var(--bg, #fbfaf8); } .ds-pill-chosen:hover { background: color-mix(in srgb, var(--fg, #232321) 86%, var(--bg, #fbfaf8)); }"
+    },
+    {
+      "name": "Section Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "The row of pills under the title; the current section is full-contrast with a border.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Sections\"><a href=\"#\" class=\"ds-nav-active\">Home</a><a href=\"#\">This week</a><a href=\"#\">Interview evidence</a><a href=\"#\">How this works</a></nav>",
+      "css": ".ds-nav { display: flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; margin: -0.3rem 0 1.2rem; } .ds-nav a { padding: 0.2rem 0.6rem; border-radius: 999px; text-decoration: none; color: var(--muted, #6b6a66); border: 1px solid transparent; } .ds-nav a:hover { text-decoration: underline; } .ds-nav a.ds-nav-active { color: var(--fg, #232321); border-color: color-mix(in srgb, var(--fg, #232321) 25%, transparent); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Dashboard panel: ink at 5%, 8px corners, no border, no shadow.",
+      "html": "<section class=\"ds-card\"><h3>This week</h3><p class=\"ds-hint\">20 of 80 goal minutes done.</p></section>",
+      "css": ".ds-card { padding: 0.8rem 1rem; border-radius: 8px; background: color-mix(in srgb, var(--fg, #232321) 5%, transparent); } .ds-card h3 { margin: 0 0 0.5rem; font-size: 1.05rem; } .ds-hint { color: var(--muted, #6b6a66); font-size: 0.875rem; margin: 0.4rem 0; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Note editor and form inputs; the practice editors use the monospace stack.",
+      "html": "<textarea class=\"ds-field\" rows=\"3\">Only you can see these.</textarea>",
+      "css": ".ds-field { width: 100%; box-sizing: border-box; font: inherit; padding: 0.6rem; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--fg, #232321) 20%, transparent); background: var(--bg, #fbfaf8); color: var(--fg, #232321); caret-color: var(--fg, #232321); } .ds-field:focus-visible { border-color: color-mix(in srgb, var(--fg, #232321) 45%, transparent); outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Rating Buttons",
+      "kind": "custom",
+      "refersTo": "rating-group",
+      "description": "The four self-ratings that close a unit and schedule its reviews.",
+      "html": "<div class=\"ds-ratings\"><button class=\"ds-rating\">Again<small>I couldn't do it; show it again tomorrow</small></button><button class=\"ds-rating\">Hard<small>Got there, with effort or a peek</small></button><button class=\"ds-rating\">Good<small>Did it, with some thought</small></button><button class=\"ds-rating\">Easy<small>Straightforward</small></button></div>",
+      "css": ".ds-ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.5rem 0; } .ds-rating { font: inherit; font-weight: 600; padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left; border: 1px solid color-mix(in srgb, var(--fg, #232321) 25%, transparent); background: var(--bg, #fbfaf8); color: var(--fg, #232321); } .ds-rating small { display: block; font-weight: 400; color: var(--muted, #6b6a66); font-size: 0.75rem; } .ds-rating:hover { border-color: color-mix(in srgb, var(--fg, #232321) 50%, transparent); background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-rating:active { background: color-mix(in srgb, var(--fg, #232321) 12%, transparent); } .ds-rating:focus-visible { outline: 2px solid color-mix(in srgb, var(--fg, #232321) 55%, transparent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Folded Spoiler",
+      "kind": "custom",
+      "refersTo": "folded",
+      "description": "A dashed border marks a section the reader should open only when ready: hints, a solution, an expected diagnosis.",
+      "html": "<details class=\"ds-folded\"><summary>Show solution</summary><p>Two pointers, one from each end.</p></details>",
+      "css": ".ds-folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg, #232321) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; } .ds-folded summary { cursor: pointer; font-weight: 600; }"
+    },
+    {
+      "name": "Goal Bar",
+      "kind": "custom",
+      "refersTo": "goal-bar",
+      "description": "The week's progress against its goal minutes; the only green on the page.",
+      "html": "<span class=\"ds-bar\"><span style=\"width: 62%\"></span></span>",
+      "css": ".ds-bar { display: block; height: 0.5rem; border-radius: 4px; overflow: hidden; background: color-mix(in srgb, var(--fg, #232321) 10%, transparent); } .ds-bar > span { display: block; height: 100%; background: #16a34a; }"
+    },
+    {
+      "name": "Verdict",
+      "kind": "custom",
+      "refersTo": "verdict",
+      "description": "The answer to a practice attempt: green when right, red when wrong, neutral otherwise.",
+      "html": "<p class=\"ds-verdict ds-verdict-right\">✓ Goal met: this week counts towards your streak.</p>",
+      "css": ".ds-verdict { padding: 0.5rem 0.8rem; border-radius: 6px; background: color-mix(in srgb, var(--fg, #232321) 6%, transparent); } .ds-verdict-right { background: color-mix(in srgb, #16a34a 18%, transparent); } .ds-verdict-wrong { background: color-mix(in srgb, #dc2626 15%, transparent); white-space: pre-wrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Engineer's Bench",
+    "overview": "Tools laid out and labelled, within reach. This interface is instrumentation for two people doing difficult work on a deadline: it reports what is due, what is done and what is left, and then gets out of the way of the material. Density appears only where density helps - a week's plan, a table of trade-offs, a set of test cases. Everywhere else the page is plain, and that plainness is the design, not an absence of one.\n\nThe system is built from three variables and a single stylesheet. Two of them are the ground (near-black ink on warm paper, inverted after dark) and one is the recessive voice for everything secondary. Every surface in the app is that same ink mixed into the background at 4-6% - never a new colour, never a shadow. Depth is tonal and shallow by construction: a card is a slightly warmer patch of the same paper, not an object floating above it. Saturated colour exists in exactly three places and always reports a state rather than setting a mood.\n\nThe intended growth is in typography, structure and the figures - a sharper scale, stronger section rhythm, better-composed diagrams and data. It is not in colour, ornament or motion. Confirmed anti-references: a SaaS dashboard, a marketing page, a documentation site.",
+    "keyCharacteristics": [
+      "Three colour variables, one stylesheet, no component framework",
+      "Flat by construction: tonal layering, zero box-shadow in the entire system",
+      "Colour reports state; it never decorates",
+      "One 44rem column, from phone to desktop",
+      "Monospace only where the content is data",
+      "Nothing animates"
+    ],
+    "rules": [
+      {
+        "name": "The State-Only Rule",
+        "body": "Saturated colour reports state and nothing else: green for progress and correct, amber for attention wanted, red for wrong. There is no brand hue, no fourth colour, and no colour used because a section needed livening up.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Ink Rule",
+        "body": "Surfaces, borders, rules, bars and code blocks are all color-mix of the foreground into the background - 4% for a diagram frame, 5% for a card, 6% for code, 10-12% for a rule, 15-25% for a border. New surfaces pick a percentage from that ladder rather than a new colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Muted-Paragraph Rule",
+        "body": "A bare <p> is muted by default, because most paragraphs in this app are supporting text. A page whose job is reading opts back into full contrast explicitly.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Column Rule",
+        "body": "44rem, centred, at every width. There is no sidebar, no second column and no right-hand table of contents. Navigation is a row of pills under the title.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Bench Rule",
+        "body": "Surfaces never lift. If something needs to stand out, it gets a rule, a tonal step or a state colour - never elevation, and never a gradient.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do build surfaces from color-mix(in srgb, var(--fg) N%, transparent), picking N from the existing ladder (4 / 5 / 6 / 10 / 12 / 15 / 20 / 25 / 30).",
+      "Do keep every new page inside the single 44rem column, and let it narrow rather than rearrange.",
+      "Do put state in colour and nothing else: green for progress or correct, amber for attention, red for wrong.",
+      "Do use monospace when the content is code or a query the learner types, and never for emphasis.",
+      "Do collapse a two-column row to one column at 560px, using minmax(0, 1fr) so long titles shrink instead of pushing controls off the row.",
+      "Do let a wide diagram scroll inside its frame below 640px, and run tools/layout-check.mjs over any page that gains one.",
+      "Do mark a spoiler with the dashed-border fold; a reader must be able to see what is safe to read.",
+      "Do give every new control the house focus ring by leaving :focus-visible alone, and let the control also answer in its own vocabulary (border, fill) on hover and press."
+    ],
+    "donts": [
+      "Don't add a box-shadow, a gradient, or any lift. This system has none, by decision.",
+      "Don't introduce a fourth colour, a brand hue, or colour used for decoration rather than state.",
+      "Don't load a web font, an icon font, or any third-party asset: the app must render fully on a private network with no outside requests.",
+      "Don't add an icon beside a heading, a coloured stat tile, or a sidebar. Those are the SaaS dashboard this interface is deliberately not.",
+      "Don't animate. There is no transition or keyframe in the system: a control answers by changing weight, not by moving, and motion needs a reason stronger than polish.",
+      "Don't leave a long token to push the page sideways - inline code wraps anywhere, table cells break only when a word genuinely does not fit.",
+      "Don't let a bare <p> carry important prose on a reading page without opting back into full contrast; muted is the default for a reason."
+    ]
+  }
+}
