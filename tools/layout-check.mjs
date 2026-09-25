@@ -28,6 +28,10 @@ const VIEWPORTS = [
 // scales the SVG down to fit, so the number that matters is the size after scaling.
 const MIN_DIAGRAM_TEXT_PX = 8.5;
 
+// Larger than this and a diagram has been stretched past the size Mermaid drew it: a small flowchart
+// forced to the column width once drew its labels at 61px.
+const MAX_DIAGRAM_SCALE = 1.05;
+
 // How many controls to tab through per page, checking that keyboard focus is actually visible.
 const FOCUS_STOPS = 4;
 
@@ -114,12 +118,18 @@ const INSPECT = `(() => {
     const viewBox = svg.viewBox?.baseVal?.width || box.width;
     const scale = viewBox > 0 ? box.width / viewBox : 1;
     let smallest = Infinity;
-    for (const text of svg.querySelectorAll('text, tspan')) {
+    // SVG text, and the HTML labels Mermaid draws inside foreignObject (mindmaps, flowcharts): the
+    // first version measured only SVG text, and passed mindmaps whose labels drew at 5px.
+    for (const text of svg.querySelectorAll('text, tspan, foreignObject div, foreignObject span')) {
       if (!text.textContent.trim()) continue;
       const size = parseFloat(getComputedStyle(text).fontSize) * scale;
       if (size > 0) smallest = Math.min(smallest, size);
     }
-    return { width: Math.round(box.width), smallestText: smallest === Infinity ? null : Math.round(smallest * 10) / 10 };
+    return {
+      width: Math.round(box.width),
+      scale: Math.round(scale * 100) / 100,
+      smallestText: smallest === Infinity ? null : Math.round(smallest * 10) / 10,
+    };
   });
   return JSON.stringify({
     pageScrolls: document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -164,6 +174,9 @@ async function main() {
           if (await evaluate(`!!document.querySelector('.unit h2')`)) break;
           await sleep(200);
         }
+        // Open the folded sections: a question unit's diagram usually sits in one, and a closed
+        // section draws at zero size, so it would never be measured.
+        await evaluate(`document.querySelectorAll('details.folded').forEach((d) => { d.open = true; })`);
         for (let i = 0; i < 40; i++) {
           const pending = await evaluate(`document.querySelectorAll('.diagram[aria-busy="true"]').length`);
           if (pending === 0) break;
@@ -188,6 +201,9 @@ async function main() {
         report.diagrams.forEach((d, i) => {
           if (d.smallestText !== null && d.smallestText < MIN_DIAGRAM_TEXT_PX) {
             problems.push(`${where}: diagram ${i + 1} draws text at ${d.smallestText}px, below ${MIN_DIAGRAM_TEXT_PX}px`);
+          }
+          if (d.scale > MAX_DIAGRAM_SCALE) {
+            problems.push(`${where}: diagram ${i + 1} is stretched to ${d.scale}x the size it was drawn at`);
           }
         });
         if (report.headings === 0) problems.push(`${where}: no headings rendered - did the page load?`);
