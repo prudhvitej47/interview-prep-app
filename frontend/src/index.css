@@ -295,8 +295,8 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .start-here { margin: 0.8rem 0 1rem; }
 .start-here ol { padding-left: 1.2rem; margin: 0.5rem 0; }
 .start-here li { margin: 0.4rem 0; }
-.start-here .tick { display: inline-block; width: 1.3rem; color: var(--muted); }
-.start-here li.done > span:last-child { color: var(--muted); }
+.start-here .tick { margin-left: 0.4rem; color: var(--muted); }
+.start-here li.done > .step-text { color: var(--muted); }
 .how-it-works section { margin: 1.4rem 0; }
 /* A page to read, like a unit: body text at full contrast, not the muted default for paragraphs. */
 .how-it-works p:not(.hint) { color: var(--fg); }
