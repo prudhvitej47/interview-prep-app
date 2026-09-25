@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { RewardsStrip } from "./RewardsStrip";
 import { mockFetch } from "../testing";
+import { formatDay } from "../unit/ProgressPanel";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,7 +45,9 @@ it("says a single week in words, with no mark and no key to decode", async () =>
 
 it("names the week when the one week on record is already finished", async () => {
   const region = await strip([{ weekStart: "2026-10-19", outcome: "GOAL_MET" }]);
-  expect(region).toHaveTextContent("Week of Mon, Oct 19: goal met");
+  // The date is in the reader's own locale ("Mon, Oct 19" or "Mon, 19 Oct"), so compare with the
+  // formatter rather than one spelling of it.
+  expect(region).toHaveTextContent(`Week of ${formatDay("2026-10-19")}: goal met`);
   expect(region).not.toHaveTextContent("●");
 });
 

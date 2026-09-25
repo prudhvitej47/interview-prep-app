@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 let nextId = 0;
 
@@ -59,6 +59,38 @@ export function diagramConfig(dark: boolean, chart = "flowchart") {
   };
 }
 
+/** The smallest drawn label, in CSS pixels, that a diagram may shrink to before it scrolls instead. */
+export const READABLE_TEXT_PX = 10;
+
+/**
+ * How wide a diagram may be drawn: never wider than Mermaid drew it, so a small diagram is not
+ * stretched into giant text; and never narrower than keeps its smallest label readable, so a wide one
+ * scrolls in its own box rather than shrinking into a smudge. Between the two it fills the column.
+ */
+export function drawnWidth(natural: number, smallestFont: number): { min: number; max: number } {
+  if (!(natural > 0)) return { min: 0, max: 0 };
+  const floor = smallestFont > 0 ? natural * (READABLE_TEXT_PX / smallestFont) : natural;
+  return { min: Math.round(Math.min(natural, floor)), max: Math.round(natural) };
+}
+
+/** Sizes a drawn SVG by `drawnWidth`, reading its natural width and its smallest label. */
+function fitToReadable(svg: SVGSVGElement) {
+  const natural = svg.viewBox?.baseVal?.width ?? 0;
+  let smallest = Infinity;
+  // SVG text, and the HTML labels Mermaid puts in foreignObject (mindmaps, flowcharts); both report
+  // their font size in the SVG's own units, before the page scales it.
+  for (const label of svg.querySelectorAll("text, foreignObject div, foreignObject span")) {
+    if (!label.textContent?.trim()) continue;
+    const size = parseFloat(getComputedStyle(label).fontSize);
+    if (size > 0) smallest = Math.min(smallest, size);
+  }
+  const { min, max } = drawnWidth(natural, smallest === Infinity ? 0 : smallest);
+  if (max === 0) return;
+  svg.style.width = "100%";
+  svg.style.maxWidth = `${max}px`;
+  svg.style.minWidth = `${min}px`;
+}
+
 /** Only the two flowchart keywords; anything else draws itself. */
 export function laidOutByElk(chart: string): boolean {
   const first = chart.trimStart().split(/\s/, 1)[0];
@@ -80,6 +112,12 @@ let drawing: Promise<unknown> = Promise.resolve();
 export function Mermaid({ chart }: { chart: string }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const drawn = box.current?.querySelector("svg");
+    if (drawn) fitToReadable(drawn);
+  }, [svg]);
 
   useEffect(() => {
     let live = true;
@@ -108,5 +146,5 @@ export function Mermaid({ chart }: { chart: string }) {
   // A diagram that will not draw still shows its source, rather than leaving a hole in the page.
   if (failed) return <pre className="diagram-source">{chart}</pre>;
   if (!svg) return <div className="diagram" aria-busy="true">Drawing the diagram…</div>;
-  return <div className="diagram" role="img" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div className="diagram" role="img" ref={box} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
