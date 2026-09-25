@@ -178,6 +178,8 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
   font-weight: 600; }
 .unit pre code .hljs-type, .unit pre code .hljs-title { color: var(--fg); }
 .unit table { border-collapse: collapse; }
+.table-scroll { overflow-x: auto; margin: 1rem 0; }
+.table-scroll > table { margin: 0; }
 .unit td, .unit th { border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); padding: 0.3rem 0.6rem; }
 .diagram { margin: 1rem 0; overflow-x: auto; padding: 1rem; border-radius: 8px;
   background: color-mix(in srgb, var(--fg) 4%, transparent); }

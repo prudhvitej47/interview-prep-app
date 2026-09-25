@@ -37,6 +37,11 @@ export function Markdown({ children }: { children: string }) {
           }
           return <code className={className} {...rest}>{code}</code>;
         },
+        // A wide table (a SQL result with seven snake_case columns) scrolls in its own box, like a
+        // diagram, instead of pushing the whole page sideways.
+        table({ children: rows, node: _node, ...rest }) {
+          return <div className="table-scroll"><table {...rest}>{rows}</table></div>;
+        },
         // A diagram replaces its code block entirely instead of sitting inside a <pre>.
         pre({ children: inner }) {
           return isMermaid(inner) ? <>{inner}</> : <pre>{inner}</pre>;
