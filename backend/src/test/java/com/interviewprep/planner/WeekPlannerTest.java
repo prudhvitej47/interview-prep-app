@@ -199,6 +199,16 @@ class WeekPlannerTest {
   }
 
   @Test
+  void aBehaviouralQuestionFillsTheScenarioSlotWhenNoScenarioIsLeft() {
+    List<Candidate> units = new ArrayList<>(curriculum());
+    units.removeIf(u -> u.unitId().equals("beh.ladder") || u.unitId().equals("ds.scenario"));
+    units.add(unit("beh.disagreement", "behavioral", "question", 30));
+    Plan p = plan(9, units, List.of());
+    assertThat(item(p, "beh.disagreement").reason()).startsWith("Required every week: scenario, project or behavioural");
+    assertThat(p.notes()).isEmpty();
+  }
+
+  @Test
   void whatIsMissingIsSaidNotHidden() {
     Plan p = plan(9, List.of(unit("dsa.window.concept", "dsa", "concept", 30)), List.of());
     assertThat(p.notes()).contains("No system design units to learn yet, so this week has none.");

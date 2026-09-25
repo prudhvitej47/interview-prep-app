@@ -91,8 +91,12 @@ final class WeekPlanner {
           c -> Set.of("databases", "data", "distributed").contains(c.domainId())),
       new Group("low-level design", c -> c.domainId().equals("lld")),
       new Group("system design", c -> c.domainId().equals("hld")),
+      // By type for scenarios and projects, which live in every domain; by domain for behavioural,
+      // whose question and concept units are the same practice under another shape. Matching the
+      // type alone left all but one behavioural unit out of this slot.
       new Group("scenario, project or behavioural",
-          c -> Set.of("scenario", "project", "behavioral").contains(c.type())));
+          c -> Set.of("scenario", "project", "behavioral").contains(c.type())
+              || c.domainId().equals("behavioral")));
 
   private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK);
 
