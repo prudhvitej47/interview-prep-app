@@ -42,3 +42,10 @@ it("still hands a mermaid fence to the diagram instead of the highlighter", () =
   expect(container.querySelector("pre")).toBeNull();
   expect(container.querySelector(".diagram")).toBeInTheDocument();
 });
+
+it("puts a table in its own scrolling box, so a wide one cannot push the page sideways", () => {
+  const { container } = render(<Markdown>{"| a | b |\n| --- | --- |\n| 1 | 2 |\n"}</Markdown>);
+  const table = container.querySelector("table");
+  expect(table?.parentElement?.className).toBe("table-scroll");
+  expect(table?.querySelectorAll("td")).toHaveLength(2);
+});
