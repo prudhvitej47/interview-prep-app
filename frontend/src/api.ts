@@ -237,7 +237,7 @@ export async function rateTopics(ratings: Record<string, number>): Promise<void>
   await send("PUT", "/api/me/ratings/topics", { ratings });
 }
 
-export type WeekOutcome = "GOAL_MET" | "BREAK" | "FREEZE_USED" | "MISSED" | "IN_PROGRESS";
+export type WeekOutcome = "GOAL_MET" | "BREAK" | "NOTHING_PLANNED" | "FREEZE_USED" | "MISSED" | "IN_PROGRESS";
 
 export type Rewards = {
   stars: number;
