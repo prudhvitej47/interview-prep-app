@@ -156,4 +156,26 @@ class RewardsTest {
     assertThat(s.freezes()).isEqualTo(1);
     assertThat(s.recentWeeks()).extracting(Rewards.Week::outcome).containsExactly(Outcome.IN_PROGRESS);
   }
+
+  @Test
+  void aWeekWhosePlanHadNothingInItNeitherCountsNorCosts() {
+    // Goal met, then a week opened after its last study day (0 planned minutes), then goal met.
+    LocalDate w1 = THIS_MONDAY.minusWeeks(3);
+    List<WeekResult> results = List.of(
+        new WeekResult(w1, 300, 240, 250),
+        new WeekResult(w1.plusWeeks(1), 0, 0, 0),
+        new WeekResult(w1.plusWeeks(2), 300, 240, 250));
+    Summary s = Rewards.of(List.of(), TYPES, results, Set.of(), THIS_MONDAY);
+    assertThat(s.streak()).isEqualTo(2);
+    assertThat(s.freezes()).isEqualTo(1);
+    assertThat(s.recentWeeks()).extracting(Rewards.Week::outcome).containsExactly(
+        Outcome.GOAL_MET, Outcome.NOTHING_PLANNED, Outcome.GOAL_MET, Outcome.IN_PROGRESS);
+  }
+
+  @Test
+  void thisWeekWithNothingPlannedSaysSoRatherThanInProgress() {
+    Summary s = Rewards.of(List.of(), TYPES, List.of(new WeekResult(THIS_MONDAY, 0, 0, 0)), Set.of(), THIS_MONDAY);
+    assertThat(s.recentWeeks()).extracting(Rewards.Week::outcome).containsExactly(Outcome.NOTHING_PLANNED);
+    assertThat(s.freezes()).isEqualTo(1);
+  }
 }

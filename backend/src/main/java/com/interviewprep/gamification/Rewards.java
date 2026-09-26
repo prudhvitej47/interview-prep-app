@@ -22,7 +22,9 @@ import java.util.Set;
  * reviews earns 1. A week that meets its goal earns 5, and 2 more if the whole plan was done.
  *
  * <p><b>The streak</b> counts consecutive weeks that met their goal, from the first planned week.
- * A planned break neither counts nor breaks it. A missed week uses a freeze if one is banked, and
+ * A planned break neither counts nor breaks it, and nor does a week whose plan had nothing in it
+ * (0 planned minutes: first opened after its last study day, say), since there was nothing to miss.
+ * A missed week uses a freeze if one is banked, and
  * otherwise resets the streak. Freezes: 1 to start, 1 more for every 4 goal weeks in a row, at
  * most 2 banked. The week in progress only ever adds: once its goal is met it counts, and until
  * then it cannot cost anything.
@@ -38,7 +40,7 @@ final class Rewards {
   static final int REVIEWS_FOR_A_STAR = 3;
   static final List<Integer> MILESTONES = List.of(50, 100, 250);
 
-  enum Outcome { GOAL_MET, BREAK, FREEZE_USED, MISSED, IN_PROGRESS }
+  enum Outcome { GOAL_MET, BREAK, NOTHING_PLANNED, FREEZE_USED, MISSED, IN_PROGRESS }
 
   record Week(LocalDate weekStart, Outcome outcome) {}
 
@@ -101,6 +103,8 @@ final class Rewards {
       Outcome outcome;
       if (breaks.contains(w)) {
         outcome = Outcome.BREAK;
+      } else if (byWeek.containsKey(w) && byWeek.get(w).planned() == 0) {
+        outcome = Outcome.NOTHING_PLANNED;
       } else if (byWeek.containsKey(w) && byWeek.get(w).goalMet()) {
         outcome = Outcome.GOAL_MET;
         streak++;
@@ -122,7 +126,9 @@ final class Rewards {
     }
     boolean thisWeekCounts = byWeek.containsKey(thisMonday) && byWeek.get(thisMonday).goalMet();
     Outcome now = breaks.contains(thisMonday) ? Outcome.BREAK
-        : thisWeekCounts ? Outcome.GOAL_MET : Outcome.IN_PROGRESS;
+        : thisWeekCounts ? Outcome.GOAL_MET
+        : byWeek.containsKey(thisMonday) && byWeek.get(thisMonday).planned() == 0 ? Outcome.NOTHING_PLANNED
+        : Outcome.IN_PROGRESS;
     history.add(new Week(thisMonday, now));
     int shownStreak = streak + (thisWeekCounts ? 1 : 0);
     longest = Math.max(longest, shownStreak);

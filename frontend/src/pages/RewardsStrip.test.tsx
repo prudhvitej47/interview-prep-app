@@ -61,3 +61,9 @@ it("keeps one row of marks and one key however many weeks there are", async () =
   // Twelve weeks, two outcomes: the key explains each mark once, not once per week.
   expect(region).toHaveTextContent("● goal met · ◌ this week, in progress");
 });
+
+it("names a week that had nothing planned without calling it missed", async () => {
+  const region = await strip([{ weekStart: "2026-10-19", outcome: "NOTHING_PLANNED" }]);
+  expect(region).toHaveTextContent(`Week of ${formatDay("2026-10-19")}: nothing was planned`);
+  expect(region).not.toHaveTextContent("not reached");
+});

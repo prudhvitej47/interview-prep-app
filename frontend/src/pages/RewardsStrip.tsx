@@ -8,10 +8,12 @@ const MARK: Record<WeekOutcome, { mark: string; label: string }> = {
   FREEZE_USED: { mark: "❄", label: "missed, a freeze kept the streak" },
   MISSED: { mark: "○", label: "goal not reached" },
   BREAK: { mark: "–", label: "planned break" },
+  // A week first opened after its last study day plans 0 minutes: there was nothing to miss.
+  NOTHING_PLANNED: { mark: "·", label: "nothing was planned" },
   IN_PROGRESS: { mark: "◌", label: "this week, in progress" },
 };
 
-// The same five outcomes as a sentence, for when there is only one week to report.
+// The same outcomes as a sentence, for when there is only one week to report.
 function inWords(week: { weekStart: string; outcome: WeekOutcome }): string {
   return week.outcome === "IN_PROGRESS"
     ? "This week: in progress"
