@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WeekPage } from "./WeekPage";
@@ -68,6 +68,21 @@ describe("WeekPage", () => {
     expect(JSON.parse(put[1]!.body as string)).toEqual({ hoursPerWeek: 9, studyDays: [1, 3], weights: {} });
     expect(put[1]!.headers).toMatchObject({ "X-XSRF-TOKEN": "token-from-the-server" });
     expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/plan" && i?.method === "DELETE")).toBe(true);
+  });
+
+  it("shows the share of the week each weight gives, as the planner computes it", async () => {
+    const fetchMock = mockFetch({
+      "/api/plan": { body: week(null, NO_SETTINGS) },
+      "/api/domains": { body: DOMAINS },
+      "/api/plan/shares": { body: [{ domainId: "dsa", name: "DSA and coding", percent: 100 }] },
+    });
+    show();
+    const dsa = await screen.findByLabelText("Weight for DSA and coding");
+    fireEvent.change(screen.getByLabelText("Weight for Databases and SQL"), { target: { value: "0" } });
+    await waitFor(() => expect(dsa.closest("label")).toHaveTextContent("≈ 100% of your week"));
+    expect(screen.getByLabelText("Weight for Databases and SQL").closest("label")).toHaveTextContent("left out");
+    const sent = fetchMock.mock.calls.filter(([url]) => url === "/api/plan/shares").at(-1);
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({ weights: { databases: 0 } });
   });
 
   it("lays the week out by day, with why each item is there and what is done", async () => {

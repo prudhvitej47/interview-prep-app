@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
-  fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, rateTopics, saveWeekSettings, takeBreak,
+  fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, previewShares, rateTopics, saveWeekSettings, takeBreak,
   type Breaks, type Domain, type PlanView, type Week, type WeekSettings,
 } from "../api";
 import { formatDay } from "../unit/ProgressPanel";
@@ -172,12 +172,30 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
   const [weights, setWeights] = useState<Record<string, string>>(
     Object.fromEntries(Object.entries(initial.weights).map(([k, v]) => [k, String(v)])));
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [shares, setShares] = useState<Record<string, number> | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDomains().then(setDomains).catch(() => setDomains([]));
   }, []);
+
+  // Weights are relative numbers, which are hard to reason about: show the share of the week each
+  // one produces, computed by the planner itself, a moment after the typing stops.
+  const overrides = weightOverrides(weights);
+  const overridesKey = JSON.stringify(overrides);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(() => {
+      previewShares(JSON.parse(overridesKey))
+        .then((list) => live && setShares(Object.fromEntries(list.map((s) => [s.domainId, s.percent]))))
+        .catch(() => live && setShares(null));
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [overridesKey]);
 
   const hoursValue = Number(hours);
   const valid = hours !== "" && hoursValue >= 1 && hoursValue <= 40 && days.length > 0;
@@ -187,9 +205,10 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
     setSaving(true);
     setError(null);
     try {
-      const overrides = Object.fromEntries(
+      // Sent as typed: an out-of-range weight is the server's to refuse, with a message.
+      const typed = Object.fromEntries(
         Object.entries(weights).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)]));
-      onSaved(await saveWeekSettings({ hoursPerWeek: hoursValue, studyDays: days, weights: overrides }));
+      onSaved(await saveWeekSettings({ hoursPerWeek: hoursValue, studyDays: days, weights: typed }));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -221,6 +240,7 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
             <span>{d.name}</span>
             <input type="number" min={0} max={100} placeholder={String(d.weight)} value={weights[d.id] ?? ""}
               onChange={(e) => setWeights({ ...weights, [d.id]: e.target.value })} aria-label={`Weight for ${d.name}`} />
+            {shares && <span className="share">{shareLabel(d.id, overrides[d.id] ?? d.weight, shares)}</span>}
           </label>
         ))}
       </details>
@@ -232,6 +252,19 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
       {error && <p role="alert">{error}</p>}
     </form>
   );
+}
+
+function weightOverrides(weights: Record<string, string>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(weights)
+      .filter(([, v]) => v.trim() !== "" && Number(v) >= 0 && Number(v) <= 100)
+      .map(([k, v]) => [k, Number(v)]));
+}
+
+function shareLabel(domainId: string, weight: number, shares: Record<string, number>): string {
+  if (weight === 0) return "left out";
+  if (domainId in shares) return `≈ ${shares[domainId]}% of your week`;
+  return "nothing to learn yet";
 }
 
 /** Up to two weeks a quarter, taken before the week starts (proposal G). */

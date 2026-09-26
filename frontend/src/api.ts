@@ -212,6 +212,13 @@ export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
   return fetchWeek();
 }
 
+/** Each area's share of the week with these weight overrides, exactly as the next plan would use it. */
+export type SharePreview = { domainId: string; name: string; percent: number }[];
+
+export async function previewShares(weights: Record<string, number>): Promise<SharePreview> {
+  return (await send("POST", "/api/plan/shares", { weights })).json();
+}
+
 /** Closes the home page's "Start here" guide, or brings it back. */
 export async function setStartGuideClosed(closed: boolean): Promise<Me> {
   return (await send("PUT", "/api/me/start-guide", { closed })).json();
