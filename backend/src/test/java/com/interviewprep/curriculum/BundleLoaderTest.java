@@ -135,6 +135,19 @@ class BundleLoaderTest extends PostgresTestBase {
   }
 
   @Test
+  void aRetiredUnitThatReturnsUnchangedIsBackInTheCurriculum() {
+    // Reverting a removal brings the unit back with the very content hash it had before.
+    load(base());
+    load(withUnitRemoved(base(), B));
+    BundleLoader.Result restored = load(base());
+
+    assertThat(jdbc.queryForObject("select state from unit where id = ?", String.class, B))
+        .isEqualTo("draft");
+    assertThat(restored.changed()).isEqualTo(1);
+    assertThat(version(B)).isEqualTo(2);
+  }
+
+  @Test
   void revertingToEarlierContentIsANewRelease() {
     load(base());
     load(withUnitEdited(base(), A));
