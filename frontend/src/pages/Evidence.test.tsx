@@ -96,6 +96,8 @@ describe("evidence", () => {
         : draft,
     }));
     fireEvent.click(screen.getByRole("button", { name: "Send to the curriculum" }));
+    // A second click while GitHub is answering cannot send it again.
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
     const note = await screen.findByRole("note");
     expect(note).toHaveTextContent("proposals/2026-10-01-2026-10-stripe-debrief");
     expect(within(note).getByRole("link", { name: /see it on GitHub/ })).toHaveAttribute("href", "https://github.com/o/c/pulls?q=x");

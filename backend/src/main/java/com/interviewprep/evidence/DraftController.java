@@ -148,6 +148,13 @@ class DraftController {
     if (!built.problems().isEmpty()) {
       return ResponseEntity.unprocessableContent().body(new Problems(built.problems()));
     }
+    // Claimed before GitHub is called: a double click, or a second tab, finds it taken and gets a
+    // 409 instead of opening a second proposal. The claim is given back if GitHub says no.
+    MapSqlParameterSource claim = new MapSqlParameterSource().addValue("id", id).addValue("learner", me.id());
+    if (jdbc.update("update evidence_draft set sent_at = now()"
+        + " where id = :id and learner_id = :learner and sent_at is null", claim) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "already sent");
+    }
     String name = LocalDate.now(ProgressQueries.STUDY_ZONE) + "-" + built.evidenceId().substring(3);
     String branch;
     try {
@@ -155,8 +162,12 @@ class DraftController {
               built.path(), built.yaml(),
               "changes/" + name + ".md", summary(built)),
           "Add a debrief of a " + companyName(built.company()) + " interview");
-    } catch (ContentRepo.Failed e) {
-      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
+    } catch (RuntimeException e) {
+      jdbc.update("update evidence_draft set sent_at = null where id = :id and learner_id = :learner", claim);
+      if (e instanceof ContentRepo.Failed) {
+        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
+      }
+      throw e;
     }
     jdbc.update("update evidence_draft set sent_at = now(), sent_branch = :branch where id = :id",
         new MapSqlParameterSource().addValue("branch", branch).addValue("id", id));
