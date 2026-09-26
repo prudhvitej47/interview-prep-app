@@ -183,6 +183,46 @@ describe("UnitPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("There is no such unit.");
   });
 
+  it("keeps the note locked when it could not be loaded, so saving cannot replace it", async () => {
+    const fetchMock = mockFetch({
+      [URL]: { body: unit() },
+      [`${URL}/note`]: { status: 500, body: {} },
+      [`${URL}/progress`]: { body: NOT_DONE },
+      "/api/me/not-for-me": { body: { topics: [], units: [] } },
+    });
+    render(
+      <MemoryRouter initialEntries={["/units/ds.transactions.idempotency-keys"]}>
+        <Routes>
+          <Route path="/units/:unitId" element={<UnitPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const retry = await screen.findByRole("button", { name: "Try loading it again" });
+    expect(screen.getByLabelText("Your notes on this unit")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Save note" })).toBeNull();
+
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: true, status: 200, json: async () => ({ body: "An earlier answer.", updatedAt: "2026-09-21T10:00:00Z" }),
+    }));
+    fireEvent.click(retry);
+    const box = await screen.findByDisplayValue("An earlier answer.");
+    expect(box).toBeEnabled();
+  });
+
+  it("asks before leaving the page with unsaved note changes", async () => {
+    show(unit());
+    const box = await screen.findByLabelText("Your notes on this unit");
+    await vi.waitFor(() => expect(box).toBeEnabled());
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.change(box, { target: { value: "Half an answer" } });
+    const dirty = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+  });
+
   it("saves a private note with the CSRF token", async () => {
     const fetchMock = show(unit());
     const box = await screen.findByLabelText("Your notes on this unit");
