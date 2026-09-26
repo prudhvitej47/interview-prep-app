@@ -10,6 +10,7 @@ import com.interviewprep.curriculum.DomainCatalog;
 import com.interviewprep.evidence.EvidenceQueries;
 import com.interviewprep.learner.LearnerPrincipal;
 import com.interviewprep.learner.LearnerProfile;
+import com.interviewprep.learner.LearnerProfile.NotForMe;
 import com.interviewprep.learner.LearnerProfile.Ratings;
 import com.interviewprep.learner.LearnerProfile.WeekSettings;
 import com.interviewprep.planner.WeekPlanner.Candidate;
@@ -142,7 +143,11 @@ class PlanController {
     });
     List<Candidate> candidates = new ArrayList<>();
     List<DueReview> reviews = new ArrayList<>();
+    NotForMe notForMe = profile.notForMe(me.id());
     for (PlannableUnit u : units) {
+      if (excluded(u, notForMe, topics)) {
+        continue;  // "Not for me": neither learned nor reviewed in this learner's plans
+      }
       if (byUnit.containsKey(u.id())) {
         LocalDate due = ProgressQueries.dueOn(byUnit.get(u.id()));
         if (!due.isAfter(monday.plusDays(6))) {
@@ -233,6 +238,19 @@ class PlanController {
     Map<String, String> unitTopics = new HashMap<>();
     units.forEach(u -> unitTopics.put(u.id(), u.topicId()));
     return new Proficiency(topics, ratings.topics(), ratings.domains(), lastRating, unitTopics);
+  }
+
+  /** Excluded by its own id, by its topic, or by any topic above it. */
+  private static boolean excluded(PlannableUnit u, NotForMe notForMe, Map<String, TopicPlace> topics) {
+    if (notForMe.units().contains(u.id())) {
+      return true;
+    }
+    for (String t = u.topicId(); t != null; t = topics.containsKey(t) ? topics.get(t).parentId() : null) {
+      if (notForMe.topics().contains(t)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Reports on the topic itself or on any topic above it: a report about "transactions" counts for sagas. */

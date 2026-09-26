@@ -21,6 +21,7 @@ function show(unitBody: object, note = { body: "", updatedAt: null }, progress: 
     [URL]: { body: unitBody },
     [`${URL}/note`]: { body: note },
     [`${URL}/progress`]: { body: progress },
+    "/api/me/not-for-me": { body: { topics: [], units: [] } },
   });
   render(
     <MemoryRouter initialEntries={["/units/ds.transactions.idempotency-keys"]}>

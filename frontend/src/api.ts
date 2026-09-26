@@ -217,6 +217,15 @@ export async function setStartGuideClosed(closed: boolean): Promise<Me> {
   return (await send("PUT", "/api/me/start-guide", { closed })).json();
 }
 
+/** Topics and units this learner has kept out of their own plans. */
+export type NotForMe = { topics: string[]; units: string[] };
+
+export const fetchNotForMe = () => getJson<NotForMe>("/api/me/not-for-me");
+
+export async function setNotForMe(scope: "topic" | "unit", id: string, excluded: boolean): Promise<NotForMe> {
+  return (await send("PUT", "/api/me/not-for-me", { scope, id, excluded })).json();
+}
+
 export async function rateTopics(ratings: Record<string, number>): Promise<void> {
   await send("PUT", "/api/me/ratings/topics", { ratings });
 }
