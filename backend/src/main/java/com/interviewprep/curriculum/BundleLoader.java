@@ -210,7 +210,9 @@ class BundleLoader {
       String id = u.path("id").asString();
       String hash = u.path("content_hash").asString();
       inBundle.add(id);
-      if (hash.equals(existing.get(id))) {
+      // A retired unit coming back has the hash it had before retiring, so it counts as changed:
+      // otherwise a reverted removal would stay retired for good.
+      if (hash.equals(existing.get(id)) && !alreadyRetired.contains(id)) {
         continue; // unchanged: keeps its version and the release it last changed in
       }
       MapSqlParameterSource p = unitParams(u, releaseId);
