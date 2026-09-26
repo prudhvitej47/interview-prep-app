@@ -26,6 +26,7 @@ export function DraftPage() {
   const [exported, setExported] = useState<{ path: string; yaml: string } | null>(null);
   const [sent, setSent] = useState<Pick<Draft, "sentAt" | "sentBranch" | "sentUrl"> | null>(null);
   const [notSetUp, setNotSetUp] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     fetchEvidenceOptions().then(setOptions).catch(() => undefined);
@@ -65,6 +66,7 @@ export function DraftPage() {
   async function send() {
     setProblems([]);
     setStatus(null);
+    setSending(true);
     try {
       const savedId = await save();
       const result = await sendDraft(savedId);
@@ -76,6 +78,8 @@ export function DraftPage() {
       } else setSent({ sentAt: new Date().toISOString(), sentBranch: result.branch, sentUrl: result.url });
     } catch (e) {
       setStatus((e as Error).message);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -161,7 +165,7 @@ export function DraftPage() {
       </fieldset>
 
       <div className="note-actions">
-        {!sent && <button onClick={send}>Send to the curriculum</button>}
+        {!sent && <button onClick={send} disabled={sending}>{sending ? "Sending…" : "Send to the curriculum"}</button>}
         {!sent && (
           <button className="secondary" onClick={() => save().catch((e: Error) => setStatus(e.message))}>Save draft</button>
         )}

@@ -56,6 +56,9 @@ class SendToCurriculumTest extends PostgresTestBase {
   static final Map<String, String> files = new LinkedHashMap<>();
   static final Set<String> taken = new HashSet<>();
   static final List<String> authorizations = new ArrayList<>();
+  /** Slows GitHub's first answer, so two sends can overlap; and makes branch creation fail. */
+  static volatile long mainRefDelayMillis;
+  static volatile boolean refuseBranches;
   static final HttpServer github = start();
 
   private static HttpServer start() {
@@ -69,8 +72,15 @@ class SendToCurriculumTest extends PostgresTestBase {
         int status;
         String response = "{}";
         if (path.endsWith("/git/ref/heads/main")) {
+          try {
+            Thread.sleep(mainRefDelayMillis);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
           status = 200;
           response = "{\"object\": {\"sha\": \"base-sha\"}}";
+        } else if (path.endsWith("/git/refs") && refuseBranches) {
+          status = 500;
         } else if (path.endsWith("/git/refs")) {
           String ref = body.path("ref").asString().substring("refs/heads/".length());
           status = taken.add(ref) ? 201 : 422;
@@ -120,6 +130,8 @@ class SendToCurriculumTest extends PostgresTestBase {
     files.clear();
     taken.clear();
     authorizations.clear();
+    mainRefDelayMillis = 0;
+    refuseBranches = false;
     jdbc.execute("truncate curriculum_release, domain, company, learner, source, track, round_type"
         + " restart identity cascade");
     jdbc.update("insert into domain (id, name, weight, sort_order) values ('distributed', 'Distributed', 100, 0)");
@@ -173,6 +185,36 @@ class SendToCurriculumTest extends PostgresTestBase {
         .andExpect(jsonPath("$.sentAt").isNotEmpty());
     send(put("/api/evidence/drafts/" + id), TESTER, "{\"body\": {}}").andExpect(status().isConflict());
     send(post("/api/evidence/drafts/" + id + "/send"), TESTER, "").andExpect(status().isConflict());
+  }
+
+  @Test
+  void twoSendsAtOnceMakeOneProposal() throws Exception {
+    long id = debrief();
+    // The first send is still waiting on GitHub when the second arrives, as with a double click.
+    mainRefDelayMillis = 500;
+    var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      var first = pool.submit(() -> send(post("/api/evidence/drafts/" + id + "/send"), TESTER, "")
+          .andReturn().getResponse().getStatus());
+      var second = pool.submit(() -> send(post("/api/evidence/drafts/" + id + "/send"), TESTER, "")
+          .andReturn().getResponse().getStatus());
+      assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(200, 409);
+    } finally {
+      pool.shutdown();
+    }
+    assertThat(branches).hasSize(1);
+  }
+
+  @Test
+  void aSendGitHubRefusedCanBeTriedAgain() throws Exception {
+    long id = debrief();
+    refuseBranches = true;
+    send(post("/api/evidence/drafts/" + id + "/send"), TESTER, "").andExpect(status().isBadGateway());
+    mvc.perform(as(get("/api/evidence/drafts/" + id), TESTER)).andExpect(jsonPath("$.sentAt").isEmpty());
+
+    refuseBranches = false;
+    send(post("/api/evidence/drafts/" + id + "/send"), TESTER, "").andExpect(status().isOk());
+    assertThat(branches).hasSize(1);
   }
 
   @Test
