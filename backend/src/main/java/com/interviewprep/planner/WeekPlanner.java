@@ -138,16 +138,7 @@ final class WeekPlanner {
     // Shares, over the domains that have something to learn and a weight above zero.
     Set<String> withUnits = new HashSet<>();
     in.candidates().forEach(c -> withUnits.add(c.domainId()));
-    Map<String, Double> raw = new LinkedHashMap<>();
-    for (Domain d : in.domains()) {
-      if (d.weight() > 0 && withUnits.contains(d.id())) {
-        double factor = 1.5 - 0.16 * Math.clamp(d.strength(), 0, 5);
-        raw.put(d.id(), Math.clamp(d.weight() * factor, d.weight() * 0.5, d.weight() * 2.0));
-      }
-    }
-    double total = raw.values().stream().mapToDouble(Double::doubleValue).sum();
-    Map<String, Double> share = new LinkedHashMap<>();
-    raw.forEach((id, v) -> share.put(id, v / total));
+    Map<String, Double> share = shareOf(in.domains(), withUnits);
     List<Share> shares = in.domains().stream().filter(d -> share.containsKey(d.id()))
         .map(d -> new Share(d.id(), d.name(), (int) Math.round(share.get(d.id()) * 100))).toList();
     Map<String, String> domainNames = new HashMap<>();
@@ -294,6 +285,25 @@ final class WeekPlanner {
       return 15;
     }
     return Math.clamp((int) Math.ceil(r.unitMinutes() / 2.0), 10, 30);
+  }
+
+  /**
+   * Each domain's fraction of the week: weight × a weakness factor from 1.5 (rated 0) down to 0.7
+   * (rated 5), over the domains with a weight above zero and something to learn. The weights form
+   * previews exactly this, so what the learner sees while typing is what the plan will use.
+   */
+  static Map<String, Double> shareOf(List<Domain> domains, Set<String> withUnits) {
+    Map<String, Double> raw = new LinkedHashMap<>();
+    for (Domain d : domains) {
+      if (d.weight() > 0 && withUnits.contains(d.id())) {
+        double factor = 1.5 - 0.16 * Math.clamp(d.strength(), 0, 5);
+        raw.put(d.id(), Math.clamp(d.weight() * factor, d.weight() * 0.5, d.weight() * 2.0));
+      }
+    }
+    double total = raw.values().stream().mapToDouble(Double::doubleValue).sum();
+    Map<String, Double> share = new LinkedHashMap<>();
+    raw.forEach((id, v) -> share.put(id, v / total));
+    return share;
   }
 
   static double score(Candidate c) {

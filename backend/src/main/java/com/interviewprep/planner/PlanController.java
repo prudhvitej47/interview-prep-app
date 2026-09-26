@@ -29,13 +29,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -110,6 +114,48 @@ class PlanController {
       planId = generate(me, monday, settings);
     }
     return new Week(monday, settings, view(me, planId, monday), false);
+  }
+
+  record SharePreview(Map<String, Integer> weights) {}
+
+  /**
+   * Each area's share of the week with these weights, computed exactly as the next plan would compute
+   * it; nothing is saved. Weights are relative numbers, which are hard to reason about; the settings
+   * form shows these percentages while the learner types.
+   */
+  @PostMapping("/api/plan/shares")
+  List<Share> previewShares(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody SharePreview body) {
+    Map<String, Integer> overrides = body == null || body.weights() == null ? Map.of() : body.weights();
+    Set<String> known = new HashSet<>();
+    domains.all().forEach(d -> known.add(d.id()));
+    overrides.forEach((domain, weight) -> {
+      if (!known.contains(domain) || weight == null || weight < 0 || weight > 100) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "weights are 0 to 100 for known areas");
+      }
+    });
+    List<PlannableUnit> units = curriculum.plannable(me.slug());
+    Map<String, TopicPlace> topics = curriculum.topicPlaces();
+    List<Attempt> attempts = progress.attempts(me.id());
+    Proficiency strength = proficiency(me, units, topics, attempts);
+    Set<String> attempted = new HashSet<>();
+    attempts.forEach(a -> attempted.add(a.unitId()));
+    Map<String, String> placed = placements.effective(me);
+    NotForMe notForMe = profile.notForMe(me.id());
+    // The same test as a plan's candidates: not done yet, not placed "later", not "not for me".
+    Set<String> withUnits = new HashSet<>();
+    for (PlannableUnit u : units) {
+      if (!attempted.contains(u.id()) && !Placements.LATER.equals(placed.get(u.id()))
+          && !excluded(u, notForMe, topics)) {
+        withUnits.add(u.domainId());
+      }
+    }
+    List<WeekPlanner.Domain> planDomains = domains.all().stream()
+        .map(d -> new WeekPlanner.Domain(d.id(), d.name(), overrides.getOrDefault(d.id(), d.weight()),
+            strength.ofDomain(d.id())))
+        .toList();
+    Map<String, Double> share = WeekPlanner.shareOf(planDomains, withUnits);
+    return planDomains.stream().filter(d -> share.containsKey(d.id()))
+        .map(d -> new Share(d.id(), d.name(), (int) Math.round(share.get(d.id()) * 100))).toList();
   }
 
   @DeleteMapping("/api/plan")

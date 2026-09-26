@@ -303,6 +303,29 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
+  void theSharePreviewIsWhatThePlanWouldUseAndSavesNothing() throws Exception {
+    // Unrated, both areas sit at neutral strength, so the shares follow the default weights 60:40.
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {}}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].percent").value(60))
+        .andExpect(jsonPath("$[?(@.domainId == 'databases')].percent").value(40));
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {\"dsa\": 20}}")
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].percent").value(33));
+    // 0 leaves an area out, and so does keeping all of its topics out of this learner's plans.
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {\"databases\": 0}}")
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].percent").value(100));
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"topic\", \"id\": \"dsa.window\", \"excluded\": true}");
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {}}")
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].domainId").value("databases"));
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {\"nope\": 5}}").andExpect(status().isBadRequest());
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {\"dsa\": 101}}").andExpect(status().isBadRequest());
+    assertThat(plans()).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from learner_weight", Integer.class)).isZero();
+  }
+
+  @Test
   void notForMeIsChecked() throws Exception {
     send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"domain\", \"id\": \"dsa\", \"excluded\": true}")
         .andExpect(status().isBadRequest());
