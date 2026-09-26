@@ -280,6 +280,42 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
+  void notForMeKeepsATopicOrAUnitOutOfThatLearnersPlansOnly() throws Exception {
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    send(put("/api/me/week"), OTHER, SETTINGS);
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"topic\", \"id\": \"dsa.window\", \"excluded\": true}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.topics[0]").value("dsa.window"));
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"unit\", \"id\": \"db.sql.joins\", \"excluded\": true}")
+        .andExpect(jsonPath("$.units[0]").value("db.sql.joins"));
+
+    // Only the tester's own project unit is left; the other learner's week is untouched.
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items.length()").value(1))
+        .andExpect(jsonPath("$.plan.items[0].unitId").value("db.sql.tester-only"));
+    mvc.perform(as(get("/api/plan"), OTHER)).andExpect(jsonPath("$.plan.items.length()").value(3));
+
+    // Clearing the mark brings the topic back from the next plan drawn.
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"topic\", \"id\": \"dsa.window\", \"excluded\": false}")
+        .andExpect(jsonPath("$.topics.length()").value(0));
+    mvc.perform(as(delete("/api/plan"), TESTER).with(RealCsrf.token(mvc, TESTER))).andExpect(status().isOk());
+    mvc.perform(as(get("/api/plan"), TESTER)).andExpect(jsonPath("$.plan.items.length()").value(3));
+  }
+
+  @Test
+  void notForMeIsChecked() throws Exception {
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"domain\", \"id\": \"dsa\", \"excluded\": true}")
+        .andExpect(status().isBadRequest());
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"unit\", \"id\": \"nope\", \"excluded\": true}")
+        .andExpect(status().isBadRequest());
+    // Another learner's private unit is unknown to this one.
+    send(put("/api/me/not-for-me"), OTHER, "{\"scope\": \"unit\", \"id\": \"db.sql.tester-only\", \"excluded\": true}")
+        .andExpect(status().isBadRequest());
+    send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"topic\", \"id\": \"dsa.window\"}")
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void aReleaseThatChangedNoUnitsLeavesTheDashboardOnTheLastOneThatDid() throws Exception {
     jdbc.update("insert into curriculum_release (version, bundle_digest, git_sha) values ('2026.39.2', 'sha256:e', 'e')");
     mvc.perform(as(get("/api/dashboard"), TESTER))

@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -58,5 +60,18 @@ public class LearnerProfile {
               .put(rs.getString("scope_id"), rs.getInt("rating"));
         });
     return new Ratings(domains, topics);
+  }
+
+  /** What a learner has kept out of their own plans: whole topics (with their subtopics) and single units. */
+  public record NotForMe(Set<String> topics, Set<String> units) {}
+
+  public NotForMe notForMe(long learnerId) {
+    Set<String> topics = new TreeSet<>();
+    Set<String> units = new TreeSet<>();
+    jdbc.query("select scope, scope_id from learner_exclusion where learner_id = :learner",
+        new MapSqlParameterSource("learner", learnerId), rs -> {
+          ("topic".equals(rs.getString("scope")) ? topics : units).add(rs.getString("scope_id"));
+        });
+    return new NotForMe(topics, units);
   }
 }

@@ -1,3 +1,4 @@
+import { NotForMe } from "../unit/NotForMe";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { fetchTopic, NotFoundError, type TopicDetail } from "../api";
@@ -30,6 +31,7 @@ export function TopicPage() {
         )}
       </nav>
       <h2>{topic.name}</h2>
+      <NotForMe scope="topic" id={topic.id} />
 
       {topic.units.length > 0 ? (
         <ul className="units">

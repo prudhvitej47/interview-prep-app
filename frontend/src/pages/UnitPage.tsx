@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { fetchUnit, NotFoundError, type UnitDetail } from "../api";
 import { Markdown } from "../unit/Markdown";
 import { NoteEditor } from "../unit/NoteEditor";
+import { NotForMe } from "../unit/NotForMe";
 import { PlanNav } from "./PlanNav";
 import { ProgressPanel } from "../unit/ProgressPanel";
 import { splitSections, TYPE_LABEL } from "../unit/sections";
@@ -101,6 +102,9 @@ export function UnitPage() {
 
       {unit.state !== "retired" && <ProgressPanel unitId={unit.id} type={unit.type} />}
       <PlanNav unitId={unit.id} />
+      {unit.state !== "retired" && (
+        <NotForMe scope="unit" id={unit.id} topicId={unit.topicId} topicName={unit.topicName} />
+      )}
       <NoteEditor unitId={unit.id} />
     </article>
   );
