@@ -13,6 +13,10 @@
   }
 }
 
+/* Radios and checkboxes are drawn by the browser, in its own blue unless told otherwise: a fourth
+   colour the State-Only Rule does not allow. Ink, like a chosen pill. */
+:root { accent-color: var(--fg); }
+
 /* Scroll anchoring shifts the page as data arrives above the fold, which fights the restored
    position after Back (navigation.ts). Pages here render before their data, so it costs nothing. */
 html, body { overflow-anchor: none; }
@@ -141,7 +145,9 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .plan-nav a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; vertical-align: bottom; }
 @media (max-width: 560px) {
-  .plan-nav { grid-template-columns: 1fr; }
+  /* minmax(0, ...), not a bare 1fr: a bare 1fr grows to the unbroken width of a long title (the
+     links do not wrap), which pushed every planned unit page ~540px wide on a phone. */
+  .plan-nav { grid-template-columns: minmax(0, 1fr); }
   .plan-nav > span:last-child { text-align: left; }
 }
 .welcome { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
@@ -160,6 +166,10 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
 .units li { display: flex; flex-direction: column; }
 
 .unit h3 { margin-top: 1.6rem; }
+/* A unit is a page to read, so its prose opts back into full contrast (the Muted-Paragraph Rule);
+   hints and the meta line stay quiet. `:where` keeps this at the weight of `.unit p`, so the
+   diagram rule below still wins inside a diagram. */
+.unit p:where(:not(.hint, .meta, .count)) { color: var(--fg); }
 .unit pre { overflow-x: auto; padding: 0.75rem; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
 
 /* Syntax highlighting, under the house rules. A default highlighter theme paints keywords green
@@ -190,6 +200,9 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
    A wider one scrolls sideways in its own box: scrolling a picture beats squinting at one.
    tools/layout-check.mjs measures the drawn text and fails under 8.5px. */
 .diagram svg { height: auto; }
+/* Mermaid writes edge labels as <p>, which the muted default for paragraphs caught: grey on
+   Mermaid's grey label box in dark mode, 2.5:1. The label takes the diagram's own text colour. */
+.diagram p { color: inherit; }
 
 /* Long unbroken tokens - a Java generic, an email address, a URL - must wrap rather than push the
    whole page sideways. `break-word` breaks one only when it genuinely does not fit; `anywhere` also
@@ -253,6 +266,11 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .goal .bar > div, .share-bar > span { display: block; height: 100%; background: #16a34a; }
 .shares { list-style: none; padding: 0; }
 .shares li { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr 3rem; gap: 0.6rem; align-items: center; margin: 0.25rem 0; }
+/* On a phone the name column left the bar 35px wide; the name goes above its bar instead. */
+@media (max-width: 560px) {
+  .shares li { grid-template-columns: minmax(0, 1fr) 3rem; gap: 0.1rem 0.6rem; margin: 0.4rem 0; }
+  .shares li > span:first-child { grid-column: 1 / -1; }
+}
 .shares .share-bar > span { background: color-mix(in srgb, var(--fg) 55%, transparent); }
 .why { margin: 1.5rem 0; }
 .why summary { cursor: pointer; font-weight: 600; }

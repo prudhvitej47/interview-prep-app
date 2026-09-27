@@ -25,8 +25,9 @@ export function App() {
   const { pathname } = useLocation();
   // A unit or a topic is the curriculum, and the curriculum lives on the home page - which is also
   // where the breadcrumb goes back to. Without this no pill was marked at all on those pages, and
-  // a row of four evenly muted links read as though it had shifted.
-  const inCurriculum = /^\/(units|topics)(\/|$)/.test(pathname);
+  // a row of four evenly muted links read as though it had shifted. "Change my ratings" is linked
+  // from the home page too, so it belongs there as well.
+  const inCurriculum = /^\/(units|topics|ratings)(\/|$)/.test(pathname);
   useScrollRestoration();
   useHeadingFocus();
 
