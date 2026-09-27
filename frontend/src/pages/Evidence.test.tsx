@@ -106,6 +106,37 @@ describe("evidence", () => {
     expect(screen.queryByRole("button", { name: "Send to the curriculum" })).not.toBeInTheDocument();
   });
 
+  it("asks before deleting a draft, and keeps it when told no", async () => {
+    const draft = { id: 7, kind: "debrief", body: { company: "" }, createdAt: "", updatedAt: "2026-09-27T10:00:00Z",
+      sentAt: null, sentBranch: null, sentUrl: null };
+    const fetchMock = mockFetch({
+      "/api/evidence/options": { body: { companies: [], rounds: [] } },
+      "/api/topics": { body: [] },
+      "/api/evidence/drafts/7": { body: draft },
+    });
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    at("/evidence/drafts/7");
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(confirm).toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await vi.waitFor(() =>
+      expect(fetchMock.mock.calls.some(([u, init]) => u === "/api/evidence/drafts/7" && init?.method === "DELETE")).toBe(true));
+  });
+
+  it("names a draft whose company was left blank", async () => {
+    mockFetch({
+      "/api/evidence": { body: [] },
+      "/api/evidence/drafts": { body: [{ id: 7, kind: "debrief", body: { company: "" }, createdAt: "",
+        updatedAt: "2026-09-27T10:00:00Z", sentAt: null, sentBranch: null, sentUrl: null }] },
+    });
+    at("/evidence");
+    expect(await screen.findByRole("link", { name: "Debrief: company not chosen" })).toBeInTheDocument();
+  });
+
   it("offers the file when sending is not set up", async () => {
     const draft = { id: 7, kind: "debrief", body: {}, createdAt: "", updatedAt: "", sentAt: null, sentBranch: null, sentUrl: null };
     mockFetch({

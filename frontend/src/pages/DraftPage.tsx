@@ -170,7 +170,12 @@ export function DraftPage() {
           <button className="secondary" onClick={() => save().catch((e: Error) => setStatus(e.message))}>Save draft</button>
         )}
         {id && (
-          <button className="secondary" onClick={() => deleteDraft(id).then(() => navigate("/evidence"))}>Delete</button>
+          <button className="secondary" onClick={() => {
+            // A debrief is personal text that exists nowhere else, and Delete sits beside Save.
+            if (window.confirm("Delete this draft? It cannot be brought back.")) {
+              deleteDraft(id).then(() => navigate("/evidence"));
+            }
+          }}>Delete</button>
         )}
         <span role="status">{status}</span>
       </div>
