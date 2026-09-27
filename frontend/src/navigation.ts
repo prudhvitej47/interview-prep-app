@@ -110,17 +110,30 @@ export function useHeadingFocus() {
     return repeatUntil(() => {
       const heading = document.querySelector<HTMLElement>("main h2");
       if (!heading) return false;
-      heading.tabIndex = -1;
-      if (lastInputWasPointer) {
-        heading.setAttribute("data-pointer-nav", "");
-        heading.addEventListener("blur", () => heading.removeAttribute("data-pointer-nav"), { once: true });
-      } else {
-        heading.removeAttribute("data-pointer-nav");
-      }
-      heading.focus({ preventScroll: true });
+      moveFocusTo(heading, { preventScroll: true });
       return true;
     });
   }, [location.key, navigationType]);
+}
+
+/**
+ * Moves the keyboard's place to an element that is not a control - a heading, a status line - after
+ * the control the reader just used has gone from the page. Without it the browser drops focus to
+ * the top of the document, and the next Tab starts again from the app's title.
+ *
+ * <p>Like the page heading above, the ring is held back when the reader used a pointer, so a mouse
+ * click in Safari does not leave a ring round a heading nobody tabbed to.
+ */
+export function moveFocusTo(element: HTMLElement | null, options?: FocusOptions) {
+  if (!element) return;
+  if (!element.hasAttribute("tabindex")) element.tabIndex = -1;
+  if (lastInputWasPointer) {
+    element.setAttribute("data-pointer-nav", "");
+    element.addEventListener("blur", () => element.removeAttribute("data-pointer-nav"), { once: true });
+  } else {
+    element.removeAttribute("data-pointer-nav");
+  }
+  element.focus(options);
 }
 
 const FRAME = 16;

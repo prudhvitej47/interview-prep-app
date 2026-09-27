@@ -148,11 +148,14 @@ describe("UnitPage", () => {
     expect(JSON.parse(init?.body as string)).toEqual({ rating: "good" });
     // Done and not yet due: no rating buttons, only undo.
     expect(within(panel).queryByRole("group")).not.toBeInTheDocument();
+    // The pressed button is gone, so the keyboard's place moves to the heading that says what happened.
+    expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Done" }));
 
     fetchMock.mockImplementationOnce(async () => ({ ok: true, status: 200, json: async () => NOT_DONE }));
     fireEvent.click(within(panel).getByRole("button", { name: "Undo: not done after all" }));
     expect(await within(panel).findByText("Finished with this unit?")).toBeInTheDocument();
     expect(fetchMock.mock.calls.at(-1)![1]?.method).toBe("DELETE");
+    expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Finished with this unit?" }));
   });
 
   it("asks how a due review went, with what a review means for the type", async () => {

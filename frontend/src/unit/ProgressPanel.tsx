@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchProgress, recordAttempt, undoAttempt, type Progress, type Rating } from "../api";
+import { moveFocusTo } from "../navigation";
 
 const RATINGS: { rating: Rating; label: string; hint: string }[] = [
   { rating: "again", label: "Again", hint: "I couldn't do it; show it again tomorrow" },
@@ -32,6 +33,14 @@ export function ProgressPanel({ unitId, type }: { unitId: string; type: string }
   const [progress, setProgress] = useState<Progress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The button just pressed disappears with the answer (a rating, or Undo), so the keyboard's place
+  // moves to the heading, which now says what happened: "Done", "Review due".
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [answered, setAnswered] = useState(0);
+
+  useEffect(() => {
+    if (answered > 0) moveFocusTo(heading.current);
+  }, [answered]);
 
   useEffect(() => {
     fetchProgress(unitId).then(setProgress).catch((e: Error) => setError(e.message));
@@ -42,6 +51,7 @@ export function ProgressPanel({ unitId, type }: { unitId: string; type: string }
     setError(null);
     try {
       setProgress(await call());
+      setAnswered((n) => n + 1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -55,7 +65,7 @@ export function ProgressPanel({ unitId, type }: { unitId: string; type: string }
 
   return (
     <section className="progress" aria-label="Your progress">
-      <h3>{!done ? "Finished with this unit?" : progress.reviewDue ? "Review due" : "Done"}</h3>
+      <h3 ref={heading}>{!done ? "Finished with this unit?" : progress.reviewDue ? "Review due" : "Done"}</h3>
       {done && (
         <p className="hint">
           Done on {formatMoment(progress.firstDoneAt!)}

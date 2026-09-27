@@ -107,8 +107,9 @@ a { color: var(--fg); text-underline-offset: 2px; }
    guesses about the reader's last input, and WebKit guesses "keyboard" - so a mouse click landed
    the new page wearing a ring nobody asked for. navigation.ts marks the heading when the
    navigation came from a pointer, and only that heading goes quiet. The ring itself is untouched,
-   and a keyboard navigation still carries it. */
-main h2[data-pointer-nav]:focus-visible { outline: none; }
+   and a keyboard navigation still carries it. The same mark covers the headings and status lines
+   that take focus when the button just pressed disappears (moveFocusTo). */
+main [data-pointer-nav]:focus-visible { outline: none; }
 ::selection { background: color-mix(in srgb, var(--fg) 18%, transparent); }
 html { scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent; caret-color: var(--fg); }
 
@@ -144,6 +145,7 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
   .plan-nav > span:last-child { text-align: left; }
 }
 .welcome { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.welcome h2 { font-size: 1rem; font-weight: 400; color: var(--muted); margin: 1rem 0; }
 .count, .meta, .hint, .crumbs { color: var(--muted); font-size: 0.875rem; }
 .empty { color: var(--muted); }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, previewShares, rateTopics, saveWeekSettings, takeBreak,
@@ -6,6 +6,7 @@ import {
 } from "../api";
 import { formatDay } from "../unit/ProgressPanel";
 import { TYPE_LABEL } from "../unit/sections";
+import { moveFocusTo } from "../navigation";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -20,10 +21,22 @@ export function WeekPage() {
   const [week, setWeek] = useState<Week | null>(null);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The form replaces the button that opened it, and the plan replaces the form, so each switch
+  // says where the keyboard goes next: back to the button after Cancel, to the week's heading
+  // after a rebuild (the plan above it is new).
+  const [focusAfter, setFocusAfter] = useState<"button" | "heading" | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const change = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     fetchWeek().then(setWeek).catch((e: Error) => setError(e.message));
   }, []);
+
+  useEffect(() => {
+    if (!focusAfter || editing) return;
+    moveFocusTo(focusAfter === "button" ? change.current : heading.current);
+    setFocusAfter(null);
+  }, [focusAfter, editing]);
 
   if (error) return <p role="alert">{error}</p>;
   if (!week) return <p>Loading…</p>;
@@ -33,7 +46,7 @@ export function WeekPage() {
       <nav className="crumbs" aria-label="Breadcrumb">
         <Link to="/">Home</Link> › This week
       </nav>
-      <h2>Week of {formatDay(week.weekStart)}</h2>
+      <h2 ref={heading}>Week of {formatDay(week.weekStart)}</h2>
       {week.onBreak ? (
         <p className="banner" role="note">This week is a planned break: no plan, and your streak is safe.</p>
       ) : !week.plan || editing ? (
@@ -43,15 +56,19 @@ export function WeekPage() {
           onSaved={(w) => {
             setWeek(w);
             setEditing(false);
+            setFocusAfter("heading");
           }}
-          onCancel={week.plan ? () => setEditing(false) : undefined}
+          onCancel={week.plan ? () => {
+            setEditing(false);
+            setFocusAfter("button");
+          } : undefined}
         />
       ) : (
         <>
           <Plan plan={week.plan} weekStart={week.weekStart} />
           <TopicCard plan={week.plan} />
           <p>
-            <button className="link" onClick={() => setEditing(true)}>Change my hours, days or weights</button>
+            <button ref={change} className="link" onClick={() => setEditing(true)}>Change my hours, days or weights</button>
           </p>
         </>
       )}
@@ -128,7 +145,9 @@ function TopicCard({ plan }: { plan: PlanView }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (plan.topicsToRate.length === 0) return null;
-  if (saved) return <p className="hint" role="status">Thanks. Next week's plan will use these.</p>;
+  if (saved) {
+    return <p className="hint" role="status" ref={(p) => moveFocusTo(p)}>Thanks. Next week's plan will use these.</p>;
+  }
   return (
     <section className="topic-card">
       <h3>How are you with these?</h3>
@@ -220,7 +239,7 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
     <form className="settings" onSubmit={save}>
       {firstTime && <p>Tell the planner how much time you have, and it will lay out this week.</p>}
       <label>
-        Hours a week <input type="number" min={1} max={40} step={0.5} value={hours} onChange={(e) => setHours(e.target.value)} />
+        Hours a week <input type="number" autoFocus={!firstTime} min={1} max={40} step={0.5} value={hours} onChange={(e) => setHours(e.target.value)} />
       </label>
       <fieldset>
         <legend>Study days</legend>
