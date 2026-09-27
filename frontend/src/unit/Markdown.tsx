@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, useRef, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createLowlight } from "lowlight";
@@ -8,6 +8,7 @@ import sql from "highlight.js/lib/languages/sql";
 import yaml from "highlight.js/lib/languages/yaml";
 import properties from "highlight.js/lib/languages/properties";
 import { Mermaid } from "./Mermaid";
+import { useOverflow } from "./overflow";
 
 /**
  * Only the languages the curriculum actually fences, registered one by one on highlight.js's bare
@@ -40,16 +41,37 @@ export function Markdown({ children }: { children: string }) {
         // A wide table (a SQL result with seven snake_case columns) scrolls in its own box, like a
         // diagram, instead of pushing the whole page sideways.
         table({ children: rows, node: _node, ...rest }) {
-          return <div className="table-scroll"><table {...rest}>{rows}</table></div>;
+          return <ScrollBox as="div" className="table-scroll" label="Table"><table {...rest}>{rows}</table></ScrollBox>;
         },
         // A diagram replaces its code block entirely instead of sitting inside a <pre>.
         pre({ children: inner }) {
-          return isMermaid(inner) ? <>{inner}</> : <pre>{inner}</pre>;
+          return isMermaid(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
         },
       }}
     >
       {children}
     </ReactMarkdown>
+  );
+}
+
+/**
+ * A box that scrolls sideways - a long code line, a wide table - is out of reach of a keyboard
+ * unless it can take focus: Safari never lets the arrow keys into it. So while, and only while, it
+ * actually overflows, it joins the Tab order as a named region; a box that fits adds no stop.
+ */
+export function ScrollBox({ as: Tag, className, label, children }: {
+  as: "div" | "pre";
+  className?: string;
+  label: string;
+  children: ReactNode;
+}) {
+  const box = useRef<HTMLDivElement & HTMLPreElement>(null);
+  const overflows = useOverflow(box);
+  return (
+    <Tag ref={box} className={className}
+      {...(overflows ? { tabIndex: 0, role: "region", "aria-label": `${label}, scrolls sideways` } : {})}>
+      {children}
+    </Tag>
   );
 }
 

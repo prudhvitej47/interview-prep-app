@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useOverflow } from "./overflow";
 
 let nextId = 0;
 
@@ -118,6 +119,8 @@ export function Mermaid({ chart }: { chart: string }) {
     const drawn = box.current?.querySelector("svg");
     if (drawn) fitToReadable(drawn);
   }, [svg]);
+  // Measured after the diagram is sized above: only a diagram wider than its frame needs a Tab stop.
+  const scrolls = useOverflow(box, svg);
 
   useEffect(() => {
     let live = true;
@@ -146,5 +149,10 @@ export function Mermaid({ chart }: { chart: string }) {
   // A diagram that will not draw still shows its source, rather than leaving a hole in the page.
   if (failed) return <pre className="diagram-source">{chart}</pre>;
   if (!svg) return <div className="diagram" aria-busy="true">Drawing the diagram…</div>;
-  return <div className="diagram" role="img" ref={box} dangerouslySetInnerHTML={{ __html: svg }} />;
+  // A figure, not an image: role="img" with no name told a screen reader nothing, and hid the
+  // labels inside, which are the diagram's words.
+  return (
+    <div className="diagram" role="figure" aria-label={scrolls ? "Diagram, scrolls sideways" : "Diagram"}
+      tabIndex={scrolls ? 0 : undefined} ref={box} dangerouslySetInnerHTML={{ __html: svg }} />
+  );
 }

@@ -90,7 +90,7 @@ function Step({ done, children }: { done?: boolean; children: React.ReactNode })
   return (
     <li className={done ? "done" : undefined}>
       <span className="step-text">{children}</span>
-      {done === true && <span className="tick" aria-label="done">✓</span>}
+      {done === true && <span className="tick" role="img" aria-label="done">✓</span>}
       {done === false && <span className="visually-hidden">to do</span>}
     </li>
   );
