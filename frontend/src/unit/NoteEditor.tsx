@@ -47,6 +47,24 @@ export function NoteEditor({ unitId }: { unitId: string }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  // So does following a link inside the app, which the browser does not count as leaving: every
+  // way off the page (nav pills, breadcrumbs, the plan strip) is a link. The check runs in the
+  // capture phase, ahead of the router, and stops the click when the reader chooses to stay.
+  useEffect(() => {
+    if (!dirty) return;
+    const ask = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || link.target === "_blank" || link.origin !== window.location.origin) return;
+      if (!window.confirm("Your note has unsaved changes. Leave without saving them?")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("click", ask, true);
+    return () => document.removeEventListener("click", ask, true);
+  }, [dirty]);
+
   async function save() {
     setStatus("saving");
     try {

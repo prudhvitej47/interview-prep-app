@@ -223,6 +223,22 @@ describe("UnitPage", () => {
     expect(dirty.defaultPrevented).toBe(true);
   });
 
+  it("asks before a link inside the app leaves unsaved note changes behind", async () => {
+    show(unit());
+    const box = await screen.findByLabelText("Your notes on this unit");
+    await vi.waitFor(() => expect(box).toBeEnabled());
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    const home = screen.getByRole("link", { name: "Home" });
+
+    fireEvent.change(box, { target: { value: "Half an answer" } });
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    home.dispatchEvent(click);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(click.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText("Your notes on this unit")).toHaveValue("Half an answer");
+  });
+
   it("saves a private note with the CSRF token", async () => {
     const fetchMock = show(unit());
     const box = await screen.findByLabelText("Your notes on this unit");

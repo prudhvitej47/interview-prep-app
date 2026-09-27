@@ -53,7 +53,8 @@ export function EvidencePage() {
             {drafts.map((d) => (
               <li key={d.id}>
                 <Link to={`/evidence/drafts/${d.id}`}>
-                  Debrief: {d.body.company ?? "company not chosen"}
+                  {/* The company select sends "" for "not chosen", so an empty string needs the words too. */}
+                  Debrief: {d.body.company || "company not chosen"}
                   {d.body.interview_date ? `, ${d.body.interview_date}` : ""}
                 </Link>
                 <span className="count">
