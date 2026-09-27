@@ -21,6 +21,9 @@ const DARK = {
   primaryColor: "#243244",
   primaryBorderColor: "#64748b",
   primaryTextColor: "#e5e7eb",
+  // Mermaid's dark default puts edge labels on #585858, where its own #ccc text is 4.4:1, just
+  // under the 4.5:1 body text needs. The darkest node fill keeps the label box and passes easily.
+  edgeLabelBackground: "#1f2937",
   ...scale(["#1f2937", "#243244", "#2b3a2f", "#3a2f3f", "#263445", "#33302a", "#2a3b3b", "#3b2f34"], "#e5e7eb"),
 };
 

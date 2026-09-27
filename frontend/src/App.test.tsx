@@ -141,6 +141,13 @@ describe("App", () => {
     expect(within(nav).getByRole("link", { name: "This week" })).not.toHaveClass("active");
   });
 
+  it("keeps Home marked while changing ratings, which is reached from the home page", async () => {
+    mockFetch({ "/api/me": { body: me({ onboarded: true }) }, "/api/domains": { body: [] } });
+    renderAt("/ratings");
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Home" })).toHaveClass("active");
+  });
+
   it("marks only the section the reader is actually in", async () => {
     mockFetch({
       "/api/me": { body: me({ onboarded: true }) },
