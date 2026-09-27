@@ -47,9 +47,9 @@ export function RewardsStrip() {
         <>
           <p className="weeks-row">
             <span className="count">Recent weeks</span>{" "}
-            <span className="weeks" aria-label="Recent weeks">
+            <span className="weeks" role="group" aria-label="Recent weeks">
               {rewards.recentWeeks.map((w) => (
-                <span key={w.weekStart} title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
+                <span key={w.weekStart} role="img" title={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}
                   aria-label={`Week of ${formatDay(w.weekStart)}: ${MARK[w.outcome].label}`}>
                   {MARK[w.outcome].mark}
                 </span>

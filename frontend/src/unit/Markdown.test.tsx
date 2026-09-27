@@ -49,3 +49,23 @@ it("puts a table in its own scrolling box, so a wide one cannot push the page si
   expect(table?.parentElement?.className).toBe("table-scroll");
   expect(table?.querySelectorAll("td")).toHaveLength(2);
 });
+
+it("lets a keyboard reach a code block or table only when it scrolls sideways", () => {
+  // jsdom has no layout: every box measures 0 wide. Make every <pre> wider inside than out.
+  const scrollWidth = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth")!;
+  Object.defineProperty(Element.prototype, "scrollWidth", {
+    configurable: true,
+    get() { return this.tagName === "PRE" ? 900 : 0; },
+  });
+  try {
+    const container = show("```text\na very long line\n```\n\n| a | b |\n| - | - |\n| 1 | 2 |\n");
+    const pre = container.querySelector("pre")!;
+    expect(pre).toHaveAttribute("tabindex", "0");
+    expect(pre).toHaveAttribute("role", "region");
+    expect(pre).toHaveAccessibleName("Code, scrolls sideways");
+    // The table fits, so it adds no Tab stop.
+    expect(container.querySelector(".table-scroll")).not.toHaveAttribute("tabindex");
+  } finally {
+    Object.defineProperty(Element.prototype, "scrollWidth", scrollWidth);
+  }
+});

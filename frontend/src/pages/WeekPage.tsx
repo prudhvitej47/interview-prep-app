@@ -103,7 +103,7 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
             {plan.items.filter((i) => i.day === day).map((i) => (
               <li key={`${i.kind}-${i.unitId}`} className={i.done ? "done" : ""}>
                 <div className="item-head">
-                  <span aria-label={i.done ? "done" : "to do"}>{i.done ? "✓" : "○"}</span>
+                  <span role="img" aria-label={i.done ? "done" : "to do"}>{i.done ? "✓" : "○"}</span>
                   <Link to={`/units/${i.unitId}`}>{i.title}</Link>
                   <span className="count">
                     {i.kind === "review" ? "Review" : TYPE_LABEL[i.type] ?? i.type} · {i.minutes} min
@@ -258,8 +258,10 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
           <label key={d.id} className="weight">
             <span>{d.name}</span>
             <input type="number" min={0} max={100} placeholder={String(d.weight)} value={weights[d.id] ?? ""}
-              onChange={(e) => setWeights({ ...weights, [d.id]: e.target.value })} aria-label={`Weight for ${d.name}`} />
-            {shares && <span className="share">{shareLabel(d.id, overrides[d.id] ?? d.weight, shares)}</span>}
+              onChange={(e) => setWeights({ ...weights, [d.id]: e.target.value })} aria-label={`Weight for ${d.name}`}
+              aria-describedby={shares ? `share-${d.id}` : undefined} />
+            {/* The field's own name overrides the label, so the share is tied on as its description. */}
+            {shares && <span className="share" id={`share-${d.id}`}>{shareLabel(d.id, overrides[d.id] ?? d.weight, shares)}</span>}
           </label>
         ))}
       </details>
