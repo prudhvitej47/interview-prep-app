@@ -97,6 +97,18 @@ describe("WeekPage", () => {
     expect(screen.getByText("No system design units to learn yet, so this week has none.")).toBeInTheDocument();
   });
 
+  it("keeps the keyboard's place when the settings form opens and closes", async () => {
+    mockFetch({ "/api/plan": { body: week(plan) }, "/api/domains": { body: DOMAINS }, "/api/plan/shares": { body: [] },
+      "/api/breaks": { body: { upcoming: [] } } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Change my hours, days or weights" }));
+    // The button that opened the form is gone; the first field takes its place.
+    expect(document.activeElement).toBe(screen.getByRole("spinbutton", { name: "Hours a week" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Change my hours, days or weights" })));
+  });
+
   it("offers to sharpen guessed topics without blocking anything", async () => {
     const fetchMock = mockFetch({ "/api/plan": { body: week(plan) }, "/api/me/ratings/topics": { body: {} } });
     show();

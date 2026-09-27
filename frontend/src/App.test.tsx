@@ -63,7 +63,8 @@ describe("App", () => {
     });
     renderAt("/");
 
-    expect(await screen.findByText("Welcome, Tester.")).toBeInTheDocument();
+    // The greeting is the home page's heading, so a link here lands the keyboard on it.
+    expect(await screen.findByRole("heading", { level: 2, name: "Welcome, Tester." })).toBeInTheDocument();
     const transactions = await screen.findByRole("link", { name: "Transactions" });
     expect(transactions).toHaveAttribute("href", "/topics/ds.transactions");
     expect(transactions.closest("details")).toHaveAttribute("open");

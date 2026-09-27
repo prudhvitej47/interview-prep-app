@@ -32,7 +32,10 @@ export function Home({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
   return (
     <>
       <div className="welcome">
-        <p>Welcome, {me.displayName}.</p>
+        {/* The page's own heading, like every other page's: it is where the keyboard lands after
+            a link here (navigation.ts), and it keeps the outline from jumping h1 to h3. It keeps
+            the quiet look the greeting always had. */}
+        <h2>Welcome, {me.displayName}.</h2>
         {/* The sections are in the bar above; what is left here is this learner's own settings. */}
         <span>
           <Link to="/ratings">Change my ratings</Link>
