@@ -19,6 +19,9 @@ import com.interviewprep.planner.WeekPlanner.Item;
 import com.interviewprep.planner.WeekPlanner.Share;
 import com.interviewprep.progress.ProgressQueries;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.projects.ProjectPlanning;
+import com.interviewprep.projects.ProjectPlanning.QuestionRef;
+import com.interviewprep.projects.ProjectPlanning.Rated;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -68,11 +72,12 @@ class PlanController {
   private final EvidenceQueries evidence;
   private final PlanQueries plans;
   private final PlacementService placements;
+  private final ProjectPlanning projects;
 
   PlanController(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
       CurriculumQueries curriculum, DomainCatalog domains, LearnerProfile profile,
       ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans,
-      PlacementService placements) {
+      PlacementService placements, ProjectPlanning projects) {
     this.jdbc = jdbc;
     this.transaction = transaction;
     this.json = json;
@@ -83,10 +88,26 @@ class PlanController {
     this.evidence = evidence;
     this.plans = plans;
     this.placements = placements;
+    this.projects = projects;
   }
 
+  /**
+   * A unit, or (kind {@code project}) a question about one of the learner's projects: then
+   * {@code unitId} is null, the title is the question's prompt and the project fields say where it
+   * lives.
+   */
   record ItemView(String unitId, String title, String type, int day, String kind, int minutes,
-      String reason, boolean done) {}
+      String reason, boolean done, Long projectQuestionId, Long projectId, String projectName, String rung) {
+
+    static ItemView unit(UnitSummary u, int day, String kind, int minutes, String reason, boolean done) {
+      return new ItemView(u.id(), u.title(), u.type(), day, kind, minutes, reason, done, null, null, null, null);
+    }
+
+    static ItemView project(QuestionRef q, int day, int minutes, String reason, boolean done) {
+      return new ItemView(null, q.prompt(), "project-question", day, "project", minutes, reason, done,
+          q.questionId(), q.projectId(), q.projectName(), q.rung());
+    }
+  }
 
   record TopicToRate(String topicId, String name, String domainName, int currentGuess) {}
 
@@ -211,9 +232,13 @@ class PlanController {
         .toList();
     double load = loadFactor(me, monday);
     int fromDay = LocalDate.now(STUDY_ZONE).getDayOfWeek().getValue();
+    List<WeekPlanner.ProjectQuestion> questions = projects.plannable(me.id()).stream()
+        .map(q -> new WeekPlanner.ProjectQuestion(q.questionId(), q.projectId(), q.projectName(),
+            q.projectOrder(), q.questionOrder(), q.rung(), q.minutes(), q.dueOn()))
+        .toList();
     WeekPlanner.Plan plan = WeekPlanner.plan(new WeekPlanner.Input(monday, fromDay, settings.studyDays(),
         settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews, startNow,
-        carryOver(me, monday)));
+        carryOver(me, monday), questions, questions.isEmpty() ? List.of() : carriedQuestions(me, monday)));
 
     try {
       return transaction.execute(status -> {
@@ -232,10 +257,11 @@ class PlanController {
         int order = 0;
         for (Item item : plan.items()) {
           jdbc.update(
-              "insert into plan_item (plan_id, unit_id, day, kind, minutes, reason, sort_order)"
-                  + " values (:plan, :unit, :day, :kind, :minutes, :reason, :order)",
+              "insert into plan_item (plan_id, unit_id, project_question_id, day, kind, minutes, reason,"
+                  + " sort_order) values (:plan, :unit, :question, :day, :kind, :minutes, :reason, :order)",
               new MapSqlParameterSource()
-                  .addValue("plan", id).addValue("unit", item.unitId()).addValue("day", item.day())
+                  .addValue("plan", id).addValue("unit", item.unitId())
+                  .addValue("question", item.projectQuestionId()).addValue("day", item.day())
                   .addValue("kind", item.kind()).addValue("minutes", item.minutes())
                   .addValue("reason", item.reason()).addValue("order", order++));
         }
@@ -274,6 +300,39 @@ class PlanController {
             "select unit_id from plan_item where plan_id = :plan and kind = 'learn' order by day, sort_order",
             new MapSqlParameterSource("plan", earlier.getFirst()), String.class)
         .stream().filter(u -> timesCarried.getOrDefault(u, 0) < 2).toList();
+  }
+
+  /**
+   * Project questions from the learner's most recent earlier plan that were not rated during or
+   * since its week, under the same two-carry limit as learning.
+   */
+  private List<Long> carriedQuestions(LearnerPrincipal me, LocalDate monday) {
+    record Earlier(long id, LocalDate week) {}
+    List<Earlier> earlier = jdbc.query(
+        "select id, week_start from week_plan where learner_id = :learner and week_start < :week"
+            + " order by week_start desc limit 2",
+        new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday),
+        (rs, i) -> new Earlier(rs.getLong(1), rs.getObject(2, LocalDate.class)));
+    if (earlier.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, Integer> timesCarried = new HashMap<>();
+    jdbc.query("select project_question_id from plan_item where plan_id in (:plans) and kind = 'project'"
+            + " and reason like :carried",
+        new MapSqlParameterSource().addValue("plans", earlier.stream().map(Earlier::id).toList())
+            .addValue("carried", WeekPlanner.CARRIED + "%"),
+        rs -> {
+          timesCarried.merge(rs.getLong(1), 1, Integer::sum);
+        });
+    LocalDate since = earlier.getFirst().week();
+    Set<Long> ratedSince = new HashSet<>();
+    projects.ratings(me.id()).stream().filter(r -> !r.day().isBefore(since))
+        .forEach(r -> ratedSince.add(r.questionId()));
+    return jdbc.queryForList(
+            "select project_question_id from plan_item where plan_id = :plan and kind = 'project'"
+                + " order by day, sort_order",
+            new MapSqlParameterSource("plan", earlier.getFirst().id()), Long.class)
+        .stream().filter(q -> !ratedSince.contains(q) && timesCarried.getOrDefault(q, 0) < 2).toList();
   }
 
   private Proficiency proficiency(LearnerPrincipal me, List<PlannableUnit> units,
@@ -332,29 +391,52 @@ class PlanController {
     Set<String> doneThisWeek = doneUnits(me, monday);
     List<ItemView> items = new ArrayList<>();
     List<String> learnUnits = new ArrayList<>();
-    List<Object[]> raw = jdbc.query(
-        "select unit_id, day, kind, minutes, reason from plan_item where plan_id = :plan order by sort_order",
+    record Row(String unitId, Long questionId, int day, String kind, int minutes, String reason) {}
+    List<Row> raw = jdbc.query(
+        "select unit_id, project_question_id, day, kind, minutes, reason from plan_item where plan_id = :plan"
+            + " order by sort_order",
         new MapSqlParameterSource("plan", planId),
-        (rs, i) -> new Object[] {rs.getString("unit_id"), rs.getInt("day"), rs.getString("kind"),
-            rs.getInt("minutes"), rs.getString("reason")});
+        (rs, i) -> new Row(rs.getString("unit_id"), rs.getObject("project_question_id", Long.class),
+            rs.getInt("day"), rs.getString("kind"), rs.getInt("minutes"), rs.getString("reason")));
     Map<String, UnitSummary> summaries = new HashMap<>();
-    curriculum.summaries(raw.stream().map(r -> (String) r[0]).toList(), me.slug())
+    curriculum.summaries(raw.stream().map(Row::unitId).filter(Objects::nonNull).toList(), me.slug())
         .forEach(u -> summaries.put(u.id(), u));
+    List<Long> questionIds = raw.stream().map(Row::questionId).filter(Objects::nonNull).toList();
+    Map<Long, QuestionRef> questions = projects.describe(me.id(), questionIds);
+    Set<Long> ratedThisWeek = new HashSet<>();
+    if (!questionIds.isEmpty()) {
+      for (Rated r : projects.ratings(me.id())) {
+        if (PlanQueries.mondayOf(r.day()).equals(monday)) {
+          ratedThisWeek.add(r.questionId());
+        }
+      }
+    }
     int doneMinutes = 0;
-    for (Object[] r : raw) {
-      UnitSummary u = summaries.get((String) r[0]);
+    for (Row r : raw) {
+      if (r.questionId() != null) {
+        QuestionRef q = questions.get(r.questionId());
+        if (q == null) {
+          continue;  // retired since the plan was made
+        }
+        boolean done = ratedThisWeek.contains(q.questionId());
+        if (done) {
+          doneMinutes += r.minutes();
+        }
+        items.add(ItemView.project(q, r.day(), r.minutes(), r.reason(), done));
+        continue;
+      }
+      UnitSummary u = summaries.get(r.unitId());
       if (u == null) {
         continue;  // retired or hidden since the plan was made
       }
       boolean done = doneThisWeek.contains(u.id());
       if (done) {
-        doneMinutes += (int) r[3];
+        doneMinutes += r.minutes();
       }
-      if ("learn".equals(r[2])) {
+      if ("learn".equals(r.kind())) {
         learnUnits.add(u.id());
       }
-      items.add(new ItemView(u.id(), u.title(), u.type(), (int) r[1], (String) r[2], (int) r[3],
-          (String) r[4], done));
+      items.add(ItemView.unit(u, r.day(), r.kind(), r.minutes(), r.reason(), done));
     }
     record Header(int planned, int goal, JsonNode rationale) {}
     Header header = jdbc.queryForObject(

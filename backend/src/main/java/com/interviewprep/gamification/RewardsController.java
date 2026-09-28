@@ -5,6 +5,7 @@ import com.interviewprep.learner.LearnerPrincipal;
 import com.interviewprep.planner.PlanQueries;
 import com.interviewprep.progress.ProgressQueries;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.projects.ProjectPlanning;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,11 +17,14 @@ class RewardsController {
   private final ProgressQueries progress;
   private final PlanQueries plans;
   private final CurriculumQueries curriculum;
+  private final ProjectPlanning projects;
 
-  RewardsController(ProgressQueries progress, PlanQueries plans, CurriculumQueries curriculum) {
+  RewardsController(ProgressQueries progress, PlanQueries plans, CurriculumQueries curriculum,
+      ProjectPlanning projects) {
     this.progress = progress;
     this.plans = plans;
     this.curriculum = curriculum;
+    this.projects = projects;
   }
 
   @GetMapping("/api/rewards")
@@ -28,6 +32,6 @@ class RewardsController {
     List<Attempt> attempts = progress.attempts(me.id());
     return Rewards.of(attempts,
         curriculum.typesOf(attempts.stream().map(Attempt::unitId).distinct().toList()),
-        plans.results(me.id()), plans.breaks(me.id()), PlanQueries.thisMonday());
+        projects.ratings(me.id()), plans.results(me.id()), plans.breaks(me.id()), PlanQueries.thisMonday());
   }
 }

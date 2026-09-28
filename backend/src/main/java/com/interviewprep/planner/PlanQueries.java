@@ -4,6 +4,8 @@ import static com.interviewprep.progress.ProgressQueries.STUDY_ZONE;
 
 import com.interviewprep.progress.ProgressQueries;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.projects.ProjectPlanning;
+import com.interviewprep.projects.ProjectPlanning.Rated;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
@@ -24,13 +26,18 @@ public class PlanQueries {
 
   private final NamedParameterJdbcTemplate jdbc;
   private final ProgressQueries progress;
+  private final ProjectPlanning projects;
 
-  PlanQueries(NamedParameterJdbcTemplate jdbc, ProgressQueries progress) {
+  PlanQueries(NamedParameterJdbcTemplate jdbc, ProgressQueries progress, ProjectPlanning projects) {
     this.jdbc = jdbc;
     this.progress = progress;
+    this.projects = projects;
   }
 
-  /** A planned week and the minutes of it done: items whose unit got an attempt that week. */
+  /**
+   * A planned week and the minutes of it done: items whose unit got an attempt that week, and
+   * project items whose question was rated that week.
+   */
   public record WeekResult(LocalDate weekStart, int planned, int goal, int done) {
     public boolean goalMet() {
       return planned > 0 && done >= goal;
@@ -51,13 +58,17 @@ public class PlanQueries {
 
   /** Every week this learner has had a plan for, oldest first. */
   public List<WeekResult> results(long learnerId) {
-    return results(learnerId, progress.attempts(learnerId));
+    return results(learnerId, progress.attempts(learnerId), projects.ratings(learnerId));
   }
 
-  List<WeekResult> results(long learnerId, List<Attempt> attempts) {
+  List<WeekResult> results(long learnerId, List<Attempt> attempts, List<Rated> projectRatings) {
     Map<LocalDate, Set<String>> doneByWeek = new HashMap<>();
     for (Attempt a : attempts) {
       doneByWeek.computeIfAbsent(mondayOf(a.day()), w -> new HashSet<>()).add(a.unitId());
+    }
+    Map<LocalDate, Set<Long>> ratedByWeek = new HashMap<>();
+    for (Rated r : projectRatings) {
+      ratedByWeek.computeIfAbsent(mondayOf(r.day()), w -> new HashSet<>()).add(r.questionId());
     }
     record Row(long plan, LocalDate week, int planned, int goal) {}
     List<Row> plans = jdbc.query(
@@ -69,13 +80,18 @@ public class PlanQueries {
     Map<Long, LocalDate> weekOf = new HashMap<>();
     plans.forEach(p -> weekOf.put(p.plan(), p.week()));
     jdbc.query(
-        "select i.plan_id, i.unit_id, i.minutes from plan_item i join week_plan p on p.id = i.plan_id"
-            + " where p.learner_id = :learner",
+        "select i.plan_id, i.unit_id, i.project_question_id, i.minutes from plan_item i"
+            + " join week_plan p on p.id = i.plan_id where p.learner_id = :learner",
         new MapSqlParameterSource("learner", learnerId),
         rs -> {
           long plan = rs.getLong(1);
-          if (doneByWeek.getOrDefault(weekOf.get(plan), Set.of()).contains(rs.getString(2))) {
-            doneMinutes.merge(plan, rs.getInt(3), Integer::sum);
+          LocalDate week = weekOf.get(plan);
+          long question = rs.getLong(3);
+          boolean done = rs.wasNull()
+              ? doneByWeek.getOrDefault(week, Set.of()).contains(rs.getString(2))
+              : ratedByWeek.getOrDefault(week, Set.of()).contains(question);
+          if (done) {
+            doneMinutes.merge(plan, rs.getInt(4), Integer::sum);
           }
         });
     List<WeekResult> out = new ArrayList<>();

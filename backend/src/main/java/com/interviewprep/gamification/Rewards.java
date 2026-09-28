@@ -4,6 +4,7 @@ import static com.interviewprep.planner.PlanQueries.mondayOf;
 
 import com.interviewprep.planner.PlanQueries.WeekResult;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.projects.ProjectPlanning.Rated;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,8 +19,11 @@ import java.util.Set;
  * <p><b>Stars</b> are never deducted for doing badly. A unit earns its stars the first time it is
  * finished with any rating but "again" (which means it was not managed): 3 for an LLD or HLD case,
  * 2 for a project deep dive, 1 for anything else, and a coding or SQL problem 1 more if it was
- * easy — the closest thing to "unaided and in time" a self-rating gives. A day with three or more
- * reviews earns 1. A week that meets its goal earns 5, and 2 more if the whole plan was done.
+ * easy — the closest thing to "unaided and in time" a self-rating gives. A question about the
+ * learner's own project earns 1 the first time it is rated anything but "again": one rung of a deep
+ * dive, where a whole project deep-dive unit earns 2. A day with three or more reviews (a unit or a
+ * project question rated again after its first time) earns 1. A week that meets its goal earns 5,
+ * and 2 more if the whole plan was done; project items count towards that goal like units.
  *
  * <p><b>The streak</b> counts consecutive weeks that met their goal, from the first planned week.
  * A planned break neither counts nor breaks it, and nor does a week whose plan had nothing in it
@@ -38,6 +42,7 @@ final class Rewards {
   static final int MAX_FREEZES = 2;
   static final int GOAL_WEEKS_PER_FREEZE = 4;
   static final int REVIEWS_FOR_A_STAR = 3;
+  static final int PROJECT_QUESTION_STARS = 1;
   static final List<Integer> MILESTONES = List.of(50, 100, 250);
 
   enum Outcome { GOAL_MET, BREAK, NOTHING_PLANNED, FREEZE_USED, MISSED, IN_PROGRESS }
@@ -50,9 +55,18 @@ final class Rewards {
 
   private Rewards() {}
 
-  /** Attempts oldest first; {@code types} maps each attempted unit to its type. */
+  /** A learner with no project questions rated. */
   static Summary of(List<Attempt> attempts, Map<String, String> types, List<WeekResult> weeks,
       Set<LocalDate> breaks, LocalDate thisMonday) {
+    return of(attempts, types, List.of(), weeks, breaks, thisMonday);
+  }
+
+  /**
+   * Attempts and project ratings oldest first; {@code types} maps each attempted unit to its type.
+   * {@code weeks} already count project items as done when rated that week.
+   */
+  static Summary of(List<Attempt> attempts, Map<String, String> types, List<Rated> projectRatings,
+      List<WeekResult> weeks, Set<LocalDate> breaks, LocalDate thisMonday) {
     int stars = 0;
     int starsThisWeek = 0;
 
@@ -69,6 +83,20 @@ final class Rewards {
         stars += s;
         if (!mondayOf(a.day()).isBefore(thisMonday)) {
           starsThisWeek += s;
+        }
+      }
+    }
+    // Project questions: the same idea, one star each.
+    Set<Long> startedQuestions = new HashSet<>();
+    Set<Long> finishedQuestions = new HashSet<>();
+    for (Rated r : projectRatings) {
+      if (!startedQuestions.add(r.questionId())) {
+        reviewsByDay.merge(r.day(), 1, Integer::sum);
+      }
+      if (!r.rating().equals("again") && finishedQuestions.add(r.questionId())) {
+        stars += PROJECT_QUESTION_STARS;
+        if (!mondayOf(r.day()).isBefore(thisMonday)) {
+          starsThisWeek += PROJECT_QUESTION_STARS;
         }
       }
     }

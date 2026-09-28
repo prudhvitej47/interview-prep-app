@@ -6,6 +6,7 @@ import com.interviewprep.gamification.Rewards.Outcome;
 import com.interviewprep.gamification.Rewards.Summary;
 import com.interviewprep.planner.PlanQueries.WeekResult;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.projects.ProjectPlanning.Rated;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -177,5 +178,49 @@ class RewardsTest {
     Summary s = Rewards.of(List.of(), TYPES, List.of(new WeekResult(THIS_MONDAY, 0, 0, 0)), Set.of(), THIS_MONDAY);
     assertThat(s.recentWeeks()).extracting(Rewards.Week::outcome).containsExactly(Outcome.NOTHING_PLANNED);
     assertThat(s.freezes()).isEqualTo(1);
+  }
+
+  // Questions about the learner's own projects.
+
+  private static Summary projects(List<Attempt> attempts, Rated... ratings) {
+    return Rewards.of(attempts, TYPES, List.of(ratings), List.of(), Set.of(), THIS_MONDAY);
+  }
+
+  @Test
+  void aProjectQuestionEarnsOneStarTheFirstTimeItIsManaged() {
+    LocalDate d = THIS_MONDAY.minusDays(3);
+    assertThat(projects(List.of(), new Rated(7, "good", d)).stars()).isEqualTo(1);
+    assertThat(projects(List.of(), new Rated(7, "again", d)).stars()).isZero();
+    assertThat(projects(List.of(), new Rated(7, "again", d), new Rated(7, "hard", d.plusDays(1))).stars())
+        .isEqualTo(1);
+    // Twice rated is still one question; two questions are two stars.
+    assertThat(projects(List.of(), new Rated(7, "good", d), new Rated(7, "easy", d.plusDays(1)),
+        new Rated(8, "good", d)).stars()).isEqualTo(2);
+  }
+
+  @Test
+  void projectStarsThisWeekAreCountedAsThisWeeks() {
+    Summary s = projects(List.of(), new Rated(7, "good", THIS_MONDAY.minusDays(1)),
+        new Rated(8, "good", THIS_MONDAY.plusDays(1)));
+    assertThat(s.stars()).isEqualTo(2);
+    assertThat(s.starsThisWeek()).isEqualTo(1);
+  }
+
+  @Test
+  void aProjectRehearsalCountsTowardsTheThreeReviewsADayStar() {
+    LocalDate first = THIS_MONDAY.minusDays(10);
+    LocalDate day = THIS_MONDAY.minusDays(2);
+    // Two unit reviews and one project rehearsal on the same day: 1 + 1 + 1 for the firsts, 1 for the day.
+    Summary s = projects(List.of(at("r1", "good", first), at("r2", "good", first), at("r1", "good", day),
+        at("r2", "good", day)), new Rated(7, "good", first), new Rated(7, "good", day));
+    assertThat(s.stars()).isEqualTo(4);
+  }
+
+  @Test
+  void withNoProjectRatingsTheOldAndNewEntryPointsAgree() {
+    List<Attempt> attempts = List.of(at("hld", "good", THIS_MONDAY.minusDays(2)), at("sql", "easy", THIS_MONDAY));
+    List<WeekResult> weeks = List.of(new WeekResult(THIS_MONDAY.minusWeeks(1), 300, 240, 250));
+    assertThat(Rewards.of(attempts, TYPES, List.of(), weeks, Set.of(), THIS_MONDAY))
+        .isEqualTo(Rewards.of(attempts, TYPES, weeks, Set.of(), THIS_MONDAY));
   }
 }
