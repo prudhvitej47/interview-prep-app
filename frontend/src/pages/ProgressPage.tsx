@@ -68,7 +68,7 @@ export function ProgressPage() {
                   <span className="area-name">{a.name}</span>
                   <StageBar counts={a.stages} label={a.name} />
                   <span className="count">{totalOf(a.stages) - a.stages.notStarted}/{totalOf(a.stages)}</span>
-                  <span className="count area-counts">{describeCounts(a.stages)}</span>
+                  <span className="count area-counts">{describeCounts(a.stages, true)}</span>
                 </li>
               ))}
             </ul>
@@ -82,6 +82,42 @@ export function ProgressPage() {
         )}
       </section>
 
+      <section aria-labelledby="h-project-questions">
+        <h3 id="h-project-questions">Project questions</h3>
+        {data.projects.length === 0 ? (
+          <p className="empty">
+            No questions yet. Add them on <Link to="/projects">My projects</Link>.
+          </p>
+        ) : (
+          data.projects.map((p) => (
+            <div key={p.projectId} className="stage-project">
+              <ul className="stage-areas">
+                <li>
+                  <h4 className="area-name">
+                    <Link to={`/projects/${p.projectId}`}>{p.name}</Link>
+                  </h4>
+                  <StageBar counts={p.stages} label={p.name} />
+                  <span className="count">{totalOf(p.stages) - p.stages.notStarted}/{totalOf(p.stages)}</span>
+                  <span className="count area-counts">{describeCounts(p.stages, true)}</span>
+                </li>
+              </ul>
+              <ul className="units stage-units">
+                {p.questions.map((q) => (
+                  <li key={q.questionId}>
+                    <span className="unit-line">
+                      <Link to={`/projects/${p.projectId}#q-${q.questionId}`}>{q.prompt}</Link>
+                      <StageChip stage={q.stage} reviews={q.reviews} />
+                    </span>
+                    <span className="meta">
+                      {[RUNG_LABEL[q.rung] ?? q.rung, when(q.stage, q.dueOn, data.today)].filter(Boolean).join(" · ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        )}
+      </section>
       <section aria-labelledby="h-units">
         <h3 id="h-units">Units</h3>
         <div className="filters">
@@ -124,42 +160,6 @@ export function ProgressPage() {
         )}
       </section>
 
-      <section aria-labelledby="h-project-questions">
-        <h3 id="h-project-questions">Project questions</h3>
-        {data.projects.length === 0 ? (
-          <p className="empty">
-            No questions yet. Add them on <Link to="/projects">My projects</Link>.
-          </p>
-        ) : (
-          data.projects.map((p) => (
-            <div key={p.projectId} className="stage-project">
-              <ul className="stage-areas">
-                <li>
-                  <h4 className="area-name">
-                    <Link to={`/projects/${p.projectId}`}>{p.name}</Link>
-                  </h4>
-                  <StageBar counts={p.stages} label={p.name} />
-                  <span className="count">{totalOf(p.stages) - p.stages.notStarted}/{totalOf(p.stages)}</span>
-                  <span className="count area-counts">{describeCounts(p.stages)}</span>
-                </li>
-              </ul>
-              <ul className="units stage-units">
-                {p.questions.map((q) => (
-                  <li key={q.questionId}>
-                    <span className="unit-line">
-                      <Link to={`/projects/${p.projectId}#q-${q.questionId}`}>{q.prompt}</Link>
-                      <StageChip stage={q.stage} reviews={q.reviews} />
-                    </span>
-                    <span className="meta">
-                      {[RUNG_LABEL[q.rung] ?? q.rung, when(q.stage, q.dueOn, data.today)].filter(Boolean).join(" · ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
-        )}
-      </section>
     </article>
   );
 }

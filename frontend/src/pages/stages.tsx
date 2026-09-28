@@ -23,9 +23,13 @@ const COUNT_KEY: Record<Stage, keyof StageCounts> = {
 export const countOf = (counts: StageCounts, stage: Stage) => counts[COUNT_KEY[stage]];
 export const totalOf = (c: StageCounts) => c.notStarted + c.learned + c.reviewDue + c.solid;
 
-/** "2 solid, 3 learned, 1 review due, 10 not started": the bar in words, for anyone not seeing its colours. */
-export function describeCounts(c: StageCounts) {
-  return STAGES.map((s) => `${countOf(c, s)} ${STAGE_LABEL[s].toLowerCase()}`).join(", ");
+/**
+ * "2 solid, 3 learned, 1 review due, 10 not started": the bar in words, for anyone not seeing its
+ * colours. The visible line skips the stages at zero; the bar's label keeps all four.
+ */
+export function describeCounts(c: StageCounts, skipZeros = false) {
+  return STAGES.filter((s) => !skipZeros || countOf(c, s) > 0)
+    .map((s) => `${countOf(c, s)} ${STAGE_LABEL[s].toLowerCase()}`).join(", ");
 }
 
 /**
