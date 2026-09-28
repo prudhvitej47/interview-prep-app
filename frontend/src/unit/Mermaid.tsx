@@ -3,9 +3,15 @@ import { useOverflow } from "./overflow";
 
 let nextId = 0;
 
+// Mermaid 12's base and dark themes default to gradient borders, running from primaryBorderColor
+// to a secondaryBorderColor derived from a hue-shifted fill (navy into green here), and to a drop
+// shadow under each box. Neither was ever chosen, and the house style has no gradients or shadows.
+const FLAT = { useGradient: false, dropShadow: "none" };
+
 // The house look for every diagram: navy on pale blue in light mode, Mermaid's own dark theme in
 // dark mode.
 const LIGHT = {
+  ...FLAT,
   primaryColor: "#eef2ff",
   primaryBorderColor: "#1e3a8a",
   primaryTextColor: "#0f172a",
@@ -18,6 +24,7 @@ const LIGHT = {
 // branches from a rainbow palette that fights the page and puts grey text on grey. Four quiet
 // shades, one readable label colour.
 const DARK = {
+  ...FLAT,
   // The mindmap's root takes the primary colours, and Mermaid's dark default puts grey on grey.
   primaryColor: "#243244",
   primaryBorderColor: "#64748b",
