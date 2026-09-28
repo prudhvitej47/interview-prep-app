@@ -28,6 +28,12 @@ describe("diagram settings", () => {
     }
   });
 
+  it("draws plain borders with no shadow, in both schemes", () => {
+    for (const dark of [false, true]) {
+      expect(diagramConfig(dark).themeVariables).toMatchObject({ useGradient: false, dropShadow: "none" });
+    }
+  });
+
   it("follows the reader's light or dark preference", () => {
     expect(diagramConfig(false).theme).toBe("base");
     expect(diagramConfig(true).theme).toBe("dark");
