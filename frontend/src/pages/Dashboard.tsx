@@ -38,12 +38,12 @@ export function Dashboard() {
         <section className="card" aria-label="Coverage">
           <h3>Coverage</h3>
           <StageLegend />
-          <ul className="shares">
+          <ul className="shares coverage">
             {data.coverage.map((c) => (
               <li key={c.domainId}>
                 <span>{c.name}</span>
                 <StageBar counts={c.stages} label={c.name} />
-                <span className="count">{c.done}/{c.total}</span>
+                <span className="count">{c.done}/{c.total}{c.stages.reviewDue > 0 && ` · ${c.stages.reviewDue} due`}</span>
               </li>
             ))}
           </ul>

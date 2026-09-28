@@ -281,6 +281,10 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
   .shares li { grid-template-columns: minmax(0, 1fr) 3rem; gap: 0.1rem 0.6rem; margin: 0.4rem 0; }
   .shares li > span:first-child { grid-column: 1 / -1; }
 }
+/* Wide enough for "12/128 · 3 due", fixed so every row's bar ends at the same place. */
+.shares.coverage li { grid-template-columns: minmax(8rem, 14rem) 1fr 7.5rem; }
+.shares.coverage .count { text-align: right; }
+@media (max-width: 560px) { .shares.coverage li { grid-template-columns: minmax(0, 1fr) 7.5rem; } }
 .shares .share-bar > span { background: color-mix(in srgb, var(--fg) 55%, transparent); }
 .why { margin: 1.5rem 0; }
 .why summary { cursor: pointer; font-weight: 600; }
@@ -354,16 +358,21 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .draft pre { max-height: 24rem; overflow: auto; padding: 0.75rem; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .draft fieldset.plain { border: 0; padding: 0; margin: 0; }
 
-/* Progress by stage (Stage.java): solid and learned in the progress green, full and at 45%, review due
-   in the attention amber, and the unstarted rest left as the empty track. The colours are never the
-   only telling: each bar carries its counts as its label and in text beside it, and a chip says its
-   stage in words. A 2px gap lets the track show between the segments, so two greens stay apart. */
+/* Progress by stage (Stage.java). Each stage must stand out from the empty track by 3:1 (WCAG
+   non-text contrast), and solid and learned must differ by more than shade: the first cut of these
+   colours measured 1.6-2.2:1 against the track. So: solid is a full green, learned the same green in
+   stripes, review due a full amber, the unstarted rest the empty track. Green and amber are close in
+   lightness, so review due is also always given in words beside the bar; every bar carries all its
+   counts as its label. A 2px gap lets the track show between the segments. */
+:root { --stage-green: #15803d; --stage-amber: #b45309; }
+@media (prefers-color-scheme: dark) { :root { --stage-green: #22c55e; --stage-amber: #f59e0b; } }
 .stage-bar { display: flex; gap: 2px; height: 0.5rem; border-radius: 4px; overflow: hidden;
   background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .stage-bar > span { display: block; height: 100%; }
-.stage-bar .solid, .swatch.solid { background: #16a34a; }
-.stage-bar .learned, .swatch.learned { background: color-mix(in srgb, #16a34a 45%, transparent); }
-.stage-bar .review-due, .swatch.review-due { background: color-mix(in srgb, #d97706 75%, transparent); }
+.stage-bar .solid, .swatch.solid { background: var(--stage-green); }
+.stage-bar .learned, .swatch.learned {
+  background: repeating-linear-gradient(135deg, var(--stage-green) 0 3px, transparent 3px 6px); }
+.stage-bar .review-due, .swatch.review-due { background: var(--stage-amber); }
 .swatch.not-started { background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .swatch { display: inline-block; width: 0.9rem; height: 0.5rem; border-radius: 4px; }
 .stage-legend { list-style: none; padding: 0; margin: 0 0 0.4rem; display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem;
