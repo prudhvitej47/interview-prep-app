@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Builds one learner's week (proposal section F). A pure function of its input, so every rule is
@@ -179,7 +180,7 @@ final class WeekPlanner {
     in.candidates().forEach(c -> withUnits.add(c.domainId()));
     Map<String, Double> share = shareOf(in.domains(), withUnits);
     List<Share> shares = in.domains().stream().filter(d -> share.containsKey(d.id()))
-        .map(d -> new Share(d.id(), d.name(), (int) Math.round(share.get(d.id()) * 100))).toList();
+        .map(d -> new Share(d.id(), d.name(), percent(share.get(d.id())))).toList();
     Map<String, String> domainNames = new HashMap<>();
     in.domains().forEach(d -> domainNames.put(d.id(), d.name()));
 
@@ -456,11 +457,35 @@ final class WeekPlanner {
    * previews exactly this, so what the learner sees while typing is what the plan will use.
    */
   static Map<String, Double> shareOf(List<Domain> domains, Set<String> withUnits) {
+    return normalised(domains, withUnits, d -> 1.5 - 0.16 * Math.clamp(d.strength(), 0, 5));
+  }
+
+  /**
+   * An area's share for the weights form: {@code percent} is what the plan uses, {@code
+   * unboostedPercent} what the weights alone would give (the same areas, no weakness factor), so the
+   * form can say when the learner's strength moved an area's share.
+   */
+  record ShareDetail(String domainId, String name, int percent, int unboostedPercent, double strength) {}
+
+  static List<ShareDetail> shareDetails(List<Domain> domains, Set<String> withUnits) {
+    Map<String, Double> share = shareOf(domains, withUnits);
+    Map<String, Double> plain = normalised(domains, withUnits, d -> 1.0);
+    return domains.stream().filter(d -> share.containsKey(d.id()))
+        .map(d -> new ShareDetail(d.id(), d.name(), percent(share.get(d.id())), percent(plain.get(d.id())),
+            d.strength()))
+        .toList();
+  }
+
+  private static int percent(double fraction) {
+    return (int) Math.round(fraction * 100);
+  }
+
+  private static Map<String, Double> normalised(List<Domain> domains, Set<String> withUnits,
+      ToDoubleFunction<Domain> factor) {
     Map<String, Double> raw = new LinkedHashMap<>();
     for (Domain d : domains) {
       if (d.weight() > 0 && withUnits.contains(d.id())) {
-        double factor = 1.5 - 0.16 * Math.clamp(d.strength(), 0, 5);
-        raw.put(d.id(), Math.clamp(d.weight() * factor, d.weight() * 0.5, d.weight() * 2.0));
+        raw.put(d.id(), Math.clamp(d.weight() * factor.applyAsDouble(d), d.weight() * 0.5, d.weight() * 2.0));
       }
     }
     double total = raw.values().stream().mapToDouble(Double::doubleValue).sum();

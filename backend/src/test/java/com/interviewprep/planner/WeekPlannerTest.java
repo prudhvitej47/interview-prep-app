@@ -78,6 +78,21 @@ class WeekPlannerTest {
   }
 
   @Test
+  void theSharePreviewSaysWhatTheWeightsAloneWouldGiveAndHowStrongTheLearnerIs() {
+    // Equal weights; the learner is new to one area and fluent in the other.
+    List<Domain> domains = List.of(new Domain("aa", "Area A", 50, 0), new Domain("bb", "Area B", 50, 5),
+        new Domain("cc", "Area C", 0, 1), new Domain("dd", "Area D", 10, 1));
+    Set<String> withUnits = Set.of("aa", "bb", "cc");
+    List<WeekPlanner.ShareDetail> details = WeekPlanner.shareDetails(domains, withUnits);
+    // 50 × 1.5 = 75 against 50 × 0.7 = 35; a weight of 0 or nothing to learn gets no share at all.
+    assertThat(details).containsExactly(new WeekPlanner.ShareDetail("aa", "Area A", 68, 50, 0),
+        new WeekPlanner.ShareDetail("bb", "Area B", 32, 50, 5));
+    // The same numbers the plan itself uses.
+    Map<String, Double> share = WeekPlanner.shareOf(domains, withUnits);
+    assertThat(details).allMatch(d -> d.percent() == (int) Math.round(share.get(d.domainId()) * 100));
+  }
+
+  @Test
   void theWeekIsNinetyPercentOfTheHoursAndTheGoalEightyPercentOfThat() {
     Plan p = plan(9, curriculum(), List.of());
     assertThat(p.plannedMinutes()).isEqualTo(486);

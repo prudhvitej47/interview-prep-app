@@ -291,8 +291,15 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .settings > label { display: flex; gap: 0.6rem; align-items: center; margin: 0.6rem 0; }
 .settings input[type="number"] { width: 5rem; font: inherit; padding: 0.3rem; border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: var(--bg); color: var(--fg); }
-.settings .weight { display: grid; grid-template-columns: minmax(10rem, 16rem) 5rem auto; gap: 0.6rem; align-items: center; margin: 0.3rem 0; }
-.settings .weight .share { color: var(--muted); font-size: 0.9em; }
+/* A base gap keeps the share from reading as part of the number box. The box column is auto, not
+   5rem: the input is 5rem plus padding and border, and overflowing a 5rem column ate the gap. */
+.settings .weight { display: grid; grid-template-columns: minmax(10rem, 16rem) auto minmax(0, 1fr); gap: 0.4rem 1rem; align-items: center; margin: 0.3rem 0; }
+.settings .weight .share { color: var(--muted); font-size: 0.875rem; }
+/* On a phone three columns squeezed the share into a sliver: name, box and share stack instead. */
+@media (max-width: 560px) {
+  .settings .weight { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; margin: 0.8rem 0; }
+  .settings .weight input { justify-self: start; }
+}
 .settings details { margin: 0.8rem 0; }
 .settings summary { cursor: pointer; }
 
