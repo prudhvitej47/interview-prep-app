@@ -8,6 +8,7 @@ import com.interviewprep.planner.WeekPlanner.DueReview;
 import com.interviewprep.planner.WeekPlanner.Input;
 import com.interviewprep.planner.WeekPlanner.Item;
 import com.interviewprep.planner.WeekPlanner.Plan;
+import com.interviewprep.planner.WeekPlanner.ProjectQuestion;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -288,6 +289,173 @@ class WeekPlannerTest {
     // Not ready when the carry-over runs, so it is not carried; it still lands after its concept.
     assertThat(item(p, "dsa.window.p1").reason()).doesNotStartWith("Carried over");
     assertThat(item(p, "dsa.window.p1").day()).isGreaterThanOrEqualTo(item(p, "dsa.window.concept").day());
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Questions about the learner's own projects. The projects are invented; this repository is public.
+  // ---------------------------------------------------------------------------------------------
+
+  private static final List<String> LADDER = List.of("walkthrough", "why", "scale", "failure", "change", "story");
+
+  /** A project's ladder of 15-minute questions, ids {@code base+0…}; none rated yet. */
+  private static List<ProjectQuestion> ladder(long base, long project, String name, int projectOrder, int count) {
+    List<ProjectQuestion> out = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      out.add(new ProjectQuestion(base + i, project, name, projectOrder, i, LADDER.get(i % 6), 15, null));
+    }
+    return out;
+  }
+
+  private static ProjectQuestion rated(ProjectQuestion q, LocalDate dueOn) {
+    return new ProjectQuestion(q.questionId(), q.projectId(), q.projectName(), q.projectOrder(),
+        q.questionOrder(), q.rung(), q.minutes(), dueOn);
+  }
+
+  private static List<ProjectQuestion> twoProjects() {
+    List<ProjectQuestion> qs = new ArrayList<>(ladder(100, 1, "Example ledger", 0, 6));
+    qs.addAll(ladder(200, 2, "Example gateway", 1, 3));
+    return qs;
+  }
+
+  private static Plan withProjects(double hours, int fromDay, List<Integer> days, List<ProjectQuestion> qs,
+      List<Long> carried) {
+    return WeekPlanner.plan(new Input(MONDAY, fromDay, days, hours, 1.0, domains(2.5), curriculum(), Set.of(),
+        List.of(), Set.of(), List.of(), qs, carried));
+  }
+
+  private static List<Item> projectItems(Plan p) {
+    return p.items().stream().filter(i -> i.kind().equals("project")).toList();
+  }
+
+  private static List<Long> questionIds(Plan p) {
+    return projectItems(p).stream().map(Item::projectQuestionId).toList();
+  }
+
+  @Test
+  void aLearnerWithNoProjectsGetsExactlyThePlanTheyGotBefore() {
+    Plan before = plan(9, curriculum(), List.of(new DueReview("done.x", "concept", 30, MONDAY)));
+    Plan now = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(), Set.of(),
+        List.of(new DueReview("done.x", "concept", 30, MONDAY)), Set.of(), List.of(), List.of(), List.of()));
+    assertThat(now).isEqualTo(before);
+    assertThat(projectItems(now)).isEmpty();
+    assertThat(now.notes()).noneMatch(n -> n.contains("project question") || n.contains("your projects"));
+  }
+
+  @Test
+  void projectQuestionsTakeAtMostATenthOfTheWeekOffTheTop() {
+    Plan without = plan(9, curriculum(), List.of());
+    Plan p = withProjects(9, 1, EVERY_DAY, twoProjects(), List.of());
+    // 10% of 486 is 48 minutes: three 15-minute questions.
+    assertThat(projectItems(p)).hasSize(3);
+    assertThat(projectItems(p).stream().mapToInt(Item::minutes).sum()).isLessThanOrEqualTo(48);
+    assertThat(projectItems(p)).allMatch(i -> i.unitId() == null && i.projectQuestionId() != null);
+    // Off the top: the domain shares are untouched, and learning shrinks by what the questions take.
+    assertThat(p.shares()).isEqualTo(without.shares());
+    int learning = p.items().stream().filter(i -> i.kind().equals("learn")).mapToInt(Item::minutes).sum();
+    assertThat(learning).isLessThanOrEqualTo(486 - 45);
+    assertThat(p.notes()).contains("Questions about your projects take 45 minutes, off the top like reviews"
+        + " (up to 10% of the week, never two on one day).");
+  }
+
+  @Test
+  void aSmallWeekStillGetsOneQuestionWhenTheShareAllowsIt() {
+    // 3 hours: 162 planned, 16 minutes for projects, so one 15-minute question.
+    assertThat(projectItems(withProjects(3, 1, EVERY_DAY, twoProjects(), List.of()))).hasSize(1);
+    // 2 hours: 108 planned, 10 minutes, and no question is that short.
+    Plan tiny = withProjects(2, 1, EVERY_DAY, twoProjects(), List.of());
+    assertThat(projectItems(tiny)).isEmpty();
+    assertThat(tiny.notes()).contains("No project question fitted this week: 10% of it is 10 minutes.");
+  }
+
+  @Test
+  void dueQuestionsComeFirstEarliestDueFirstAndNotBeforeTheirDay() {
+    List<ProjectQuestion> qs = new ArrayList<>(twoProjects());
+    qs.set(1, rated(qs.get(1), MONDAY.plusDays(3)));   // due Thursday
+    qs.set(7, rated(qs.get(7), MONDAY.minusDays(2)));  // overdue since Saturday
+    qs.set(2, rated(qs.get(2), MONDAY.plusDays(10)));  // rated, due next week: not this one
+    Plan p = withProjects(9, 1, EVERY_DAY, qs, List.of());
+    // Overdue, then due, then the first new rung of the project already under way (the ledger).
+    assertThat(questionIds(p)).containsExactlyInAnyOrder(201L, 101L, 100L);
+    Item overdue = projectItems(p).stream().filter(i -> i.projectQuestionId() == 201L).findFirst().orElseThrow();
+    Item due = projectItems(p).stream().filter(i -> i.projectQuestionId() == 101L).findFirst().orElseThrow();
+    assertThat(overdue.reason()).startsWith("Rehearse again, overdue since Sat 26 Sept")
+        .contains("why it was built this way on Example gateway");
+    assertThat(due.reason()).startsWith("Rehearse again, due Thu 1 Oct");
+    assertThat(due.day()).isGreaterThanOrEqualTo(4);
+    assertThat(questionIds(p)).doesNotContain(102L);
+  }
+
+  @Test
+  void newQuestionsFollowOneProjectsLadderInOrder() {
+    Plan p = withProjects(9, 1, EVERY_DAY, twoProjects(), List.of());
+    assertThat(questionIds(p)).containsExactlyInAnyOrder(100L, 101L, 102L);
+    assertThat(projectItems(p)).allMatch(i -> i.reason().startsWith("Next on the Example ledger ladder: "));
+    assertThat(projectItems(p).stream().filter(i -> i.projectQuestionId() == 100L).findFirst().orElseThrow()
+        .reason()).startsWith("Next on the Example ledger ladder: the walk-through. Your projects take up to 10%");
+  }
+
+  @Test
+  void aProjectAlreadyUnderWayIsFinishedBeforeAnotherIsStarted() {
+    List<ProjectQuestion> qs = new ArrayList<>(twoProjects());
+    // The gateway (second on the page) has one rung rated and not due yet; the ledger is untouched.
+    qs.set(6, rated(qs.get(6), MONDAY.plusDays(20)));
+    Plan p = withProjects(9, 1, EVERY_DAY, qs, List.of());
+    // Its two remaining rungs, in order, then the ledger's first.
+    assertThat(questionIds(p)).containsExactlyInAnyOrder(201L, 202L, 100L);
+  }
+
+  @Test
+  void aRungThatDoesNotFitEndsTheWalkRatherThanBeingSkipped() {
+    List<ProjectQuestion> qs = new ArrayList<>(ladder(100, 1, "Example ledger", 0, 3));
+    ProjectQuestion longOne = qs.get(1);
+    qs.set(1, new ProjectQuestion(longOne.questionId(), 1, "Example ledger", 0, 1, "why", 45, null));
+    Plan p = withProjects(9, 1, EVERY_DAY, qs, List.of());
+    assertThat(questionIds(p)).containsExactly(100L);
+  }
+
+  @Test
+  void neverTwoProjectQuestionsOnOneDayOnTheLeastBusyDays() {
+    // 20 hours leaves 108 minutes for projects, room for seven, but only three study days.
+    Plan p = withProjects(20, 1, List.of(2, 4, 6), twoProjects(), List.of());
+    assertThat(projectItems(p)).hasSize(3);
+    assertThat(projectItems(p).stream().map(Item::day).distinct()).containsExactlyInAnyOrder(2, 4, 6);
+  }
+
+  @Test
+  void aWeekMadeMidweekKeepsProjectQuestionsToTheDaysLeft() {
+    Plan p = withProjects(9, 5, EVERY_DAY, twoProjects(), List.of());
+    // 3 days left: 208 planned, 20 minutes for projects.
+    assertThat(p.plannedMinutes()).isEqualTo((int) Math.round(486 * 3 / 7.0));
+    assertThat(projectItems(p)).hasSize(1);
+    assertThat(projectItems(p)).allMatch(i -> i.day() >= 5);
+  }
+
+  @Test
+  void lastWeeksUnratedQuestionsComeFirstAndAGoneOneIsSkipped() {
+    List<ProjectQuestion> qs = new ArrayList<>(twoProjects());
+    qs.set(1, rated(qs.get(1), MONDAY.minusDays(1)));  // overdue
+    Plan p = withProjects(9, 1, EVERY_DAY, qs, List.of(999L, 202L));
+    assertThat(questionIds(p)).containsExactlyInAnyOrder(202L, 101L, 100L);
+    Item carried = projectItems(p).stream().filter(i -> i.projectQuestionId() == 202L).findFirst().orElseThrow();
+    assertThat(carried.reason()).isEqualTo("Carried over from last week: what happens at scale on Example gateway.");
+  }
+
+  @Test
+  void carriedQuestionsShareTheCarryOverShareWithLearning() {
+    // 3 hours: 162 planned, 48 minutes of carry-over. A carried 15-minute question leaves 33,
+    // so only one of the two 30-minute units still fits.
+    List<ProjectQuestion> qs = ladder(100, 1, "Example ledger", 0, 2);
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 3, 1.0, domains(2.5), curriculum(), Set.of(),
+        List.of(), Set.of(), List.of("java.u1", "spring.u1"), qs, List.of(100L)));
+    assertThat(questionIds(p)).containsExactly(100L);
+    assertThat(p.items()).filteredOn(i -> i.reason().startsWith("Carried over")).hasSize(2);
+    assertThat(p.notes()).anyMatch(n -> n.startsWith("1 unfinished item from last week did not fit"));
+  }
+
+  @Test
+  void theSameInputWithProjectsGivesTheSamePlan() {
+    assertThat(withProjects(9, 1, EVERY_DAY, twoProjects(), List.of()))
+        .isEqualTo(withProjects(9, 1, EVERY_DAY, twoProjects(), List.of()));
   }
 
   private static int share(Plan p, String domain) {

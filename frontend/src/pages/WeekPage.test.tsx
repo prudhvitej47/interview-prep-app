@@ -97,6 +97,48 @@ describe("WeekPage", () => {
     expect(screen.getByText("No system design units to learn yet, so this week has none.")).toBeInTheDocument();
   });
 
+  it("shows a question about the learner's own project, linked to it on the project's page", async () => {
+    const question = {
+      unitId: null, title: "Walk me through the ledger.", type: "project-question", day: 3, kind: "project", minutes: 15,
+      reason: "Next on the Example ledger ladder: the walk-through. Your projects take up to 10% of the week.",
+      done: false, projectQuestionId: 12, projectId: 3, projectName: "Example ledger", rung: "walkthrough",
+    };
+    mockFetch({ "/api/plan": { body: week({ ...plan, items: [...plan.items, question] }) } });
+    show();
+    const link = await screen.findByRole("link", { name: "Walk me through the ledger." });
+    expect(link).toHaveAttribute("href", "/projects/3#q-12");
+    const item = link.closest("li")!;
+    expect(item).toHaveTextContent("Your project: Example ledger · Walk-through · 15 min");
+    expect(item).toHaveTextContent("Next on the Example ledger ladder");
+    expect(within(item).getByLabelText("to do")).toBeInTheDocument();
+    // On the same day as the units, after them.
+    const wednesday = screen.getByRole("heading", { name: heading(2026, 9, 30) }).closest("section")!;
+    expect(within(wednesday).getAllByRole("listitem").at(-1)).toBe(item);
+    expect(screen.getByText(/and a project question once you rate it/)).toBeInTheDocument();
+    expect(screen.getByText(/Questions about your own projects take 15 minutes this week/)).toBeInTheDocument();
+  });
+
+  it("marks a rated project question done", async () => {
+    const question = {
+      unitId: null, title: "Why double entry?", type: "project-question", day: 1, kind: "project", minutes: 15,
+      reason: "Rehearse again, due Mon 28 Sept.", done: true, projectQuestionId: 13, projectId: 3,
+      projectName: "Example ledger", rung: "why",
+    };
+    mockFetch({ "/api/plan": { body: week({ ...plan, items: [question] }) } });
+    show();
+    const item = (await screen.findByRole("link", { name: "Why double entry?" })).closest("li")!;
+    expect(within(item).getByLabelText("done")).toBeInTheDocument();
+    expect(item).toHaveTextContent("Why this way");
+  });
+
+  it("says nothing about project questions when the week has none", async () => {
+    mockFetch({ "/api/plan": { body: week(plan) } });
+    show();
+    await screen.findByRole("link", { name: "Sliding window" });
+    expect(screen.queryByText(/project question/)).toBeNull();
+    expect(screen.queryByText(/your own projects/)).toBeNull();
+  });
+
   it("keeps the keyboard's place when the settings form opens and closes", async () => {
     mockFetch({ "/api/plan": { body: week(plan) }, "/api/domains": { body: DOMAINS }, "/api/plan/shares": { body: [] },
       "/api/breaks": { body: { upcoming: [] } } });

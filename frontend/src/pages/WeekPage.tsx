@@ -5,7 +5,7 @@ import {
   type Breaks, type Domain, type PlanView, type Week, type WeekSettings,
 } from "../api";
 import { formatDay } from "../unit/ProgressPanel";
-import { TYPE_LABEL } from "../unit/sections";
+import { itemHref, itemKey, itemLabel } from "./planItem";
 import { moveFocusTo } from "../navigation";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -80,6 +80,7 @@ export function WeekPage() {
 function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
   const days = [...new Set(plan.items.map((i) => i.day))].sort();
   const percent = plan.goalMinutes === 0 ? 0 : Math.min(100, Math.round((plan.doneMinutes / plan.goalMinutes) * 100));
+  const projectMinutes = plan.items.filter((i) => i.kind === "project").reduce((sum, i) => sum + i.minutes, 0);
   return (
     <>
       <section className="goal" aria-label="This week's goal">
@@ -91,7 +92,8 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
         )}
         <p className="hint">
           {plan.doneMinutes} of {plan.goalMinutes} goal minutes done ({plan.plannedMinutes} planned; the goal leaves room
-          for a bad day). An item counts once you mark it done or record its review.
+          for a bad day). An item counts once you mark it done or record its review
+          {projectMinutes > 0 && ", and a project question once you rate it"}.
         </p>
       </section>
 
@@ -101,13 +103,11 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
           <h3>{dayDate(weekStart, day)}</h3>
           <ul>
             {plan.items.filter((i) => i.day === day).map((i) => (
-              <li key={`${i.kind}-${i.unitId}`} className={i.done ? "done" : ""}>
+              <li key={itemKey(i)} className={i.done ? "done" : ""}>
                 <div className="item-head">
                   <span role="img" aria-label={i.done ? "done" : "to do"}>{i.done ? "✓" : "○"}</span>
-                  <Link to={`/units/${i.unitId}`}>{i.title}</Link>
-                  <span className="count">
-                    {i.kind === "review" ? "Review" : TYPE_LABEL[i.type] ?? i.type} · {i.minutes} min
-                  </span>
+                  <Link to={itemHref(i)}>{i.title}</Link>
+                  <span className="count">{itemLabel(i)} · {i.minutes} min</span>
                 </div>
                 <p className="hint">{i.reason}</p>
               </li>
@@ -131,6 +131,12 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
           Each area's share starts from its weight and grows when you are weaker in it, by at most half again.
           Topics you are weakest in come first within an area.
         </p>
+        {projectMinutes > 0 && (
+          <p className="hint">
+            Questions about your own projects take {projectMinutes} minutes this week, off the top like reviews: up to
+            10% of the week, never two on one day, so the shares above split the rest.
+          </p>
+        )}
         {plan.notes.length > 0 && (
           <ul>{plan.notes.map((n) => <li key={n} className="hint">{n}</li>)}</ul>
         )}

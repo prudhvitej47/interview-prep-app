@@ -4,7 +4,8 @@
  * details never go into a repository; everything here is personal and scoped to one learner.
  *
  * <p>Uses the progress module's review schedule, so a project question spaces out exactly like a
- * unit, and the curriculum only to check and title the units a question links to.
+ * unit, and the curriculum only to check and title the units a question links to. The planner and
+ * the rewards read it only through {@link com.interviewprep.projects.ProjectPlanning}.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Projects")
 package com.interviewprep.projects;

@@ -38,7 +38,11 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           that week (weeks start on Monday):
         </p>
         <ul>
-          <li>It plans 90% of your hours, leaving room for a busy day. Reviews take up to a fifth of that.</li>
+          <li>
+            It plans 90% of your hours, leaving room for a busy day. Reviews take up to a fifth of that, and
+            questions about <Link to="/projects">your own projects</Link> up to a tenth, before the areas share the
+            rest.
+          </li>
           <li>
             Each area gets a share of the time from its <strong>weight</strong>, multiplied by how weak you are in
             it: up to 1.5× for a weak area, down to 0.7× for a strong one, never below half or above double its
@@ -55,6 +59,12 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           <li>
             Units you did not finish last week come back first, using up to 30% of the time, and each comes back
             at most twice. After that it waits its turn like any other unit.
+          </li>
+          <li>
+            Project questions: those you did not rate last week come back first (sharing that 30%), then those due
+            for another rehearsal, then the next rungs of one project's ladder, finishing a project you have started
+            before beginning another. Never two on one day, and at least one a week when a tenth of it has room for
+            one.
           </li>
           <li>The week's <strong>goal</strong> is 80% of the planned minutes.</li>
         </ul>
@@ -129,8 +139,9 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           <li>
             <strong>Stars</strong>, never taken away: a unit earns them the first time it is done with anything but
             Again (3 for a design case, 2 for a project deep dive, 1 otherwise, and 1 more for a coding or SQL
-            problem rated Easy). A day with three or more reviews earns 1. A week that meets its goal earns 5, and
-            2 more if the whole plan was done.
+            problem rated Easy). A question about your own project earns 1 the first time you rate it anything but
+            Again. A day with three or more reviews earns 1. A week that meets its goal earns 5, and 2 more if the
+            whole plan was done; a planned project question counts once you rate it that week.
           </li>
           <li><strong>Streak</strong>: weeks in a row that met their goal.</li>
           <li>
@@ -188,7 +199,7 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           </li>
           <li>
             Rating a question schedules it like a unit's review, and due ones show on the home page under their own
-            heading. <strong>Export</strong> downloads everything, answers and ratings included.
+            heading. Each week's plan includes some of them, as section 1 describes. <strong>Export</strong> downloads everything, answers and ratings included.
           </li>
         </ul>
       </section>
