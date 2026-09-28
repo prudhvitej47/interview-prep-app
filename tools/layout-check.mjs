@@ -43,6 +43,7 @@ function arg(name, fallback = null) {
 const base = arg("base", "http://localhost:8091");
 const bundle = arg("bundle", "../interview-prep-content/dist/content.json");
 const only = arg("only");            // comma-separated unit ids, or a file of them
+const paths = arg("paths");          // comma-separated app paths (/projects,/projects/1) instead of units
 const scheme = arg("scheme", "both"); // dark | light | both
 const port = Number(arg("port", "9500"));
 
@@ -52,6 +53,12 @@ function unitIds() {
     return raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
   }
   return JSON.parse(readFileSync(bundle, "utf8")).units.map((u) => u.id);
+}
+
+// Units by default; with --paths, any other page of the app, which has no .unit to wait for.
+function pages() {
+  if (paths) return paths.split(",").map((s) => s.trim()).filter(Boolean);
+  return unitIds().map((id) => `/units/${id}`);
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -97,8 +104,12 @@ async function connect() {
   return { chrome, send, evaluate };
 }
 
+// A unit page's own headings; another page has no .unit, so any heading in the main column counts.
+const HEADINGS = paths ? "main h2, main h3" : ".unit h2, .unit h3";
+
 // Runs inside the page. Returns everything one load can tell us about the layout.
 const INSPECT = `(() => {
+  const HEADINGS = ${JSON.stringify(HEADINGS)};
   const unit = document.querySelector('.unit, .how-it-works, main article') || document.body;
   const limit = unit.getBoundingClientRect().right;
   const tooWide = [];
@@ -138,7 +149,7 @@ const INSPECT = `(() => {
     sourceFallbacks: document.querySelectorAll('.diagram-source').length,
     undrawn: document.querySelectorAll('.diagram[aria-busy="true"]').length,
     alerts: [...document.querySelectorAll('[role=alert]')].map((a) => a.textContent.trim().slice(0, 80)),
-    headings: document.querySelectorAll('.unit h2, .unit h3').length,
+    headings: document.querySelectorAll(HEADINGS).length,
   });
 })()`;
 
@@ -154,7 +165,7 @@ const FOCUS_RING = `(() => {
 })()`;
 
 async function main() {
-  const ids = unitIds();
+  const ids = pages();
   const schemes = scheme === "both" ? ["dark", "light"] : [scheme];
   const { chrome, send, evaluate } = await connect();
   await send("Page.enable");
@@ -168,10 +179,13 @@ async function main() {
       });
       await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: colours }] });
       for (const id of ids) {
-        await send("Page.navigate", { url: `${base}/units/${id}` });
-        // Wait for the unit, then for its diagrams: Mermaid draws after the page appears.
+        await send("Page.navigate", { url: `${base}${id}` });
+        // Wait for the page and its data, then for its diagrams: Mermaid draws after the page appears.
         for (let i = 0; i < 60; i++) {
-          if (await evaluate(`!!document.querySelector('.unit h2')`)) break;
+          const ready = paths
+            ? `!!document.querySelector('main h2') && !document.querySelector('main').textContent.includes('Loading…')`
+            : `!!document.querySelector('.unit h2')`;
+          if (await evaluate(ready)) break;
           await sleep(200);
         }
         // Open the folded sections: a question unit's diagram usually sits in one, and a closed
@@ -213,7 +227,7 @@ async function main() {
   }
 
   chrome.kill();
-  console.log(`\n${checked} page load(s): ${ids.length} unit(s) x ${VIEWPORTS.length} width(s) x ${schemes.length} scheme(s)`);
+  console.log(`\n${checked} page load(s): ${ids.length} page(s) x ${VIEWPORTS.length} width(s) x ${schemes.length} scheme(s)`);
   if (problems.length === 0) {
     console.log("no layout problems");
     return 0;

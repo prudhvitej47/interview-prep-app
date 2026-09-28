@@ -85,7 +85,8 @@ Every unit is loaded at 390px and at 1000px, in dark and light, and each page mu
 - every diagram's **drawn** text at 8.5px or larger, measured after the page scales the SVG down;
 - no error banner, and headings actually rendered.
 
-Useful flags: `--only` takes unit ids (or a file of them) to check just a slice, `--scheme dark`
+Useful flags: `--only` takes unit ids (or a file of them) to check just a slice, `--paths` checks other
+pages instead (`--paths /projects,/projects/1`), `--scheme dark`
 halves the run, and `--base` points at another host. It exits non-zero when anything fails.
 
 A whole-curriculum run is a few hundred page loads and takes several minutes; a slice takes
