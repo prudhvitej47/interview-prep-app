@@ -2,6 +2,7 @@ package com.interviewprep.progress;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 /**
  * When a unit is next due for review, worked out from how each attempt at it went.
@@ -12,18 +13,25 @@ import java.util.List;
  *
  * <p>ponytail: a fixed ladder, not FSRS. It needs no tuning data, which two learners will not have
  * for months; switch to FSRS if reviews start feeling badly timed.
+ *
+ * <p>Public so that anything else a learner rehearses (their own project questions) spaces out on
+ * exactly the same ladder, rather than on a copy of it that drifts.
  */
-final class ReviewSchedule {
+public final class ReviewSchedule {
+
+  /** The four answers to "how did it go?", the same wherever the question is asked. */
+  public static final Set<String> RATINGS = Set.of("again", "hard", "good", "easy");
 
   static final int[] LADDER = {1, 3, 7, 16, 35};
   private static final int MAX_DAYS = 365;
 
-  record Step(String rating, LocalDate on) {}
+  /** One rating, and the day (in {@link ProgressQueries#STUDY_ZONE}) it was given. */
+  public record Step(String rating, LocalDate on) {}
 
   private ReviewSchedule() {}
 
   /** Attempts oldest first; returns null when there are none (the unit was never done). */
-  static LocalDate dueOn(List<Step> attempts) {
+  public static LocalDate dueOn(List<Step> attempts) {
     if (attempts.isEmpty()) {
       return null;
     }
