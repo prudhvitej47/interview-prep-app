@@ -326,6 +326,28 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
+  void theSharePreviewShowsWhatTheWeightsAloneWouldGiveAndTheLearnersStrength() throws Exception {
+    // Unrated: neutral strength everywhere, so the weakness factor moves nothing.
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {}}")
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].unboostedPercent").value(60))
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].strength").value(2.5));
+    // Weak in DSA (1/5), strong in databases (4/5): 60 × 1.34 against 40 × 0.86.
+    mvc.perform(as(get("/api/me"), TESTER));
+    jdbc.update("insert into learner_competency (learner_id, scope, scope_id, rating, source)"
+        + " select id, 'domain', 'dsa', 1, 'self-rating' from learner where slug = 'tester'");
+    jdbc.update("insert into learner_competency (learner_id, scope, scope_id, rating, source)"
+        + " select id, 'domain', 'databases', 4, 'self-rating' from learner where slug = 'tester'");
+    send(post("/api/plan/shares"), TESTER, "{\"weights\": {}}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].percent").value(70))
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].unboostedPercent").value(60))
+        .andExpect(jsonPath("$[?(@.domainId == 'dsa')].strength").value(1.0))
+        .andExpect(jsonPath("$[?(@.domainId == 'databases')].percent").value(30))
+        .andExpect(jsonPath("$[?(@.domainId == 'databases')].unboostedPercent").value(40))
+        .andExpect(jsonPath("$[?(@.domainId == 'databases')].strength").value(4.0));
+  }
+
+  @Test
   void notForMeIsChecked() throws Exception {
     send(put("/api/me/not-for-me"), TESTER, "{\"scope\": \"domain\", \"id\": \"dsa\", \"excluded\": true}")
         .andExpect(status().isBadRequest());

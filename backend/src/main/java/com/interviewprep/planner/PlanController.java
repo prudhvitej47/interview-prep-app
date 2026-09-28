@@ -142,10 +142,11 @@ class PlanController {
   /**
    * Each area's share of the week with these weights, computed exactly as the next plan would compute
    * it; nothing is saved. Weights are relative numbers, which are hard to reason about; the settings
-   * form shows these percentages while the learner types.
+   * form shows these percentages while the learner types, with each area's share before the weakness
+   * factor and its strength, so it can say when being weaker in an area grew its share.
    */
   @PostMapping("/api/plan/shares")
-  List<Share> previewShares(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody SharePreview body) {
+  List<WeekPlanner.ShareDetail> previewShares(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody SharePreview body) {
     Map<String, Integer> overrides = body == null || body.weights() == null ? Map.of() : body.weights();
     Set<String> known = new HashSet<>();
     domains.all().forEach(d -> known.add(d.id()));
@@ -174,9 +175,7 @@ class PlanController {
         .map(d -> new WeekPlanner.Domain(d.id(), d.name(), overrides.getOrDefault(d.id(), d.weight()),
             strength.ofDomain(d.id())))
         .toList();
-    Map<String, Double> share = WeekPlanner.shareOf(planDomains, withUnits);
-    return planDomains.stream().filter(d -> share.containsKey(d.id()))
-        .map(d -> new Share(d.id(), d.name(), (int) Math.round(share.get(d.id()) * 100))).toList();
+    return WeekPlanner.shareDetails(planDomains, withUnits);
   }
 
   @DeleteMapping("/api/plan")

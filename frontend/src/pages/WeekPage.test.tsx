@@ -74,7 +74,9 @@ describe("WeekPage", () => {
     const fetchMock = mockFetch({
       "/api/plan": { body: week(null, NO_SETTINGS) },
       "/api/domains": { body: DOMAINS },
-      "/api/plan/shares": { body: [{ domainId: "dsa", name: "DSA and coding", percent: 100 }] },
+      "/api/plan/shares": {
+        body: [{ domainId: "dsa", name: "DSA and coding", percent: 100, unboostedPercent: 100, strength: 2.5 }],
+      },
     });
     show();
     const dsa = await screen.findByLabelText("Weight for DSA and coding");
@@ -83,6 +85,44 @@ describe("WeekPage", () => {
     expect(screen.getByLabelText("Weight for Databases and SQL").closest("label")).toHaveTextContent("left out");
     const sent = fetchMock.mock.calls.filter(([url]) => url === "/api/plan/shares").at(-1);
     expect(JSON.parse(String(sent?.[1]?.body))).toEqual({ weights: { databases: 0 } });
+  });
+
+  it("explains the share and notes a weakness boost only when it moves the share by 2 points or more", async () => {
+    mockFetch({
+      "/api/plan": { body: week(null, NO_SETTINGS) },
+      "/api/domains": { body: DOMAINS },
+      "/api/plan/shares": {
+        body: [
+          { domainId: "dsa", name: "DSA and coding", percent: 62, unboostedPercent: 60, strength: 2 },
+          { domainId: "databases", name: "Databases and SQL", percent: 38, unboostedPercent: 40, strength: 3.4 },
+        ],
+      },
+    });
+    show();
+    const dsa = await screen.findByLabelText("Weight for DSA and coding");
+    await waitFor(() =>
+      expect(dsa).toHaveAccessibleDescription("≈ 62% of your week (includes a boost: you're at 2.0/5 here)"));
+    const databases = screen.getByLabelText("Weight for Databases and SQL");
+    expect(databases).toHaveAccessibleDescription("≈ 38% of your week");
+    expect(screen.getByText(/Weights are scaled so all areas add up to 100%/)).toHaveTextContent(
+      "an area you're weaker in gets up to half as much again");
+  });
+
+  it("leaves the boost note out when the boost moved the share by a single point", async () => {
+    mockFetch({
+      "/api/plan": { body: week(null, NO_SETTINGS) },
+      "/api/domains": { body: DOMAINS },
+      "/api/plan/shares": {
+        body: [
+          { domainId: "dsa", name: "DSA and coding", percent: 61, unboostedPercent: 60, strength: 2.9 },
+          { domainId: "databases", name: "Databases and SQL", percent: 39, unboostedPercent: 40, strength: 3.2 },
+        ],
+      },
+    });
+    show();
+    const dsa = await screen.findByLabelText("Weight for DSA and coding");
+    await waitFor(() => expect(dsa).toHaveAccessibleDescription("≈ 61% of your week"));
+    expect(screen.queryByText(/includes a boost/)).not.toBeInTheDocument();
   });
 
   it("lays the week out by day, with why each item is there and what is done", async () => {

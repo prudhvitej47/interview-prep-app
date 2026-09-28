@@ -221,7 +221,9 @@ export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
 }
 
 /** Each area's share of the week with these weight overrides, exactly as the next plan would use it. */
-export type SharePreview = { domainId: string; name: string; percent: number }[];
+/** An area's share: {@code unboostedPercent} is what the weights alone give, before the weakness factor. */
+export type ShareDetail = { domainId: string; name: string; percent: number; unboostedPercent: number; strength: number };
+export type SharePreview = ShareDetail[];
 
 export async function previewShares(weights: Record<string, number>): Promise<SharePreview> {
   return (await send("POST", "/api/plan/shares", { weights })).json();

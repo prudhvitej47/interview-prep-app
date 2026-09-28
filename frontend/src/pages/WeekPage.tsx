@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, previewShares, rateTopics, saveWeekSettings, takeBreak,
-  type Breaks, type Domain, type PlanView, type Week, type WeekSettings,
+  type Breaks, type Domain, type PlanView, type ShareDetail, type Week, type WeekSettings,
 } from "../api";
 import { formatDay } from "../unit/ProgressPanel";
 import { itemHref, itemKey, itemLabel } from "./planItem";
@@ -197,7 +197,7 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
   const [weights, setWeights] = useState<Record<string, string>>(
     Object.fromEntries(Object.entries(initial.weights).map(([k, v]) => [k, String(v)])));
   const [domains, setDomains] = useState<Domain[]>([]);
-  const [shares, setShares] = useState<Record<string, number> | null>(null);
+  const [shares, setShares] = useState<Record<string, ShareDetail> | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -213,7 +213,7 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
     let live = true;
     const timer = setTimeout(() => {
       previewShares(JSON.parse(overridesKey))
-        .then((list) => live && setShares(Object.fromEntries(list.map((s) => [s.domainId, s.percent]))))
+        .then((list) => live && setShares(Object.fromEntries(list.map((s) => [s.domainId, s]))))
         .catch(() => live && setShares(null));
     }, 250);
     return () => {
@@ -270,6 +270,11 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
             {shares && <span className="share" id={`share-${d.id}`}>{shareLabel(d.id, overrides[d.id] ?? d.weight, shares)}</span>}
           </label>
         ))}
+        <p className="hint">
+          The % is this area's share of your week. Weights are scaled so all areas add up to 100%, and an area
+          you're weaker in gets up to half as much again (one you're strong in, up to 30% less). An area with
+          nothing left to learn gets none, and the others grow to fill it.
+        </p>
       </details>
       <div className="note-actions">
         <button type="submit" disabled={!valid || saving}>{firstTime ? "Plan my week" : "Save and rebuild this week"}</button>
@@ -288,10 +293,21 @@ function weightOverrides(weights: Record<string, string>): Record<string, number
       .map(([k, v]) => [k, Number(v)]));
 }
 
-function shareLabel(domainId: string, weight: number, shares: Record<string, number>): string {
+/**
+ * Percentage points an area's share must gain from the weakness factor before the form says so. The
+ * percentages are whole numbers, so a 1-point gap can be rounding alone; 2 is always the boost.
+ */
+const BOOST_NOTE_POINTS = 2;
+
+function shareLabel(domainId: string, weight: number, shares: Record<string, ShareDetail>): string {
   if (weight === 0) return "left out";
-  if (domainId in shares) return `≈ ${shares[domainId]}% of your week`;
-  return "nothing to learn yet";
+  const share = shares[domainId];
+  if (!share) return "nothing to learn yet";
+  const label = `≈ ${share.percent}% of your week`;
+  if (share.percent - share.unboostedPercent >= BOOST_NOTE_POINTS) {
+    return `${label} (includes a boost: you're at ${share.strength.toFixed(1)}/5 here)`;
+  }
+  return label;
 }
 
 /** Up to two weeks a quarter, taken before the week starts (proposal G). */
