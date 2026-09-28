@@ -372,3 +372,72 @@ export async function exportDraft(id: number): Promise<{ path: string; yaml: str
   if (response.ok || response.status === 422) return response.json();
   throw new Error(`Could not export (${response.status})`);
 }
+
+/** The six angles an interviewer takes on a project, in ladder order. */
+export type Rung = "walkthrough" | "why" | "scale" | "failure" | "change" | "story";
+
+export type ProjectSummary = { id: number; name: string; questions: number; answered: number; due: number };
+
+export type ProjectQuestion = {
+  id: number;
+  rung: Rung;
+  prompt: string;
+  probes: string;
+  strongAnswer: string;
+  units: { id: string; title: string }[];
+  minutes: number;
+  answer: string;
+  answeredAt: string | null;
+  /** The same shape as a unit's progress, so one rating panel serves both. */
+  progress: Progress;
+};
+
+export type Project = { id: number; name: string; summary: string; topics: string[]; questions: ProjectQuestion[] };
+
+export type ProjectImport = {
+  projectsAdded: number;
+  projectsUpdated: number;
+  projectsRetired: number;
+  questionsAdded: number;
+  questionsUpdated: number;
+  questionsRetired: number;
+  unknownUnits: string[];
+};
+
+export type ProjectReviewQueue = {
+  due: { questionId: number; projectId: number; projectName: string; rung: Rung; prompt: string; minutes: number; dueOn: string }[];
+  nextDueOn: string | null;
+};
+
+export const fetchProjects = () => getJson<ProjectSummary[]>("/api/projects");
+export const fetchProject = (id: number) => getOrNotFound<Project>(`/api/projects/${id}`);
+export const fetchProjectReviews = () => getJson<ProjectReviewQueue>("/api/projects/reviews");
+
+export async function saveAnswer(questionId: number, answer: string): Promise<{ answer: string; answeredAt: string | null }> {
+  return (await send("PUT", `/api/projects/questions/${questionId}/answer`, { answer })).json();
+}
+
+export const rateQuestion = (questionId: number, rating: Rating) =>
+  sendForProgress("POST", `/api/projects/questions/${questionId}/attempts`, { rating });
+export const undoQuestionRating = (questionId: number) =>
+  sendForProgress("DELETE", `/api/projects/questions/${questionId}/attempts/latest`);
+
+/**
+ * Sends the file exactly as it was read, so the server's 1 MB limit applies to what was chosen. A
+ * refused file comes back as the list of what to fix.
+ */
+export async function importProjects(fileText: string): Promise<ProjectImport | { problems: string[] }> {
+  const response = await fetch("/api/projects/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: fileText,
+  });
+  if (response.ok || response.status === 422 || response.status === 413) return response.json();
+  throw new Error(`Could not import it (${response.status}). Nothing was changed; try again.`);
+}
+
+export async function exportProjects(): Promise<Blob> {
+  const response = await fetch("/api/projects/export");
+  if (!response.ok) throw new Error(`Could not export (${response.status})`);
+  return response.blob();
+}

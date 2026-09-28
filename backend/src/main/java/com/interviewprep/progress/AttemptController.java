@@ -13,7 +13,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -34,8 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @RestController
 class AttemptController {
-
-  private static final Set<String> RATINGS = Set.of("again", "hard", "good", "easy");
 
   private final NamedParameterJdbcTemplate jdbc;
   private final CurriculumQueries curriculum;
@@ -72,8 +69,9 @@ class AttemptController {
   Progress record(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me,
       @RequestBody Rating request) {
     requireVisible(unitId, me);
-    if (request == null || !RATINGS.contains(request.rating())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "rating must be one of " + RATINGS);
+    if (request == null || !ReviewSchedule.RATINGS.contains(request.rating())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "rating must be one of " + ReviewSchedule.RATINGS);
     }
     jdbc.update("insert into attempt (learner_id, unit_id, rating) values (:learner, :unit, :rating)",
         params(unitId, me).addValue("rating", request.rating()));

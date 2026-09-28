@@ -82,6 +82,7 @@ describe("App", () => {
     renderAt("/");
     const sections = await screen.findByRole("navigation", { name: "Sections" });
     expect(within(sections).getByRole("link", { name: "This week" })).toHaveAttribute("href", "/week");
+    expect(within(sections).getByRole("link", { name: "My projects" })).toHaveAttribute("href", "/projects");
     expect(within(sections).getByRole("link", { name: "Interview evidence" })).toHaveAttribute("href", "/evidence");
     expect(within(sections).getByRole("link", { name: "How this works" })).toHaveAttribute("href", "/how-it-works");
     // The page you are on is marked, not just underlined on hover.
@@ -158,6 +159,17 @@ describe("App", () => {
     const nav = await screen.findByRole("navigation", { name: "Sections" });
     expect(within(nav).getByRole("link", { name: "Home" })).not.toHaveClass("active");
     expect(within(nav).getByRole("link", { name: "Interview evidence" })).toHaveClass("active");
+  });
+
+  it("keeps My projects marked on a project's own page", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/projects/7": { status: 404 },
+    });
+    renderAt("/projects/7");
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "My projects" })).toHaveClass("active");
+    expect(within(nav).getByRole("link", { name: "Home" })).not.toHaveClass("active");
   });
 
   it("shows the problem when the API is unreachable", async () => {
