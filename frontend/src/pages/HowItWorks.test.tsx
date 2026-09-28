@@ -17,6 +17,8 @@ it("explains the plan, reviews and rewards", () => {
   expect(screen.getByText(/It plans 90% of your hours/)).toHaveTextContent("questions about your own projects up to a tenth");
   expect(screen.getByText(/Project questions: those you did not rate last week/)).toHaveTextContent("Never two on one day");
   expect(screen.getByRole("heading", { name: "4. Marking it done, and reviews" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "9. Progress" })).toBeInTheDocument();
+  expect(screen.getByRole("row", { name: /^Solid/ })).toHaveTextContent("16 or more days away");
 });
 
 it("brings a closed start guide back", async () => {

@@ -6,12 +6,14 @@ import { fetchNotForMe, setNotForMe, type NotForMe as Marks } from "../api";
  * this is for one piece inside an area the learner otherwise wants. It never changes the shared
  * curriculum or the other learner's plans, and it is undone with one click.
  */
-export function NotForMe({ scope, id, topicId, topicName }: {
+export function NotForMe({ scope, id, topicId, topicName, onChange }: {
   scope: "topic" | "unit";
   id: string;
   /** On a unit page: its topic, so a unit whose whole topic is out can say so. */
   topicId?: string;
   topicName?: string;
+  /** Called after a mark is saved, so a page can refresh what depends on it. */
+  onChange?: () => void;
 }) {
   const [marks, setMarks] = useState<Marks | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export function NotForMe({ scope, id, topicId, topicName }: {
     setError(null);
     try {
       setMarks(await setNotForMe(scope, id, excluded));
+      onChange?.();
     } catch {
       setError("Could not save that. Try again.");
     }

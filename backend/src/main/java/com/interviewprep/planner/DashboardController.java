@@ -14,6 +14,7 @@ import com.interviewprep.learner.LearnerProfile;
 import com.interviewprep.learner.LearnerProfile.Ratings;
 import com.interviewprep.progress.ProgressQueries;
 import com.interviewprep.progress.ProgressQueries.Attempt;
+import com.interviewprep.progress.Stage.Standing;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -50,19 +51,25 @@ class DashboardController {
   private final LearnerProfile profile;
   private final ProgressQueries progress;
   private final PlacementService placements;
+  private final UnitStages stages;
 
   DashboardController(NamedParameterJdbcTemplate jdbc, CurriculumQueries curriculum,
       DomainCatalog domains, LearnerProfile profile, ProgressQueries progress,
-      PlacementService placements) {
+      PlacementService placements, UnitStages stages) {
     this.jdbc = jdbc;
     this.curriculum = curriculum;
     this.domains = domains;
     this.profile = profile;
     this.progress = progress;
     this.placements = placements;
+    this.stages = stages;
   }
 
-  record Coverage(String domainId, String name, int done, int total) {}
+  /**
+   * An area's units, leaving out those the learner marked "not for me": {@code done} were attempted
+   * at least once, and {@code stages} splits the {@code total} by stage, as the progress page does.
+   */
+  record Coverage(String domainId, String name, int done, int total, UnitStages.StageCounts stages) {}
 
   record WeakArea(String topicId, String name, String domainName, double strength, int unitsLeft) {}
 
@@ -93,14 +100,16 @@ class DashboardController {
     Proficiency strength = new Proficiency(topics, ratings.topics(), ratings.domains(), lastRating, unitTopics);
 
     // Coverage: only areas that have units, in curriculum order.
+    List<UnitStages.StagedUnit> staged = stages.of(me).stream().filter(s -> !s.notForMe()).toList();
     List<Coverage> coverage = new ArrayList<>();
     Map<String, String> domainNames = new HashMap<>();
     for (DomainSummary d : domains.all()) {
       domainNames.put(d.id(), d.name());
-      List<PlannableUnit> in = units.stream().filter(u -> u.domainId().equals(d.id())).toList();
+      List<Standing> in = staged.stream().filter(s -> s.unit().domainId().equals(d.id()))
+          .map(UnitStages.StagedUnit::standing).toList();
       if (!in.isEmpty()) {
-        coverage.add(new Coverage(d.id(), d.name(), (int) in.stream().filter(u -> done.contains(u.id())).count(),
-            in.size()));
+        UnitStages.StageCounts counts = UnitStages.StageCounts.of(in);
+        coverage.add(new Coverage(d.id(), d.name(), counts.total() - counts.notStarted(), counts.total(), counts));
       }
     }
 

@@ -43,6 +43,11 @@ public class ProgressQueries {
         attempts.stream().map(a -> new ReviewSchedule.Step(a.rating(), a.day())).toList());
   }
 
+  /** Where the learner stands with a unit, from its attempts oldest first, as of today in India time. */
+  public static Stage.Standing standing(List<Attempt> attempts, LocalDate today) {
+    return Stage.of(attempts.stream().map(a -> new ReviewSchedule.Step(a.rating(), a.day())).toList(), today);
+  }
+
   private List<Attempt> query(String where, MapSqlParameterSource params) {
     return jdbc.query(
         "select unit_id, rating, created_at from attempt where " + where + " order by created_at, id",

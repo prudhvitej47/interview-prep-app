@@ -346,7 +346,7 @@ class PlanController {
   }
 
   /** Excluded by its own id, by its topic, or by any topic above it. */
-  private static boolean excluded(PlannableUnit u, NotForMe notForMe, Map<String, TopicPlace> topics) {
+  static boolean excluded(PlannableUnit u, NotForMe notForMe, Map<String, TopicPlace> topics) {
     if (notForMe.units().contains(u.id())) {
       return true;
     }

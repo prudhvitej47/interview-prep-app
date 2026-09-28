@@ -204,6 +204,27 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         </ul>
       </section>
 
+      <section aria-labelledby="h-progress">
+        <h3 id="h-progress">9. Progress</h3>
+        <p>
+          <Link to="/progress">Progress</Link> shows where you stand with every unit, and with every question about
+          your projects, in one of four stages worked out from your ratings alone:
+        </p>
+        <table>
+          <tbody>
+            <tr><th>Not started</th><td>Never marked done.</td></tr>
+            <tr><th>Learned</th><td>Done, and the next review is under 16 days away: still early in the spacing.</td></tr>
+            <tr><th>Review due</th><td>Its review is today or overdue. Any stage can come due, solid included.</td></tr>
+            <tr><th>Solid</th><td>The next review is 16 or more days away, a gap reached only through several good reviews.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          "Reviewed ×2" on a learned unit counts the reviews after the first time. An "again" starts the spacing over,
+          so a solid unit you have forgotten goes back to learned. Units you marked "not for me" are left out of the
+          counts, here and in the home page's coverage.
+        </p>
+      </section>
+
       <section aria-labelledby="h-guide">
         <h3 id="h-guide">The start guide</h3>
         {me.startGuideClosed ? (

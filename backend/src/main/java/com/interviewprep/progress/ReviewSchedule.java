@@ -35,6 +35,14 @@ public final class ReviewSchedule {
     if (attempts.isEmpty()) {
       return null;
     }
+    return attempts.getLast().on().plusDays(intervalAfter(attempts));
+  }
+
+  /**
+   * The gap, in days, between the last attempt and the next review: how far up the ladder the
+   * attempts have climbed. Attempts oldest first; there must be at least one.
+   */
+  public static int intervalAfter(List<Step> attempts) {
     int step = -1;
     for (Step a : attempts) {
       step = switch (a.rating()) {
@@ -45,7 +53,7 @@ public final class ReviewSchedule {
         default -> throw new IllegalArgumentException("unknown rating " + a.rating());
       };
     }
-    return attempts.getLast().on().plusDays(intervalDays(step));
+    return intervalDays(step);
   }
 
   static int intervalDays(int step) {
