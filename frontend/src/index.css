@@ -227,6 +227,16 @@ summary:hover { text-decoration: underline; }
 .note-actions button:disabled { opacity: 0.45; cursor: default; }
 .note-actions [role="status"] { color: var(--muted); font-size: 0.875rem; }
 
+/* A project page: each question is a section of a reading page, ruled off from the one before like
+   the list items elsewhere, with its answer box and rating card inside it. */
+.project-question { margin-top: 1.6rem; padding-top: 0.4rem; border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.unit .project-question h3 { margin: 0.2rem 0 0.8rem; }
+.project-question .progress { margin: 1rem 0 0; }
+.progress h4 { margin: 0 0 0.3rem; }
+.answer label { display: block; font-weight: 600; margin-bottom: 0.3rem; }
+.my-projects .note-actions { flex-wrap: wrap; margin: 1rem 0; }
+.import-result p { margin: 0.4rem 0; }
+
 .practice textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9rem; padding: 0.6rem; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
   background: var(--bg); color: var(--fg); }

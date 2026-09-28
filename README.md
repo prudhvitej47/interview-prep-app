@@ -6,7 +6,7 @@ PostgreSQL. Runs on one Lightsail VM in Mumbai, reachable only over Tailscale at
 
 | Path | What it holds |
 | --- | --- |
-| `backend/` | Spring Boot modular monolith: curriculum, evidence, learner, (later) planner, progress, gamification, AI. |
+| `backend/` | Spring Boot modular monolith: curriculum, evidence, learner, planner, progress, projects, gamification, (later) AI. |
 | `frontend/` | React + Vite SPA. Built into the backend jar, so one process serves the UI and the API. |
 | `deploy/` | Docker Compose for the VM: app and PostgreSQL, with the database on the dedicated `/data` disk. |
 | `.github/workflows/` | Build and test on every push and pull request. |
@@ -104,4 +104,6 @@ other by id rather than by JPA association, which is what keeps them separable l
 Flyway owns the schema; Hibernate never alters it. Migrations land alongside the code that reads
 them, so a table arrives in the same change as its first query.
 
-Personal data — progress, notes, project write-ups — lives only in PostgreSQL, never in Git.
+Personal data — progress, notes, project write-ups — lives only in PostgreSQL, never in Git. Questions
+about a learner's own projects arrive the same way: each learner imports a question file they keep
+outside every repository on the My projects page, answers there, and can export it all back out.

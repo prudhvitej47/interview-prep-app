@@ -11,6 +11,8 @@ import { DraftPage } from "./pages/DraftPage";
 import { ArticlePage } from "./pages/ArticlePage";
 import { UnitPage } from "./pages/UnitPage";
 import { HowItWorks } from "./pages/HowItWorks";
+import { MyProjects } from "./pages/MyProjects";
+import { ProjectPage } from "./pages/ProjectPage";
 import { useHeadingFocus, useScrollRestoration } from "./navigation";
 
 type State =
@@ -65,6 +67,7 @@ export function App() {
             Home
           </NavLink>
           <NavLink to="/week">This week</NavLink>
+          <NavLink to="/projects">My projects</NavLink>
           <NavLink to="/evidence">Interview evidence</NavLink>
           <NavLink to="/how-it-works">How this works</NavLink>
         </nav>
@@ -89,6 +92,8 @@ export function App() {
             element={<Onboarding me={state.me} onDone={saved} title="Change your ratings" />}
           />
           <Route path="/week" element={<WeekPage />} />
+          <Route path="/projects" element={<MyProjects />} />
+          <Route path="/projects/:projectId" element={<ProjectPage />} />
           <Route path="/evidence" element={<EvidencePage />} />
           <Route path="/evidence/drafts/:draftId" element={<DraftPage />} />
           <Route path="/evidence/articles/new" element={<ArticlePage />} />

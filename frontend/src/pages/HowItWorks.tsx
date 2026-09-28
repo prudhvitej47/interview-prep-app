@@ -162,6 +162,37 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         </p>
       </section>
 
+      <section aria-labelledby="h-projects">
+        <h3 id="h-projects">8. Your own projects</h3>
+        <p>
+          <Link to="/projects">My projects</Link> holds the questions an interviewer asks about work you have done
+          (walk me through it, why that way, what breaks at scale, what happens when a part dies, what you would
+          change, and the story behind it), with your answer to each. They are private to you, and they never go
+          into the curriculum's repository.
+        </p>
+        <ul>
+          <li>
+            They arrive as a question file you <strong>import</strong>: a JSON file with <code>"version": 1</code> and
+            a list of projects, each with a <code>key</code>, <code>name</code>, <code>summary</code> and
+            its <code>questions</code> (<code>key</code>, <code>rung</code>, <code>prompt</code>,{" "}
+            <code>probes</code>, <code>strong_answer</code>, <code>units</code>, <code>minutes</code>). Up to 30
+            projects of 30 questions, and 1 MB.
+          </li>
+          <li>
+            Importing an edited file again is safe: questions are matched by their key, so your answers and ratings
+            stay. One missing from the new file is hidden, not deleted.
+          </li>
+          <li>
+            Your answer saves as you type. The follow-ups and what a strong answer covers stay closed until you have
+            written an answer or rated the question, so you rehearse before you read.
+          </li>
+          <li>
+            Rating a question schedules it like a unit's review, and due ones show on the home page under their own
+            heading. <strong>Export</strong> downloads everything, answers and ratings included.
+          </li>
+        </ul>
+      </section>
+
       <section aria-labelledby="h-guide">
         <h3 id="h-guide">The start guide</h3>
         {me.startGuideClosed ? (
