@@ -1,13 +1,23 @@
 import { NotForMe } from "../unit/NotForMe";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { fetchTopic, NotFoundError, type TopicDetail } from "../api";
+import { fetchProgressView, fetchTopic, NotFoundError, type TopicDetail, type UnitProgress } from "../api";
 import { TYPE_LABEL } from "../unit/sections";
+import { StageChip } from "./stages";
 
 export function TopicPage() {
   const { topicId = "" } = useParams();
   const [topic, setTopic] = useState<TopicDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Map<string, UnitProgress>>(new Map());
+
+  // Each unit's status. If it cannot load, the list simply shows no chips; the units matter more.
+  const loadProgress = useCallback(() => {
+    fetchProgressView()
+      .then((p) => setProgress(new Map(p.units.map((u) => [u.unitId, u]))))
+      .catch(() => undefined);
+  }, []);
+  useEffect(loadProgress, [loadProgress]);
 
   useEffect(() => {
     setTopic(null);
@@ -31,18 +41,24 @@ export function TopicPage() {
         )}
       </nav>
       <h2>{topic.name}</h2>
-      <NotForMe scope="topic" id={topic.id} />
+      <NotForMe scope="topic" id={topic.id} onChange={loadProgress} />
 
       {topic.units.length > 0 ? (
         <ul className="units">
-          {topic.units.map((u) => (
-            <li key={u.id}>
-              <Link to={`/units/${u.id}`}>{u.title}</Link>
-              <span className="meta">
-                {TYPE_LABEL[u.type] ?? u.type} · difficulty {u.difficulty}/5 · {u.estMinutes} min
-              </span>
-            </li>
-          ))}
+          {topic.units.map((u) => {
+            const p = progress.get(u.id);
+            return (
+              <li key={u.id}>
+                <span className="unit-line">
+                  <Link to={`/units/${u.id}`}>{u.title}</Link>
+                  {p && <StageChip stage={p.stage} reviews={p.reviews} notForMe={p.notForMe} />}
+                </span>
+                <span className="meta">
+                  {TYPE_LABEL[u.type] ?? u.type} · difficulty {u.difficulty}/5 · {u.estMinutes} min
+                </span>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="empty">Nothing has been written for this topic itself yet.</p>

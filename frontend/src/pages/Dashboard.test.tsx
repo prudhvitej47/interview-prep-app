@@ -5,7 +5,8 @@ import { Dashboard } from "./Dashboard";
 import { mockFetch } from "../testing";
 
 const dashboard = {
-  coverage: [{ domainId: "dsa", name: "DSA", done: 1, total: 4 }],
+  coverage: [{ domainId: "dsa", name: "DSA", done: 1, total: 4,
+    stages: { notStarted: 3, learned: 0, reviewDue: 1, solid: 0 } }],
   weakAreas: [{ topicId: "ds.locks", name: "Locks and leases", domainName: "Distributed", strength: 1.5, unitsLeft: 2 }],
   whatChanged: {
     version: "2026.40.1", releasedAt: "2026-09-27T20:00:00Z", changelog: "# Job scheduler\n\nFrom a new report.",
@@ -75,4 +76,19 @@ it("points a learner without settings to their week", async () => {
   render(<MemoryRouter><Dashboard /></MemoryRouter>);
   expect(await screen.findByRole("link", { name: "Tell the planner how much time you have" }))
     .toHaveAttribute("href", "/week");
+});
+
+it("splits each area's coverage bar by stage, in words as well as colour, and links to progress", async () => {
+  const coverage = [{ domainId: "dsa", name: "DSA", done: 6, total: 10,
+    stages: { notStarted: 4, learned: 3, reviewDue: 1, solid: 2 } }];
+  mockFetch({ "/api/dashboard": { body: { ...dashboard, coverage } }, "/api/plan": { body: week } });
+  render(<MemoryRouter><Dashboard /></MemoryRouter>);
+  const card = await screen.findByRole("region", { name: "Coverage" });
+  // The done/total number stays.
+  expect(card).toHaveTextContent("6/10");
+  const bar = within(card).getByRole("img", { name: "DSA: 2 solid, 3 learned, 1 review due, 4 not started" });
+  const widths = Array.from(bar.children).map((c) => [c.className, (c as HTMLElement).style.width]);
+  expect(widths).toEqual([["solid", "20%"], ["learned", "30%"], ["review-due", "10%"]]);
+  expect(within(card).getByRole("list", { name: "Key" })).toHaveTextContent("SolidLearnedReview dueNot started");
+  expect(within(card).getByRole("link", { name: "See every unit's progress" })).toHaveAttribute("href", "/progress");
 });

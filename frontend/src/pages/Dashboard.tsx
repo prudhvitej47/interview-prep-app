@@ -5,6 +5,7 @@ import { Markdown } from "../unit/Markdown";
 import { formatMoment } from "../unit/ProgressPanel";
 import { TYPE_LABEL } from "../unit/sections";
 import { itemHref, itemKey, itemLabel } from "./planItem";
+import { StageBar, StageLegend } from "./stages";
 
 const PLACEMENT: Record<Placement, string> = { now: "Now", "next-week": "Next week", "end-of-track": "Later" };
 
@@ -36,16 +37,21 @@ export function Dashboard() {
       {data && data.coverage.length > 0 && (
         <section className="card" aria-label="Coverage">
           <h3>Coverage</h3>
+          <StageLegend />
           <ul className="shares">
             {data.coverage.map((c) => (
               <li key={c.domainId}>
                 <span>{c.name}</span>
-                <span className="share-bar"><span style={{ width: `${(c.done / c.total) * 100}%` }} /></span>
+                <StageBar counts={c.stages} label={c.name} />
                 <span className="count">{c.done}/{c.total}</span>
               </li>
             ))}
           </ul>
-          <p className="hint">Units done out of those in the curriculum so far, by area.</p>
+          <p className="hint">
+            Units done out of those in the curriculum so far, by area, leaving out any you marked "not for
+            me".{" "}
+            <Link to="/progress">See every unit's progress</Link>
+          </p>
         </section>
       )}
       {data && data.weakAreas.length > 0 && (

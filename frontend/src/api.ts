@@ -270,8 +270,18 @@ export const giveBackBreak = async (weekStart: string): Promise<Breaks> =>
 
 export type Placement = "now" | "next-week" | "end-of-track";
 
+/**
+ * Where a learner stands with a unit or a project question, decided on the server in India time:
+ * never attempted; attempted and due today or overdue; attempted, not due and next review under 16
+ * days out; attempted, not due and next review 16 or more days out.
+ */
+export type Stage = "not-started" | "learned" | "review-due" | "solid";
+
+/** How many units (or questions) are at each stage. */
+export type StageCounts = { notStarted: number; learned: number; reviewDue: number; solid: number };
+
 export type Dashboard = {
-  coverage: { domainId: string; name: string; done: number; total: number }[];
+  coverage: { domainId: string; name: string; done: number; total: number; stages: StageCounts }[];
   weakAreas: { topicId: string; name: string; domainName: string; strength: number; unitsLeft: number }[];
   whatChanged: {
     version: string;
@@ -283,6 +293,41 @@ export type Dashboard = {
     units: { unitId: string; title: string; type: string; added: boolean; placement: Placement; suggested: Placement; chosen: boolean }[];
   } | null;
 };
+
+export type UnitProgress = {
+  unitId: string;
+  title: string;
+  type: string;
+  topicId: string;
+  topicName: string;
+  domainId: string;
+  stage: Stage;
+  /** Attempts after the first. */
+  reviews: number;
+  dueOn: string | null;
+  /** Kept out of this learner's plans, by its own mark or a topic's above it. */
+  notForMe: boolean;
+};
+
+export type QuestionProgress = {
+  questionId: number;
+  rung: Rung;
+  prompt: string;
+  stage: Stage;
+  reviews: number;
+  dueOn: string | null;
+};
+
+export type ProgressView = {
+  today: string;
+  /** Leaving out "not for me" units, which `notForMe` counts. */
+  areas: { domainId: string; name: string; stages: StageCounts }[];
+  units: UnitProgress[];
+  notForMe: number;
+  projects: { projectId: number; name: string; stages: StageCounts; questions: QuestionProgress[] }[];
+};
+
+export const fetchProgressView = () => getJson<ProgressView>("/api/progress");
 
 export const fetchDashboard = () => getJson<Dashboard>("/api/dashboard");
 export const placeUnit = async (unitId: string, choice: Placement): Promise<Dashboard> =>
