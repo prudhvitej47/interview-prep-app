@@ -29,6 +29,16 @@ it("offers the unit before and after, in the plan's own order", async () => {
   expect(screen.getByRole("link", { name: "This week's plan (2 of 3)" })).toHaveAttribute("href", "/week");
 });
 
+it("steps over project questions, which live on their project's page", async () => {
+  const question = { unitId: null, title: "Walk me through the ledger.", type: "project-question", day: 2,
+    kind: "project", minutes: 15, reason: "", done: false, projectQuestionId: 12, projectId: 3,
+    projectName: "Example ledger", rung: "walkthrough" };
+  show("a", [item("a", "First", 1), question, item("b", "Second", 3)]);
+  const nav = await screen.findByRole("navigation", { name: "This week's plan" });
+  expect(nav).toHaveTextContent("Second →");
+  expect(screen.getByRole("link", { name: "This week's plan (1 of 2)" })).toBeInTheDocument();
+});
+
 it("says so at the end of the week", async () => {
   show("b", [item("a", "First", 1), item("b", "Second", 2)]);
   expect(await screen.findByText("Last in the week")).toBeInTheDocument();

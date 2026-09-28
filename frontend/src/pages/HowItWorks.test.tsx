@@ -14,6 +14,8 @@ it("explains the plan, reviews and rewards", () => {
   expect(screen.getByRole("heading", { name: "How this works" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "1. Your week" })).toBeInTheDocument();
   expect(screen.getByText(/The week's/)).toHaveTextContent("80% of the planned minutes");
+  expect(screen.getByText(/It plans 90% of your hours/)).toHaveTextContent("questions about your own projects up to a tenth");
+  expect(screen.getByText(/Project questions: those you did not rate last week/)).toHaveTextContent("Never two on one day");
   expect(screen.getByRole("heading", { name: "4. Marking it done, and reviews" })).toBeInTheDocument();
 });
 

@@ -38,10 +38,14 @@ export function PlanNav({ unitId }: { unitId: string }) {
   );
 }
 
-/** Day order, and within a day the order the plan put them in. One entry per unit. */
-function ordered(items: PlanItem[]): PlanItem[] {
+/**
+ * Day order, and within a day the order the plan put them in. One entry per unit; project questions
+ * are left out, since this bar walks between unit pages.
+ */
+function ordered(items: PlanItem[]): (PlanItem & { unitId: string })[] {
   const seen = new Set<string>();
   return items
+    .filter((item): item is PlanItem & { unitId: string } => item.unitId !== null)
     .map((item, i) => ({ item, i }))
     .sort((a, b) => a.item.day - b.item.day || a.i - b.i)
     .map(({ item }) => item)

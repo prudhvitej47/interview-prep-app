@@ -4,6 +4,7 @@ import { fetchDashboard, fetchWeek, placeUnit, type Dashboard as Data, type Plac
 import { Markdown } from "../unit/Markdown";
 import { formatMoment } from "../unit/ProgressPanel";
 import { TYPE_LABEL } from "../unit/sections";
+import { itemHref, itemKey, itemLabel } from "./planItem";
 
 const PLACEMENT: Record<Placement, string> = { now: "Now", "next-week": "Next week", "end-of-track": "Later" };
 
@@ -129,9 +130,9 @@ function ThisWeek({ week }: { week: Week }) {
           <p>{day === today ? "Today" : "Next up"}:</p>
           <ul className="units">
             {next.filter((i) => i.day === day).map((i) => (
-              <li key={`${i.kind}-${i.unitId}`}>
-                <Link to={`/units/${i.unitId}`}>{i.title}</Link>
-                <span className="count">{i.kind === "review" ? "Review" : TYPE_LABEL[i.type] ?? i.type} · {i.minutes} min</span>
+              <li key={itemKey(i)}>
+                <Link to={itemHref(i)}>{i.title}</Link>
+                <span className="count">{itemLabel(i)} · {i.minutes} min</span>
               </li>
             ))}
           </ul>

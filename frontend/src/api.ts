@@ -170,15 +170,23 @@ export const undoAttempt = (unitId: string) =>
 
 export type WeekSettings = { hoursPerWeek: number | null; studyDays: number[]; weights: Record<string, number> };
 
+/**
+ * A unit to learn or review, or (kind "project") a question about one of the learner's own projects:
+ * then unitId is null, the title is the question's prompt and the project fields say where it lives.
+ */
 export type PlanItem = {
-  unitId: string;
+  unitId: string | null;
   title: string;
   type: string;
   day: number;
-  kind: "learn" | "review";
+  kind: "learn" | "review" | "project";
   minutes: number;
   reason: string;
   done: boolean;
+  projectQuestionId?: number | null;
+  projectId?: number | null;
+  projectName?: string | null;
+  rung?: Rung | null;
 };
 
 export type PlanView = {

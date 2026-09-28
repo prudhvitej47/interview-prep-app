@@ -44,6 +44,18 @@ it("shows this week, coverage, weak areas and what changed", async () => {
   expect(changed).toHaveTextContent(/28/);
 });
 
+it("lists a planned project question beside the units, linked to its project", async () => {
+  const question = { unitId: null, title: "Why double entry?", type: "project-question", day: 7, kind: "project",
+    minutes: 15, reason: "", done: false, projectQuestionId: 13, projectId: 3, projectName: "Example ledger",
+    rung: "why" };
+  mockFetch({ "/api/dashboard": { body: dashboard },
+    "/api/plan": { body: { ...week, plan: { ...week.plan, items: [...week.plan.items, question] } } } });
+  render(<MemoryRouter><Dashboard /></MemoryRouter>);
+  const thisWeek = await screen.findByRole("region", { name: "This week" });
+  expect(within(thisWeek).getByRole("link", { name: "Why double entry?" })).toHaveAttribute("href", "/projects/3#q-13");
+  expect(thisWeek).toHaveTextContent("Your project: Example ledger · Why this way · 15 min");
+});
+
 it("lets the learner start a new unit now", async () => {
   const fetchMock = mockFetch({ "/api/dashboard": { body: dashboard }, "/api/plan": { body: week }, "/api/placements": {
     body: { ...dashboard, whatChanged: { ...dashboard.whatChanged,
