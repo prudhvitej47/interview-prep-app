@@ -128,7 +128,7 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
           ))}
         </ul>
         <p className="hint">
-          Each area's share starts from its weight and grows when you are weaker in it, by at most half again.
+          Each area's share starts from its weight: it grows when you are weaker in it, by at most half again, and shrinks when you are strong in it, by at most 30%.
           Topics you are weakest in come first within an area.
         </p>
         {projectMinutes > 0 && (
