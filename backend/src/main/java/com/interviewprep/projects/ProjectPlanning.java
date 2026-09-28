@@ -1,5 +1,6 @@
 package com.interviewprep.projects;
 
+import com.interviewprep.progress.Stage;
 import com.interviewprep.projects.ProjectQueries.Rehearsal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -64,6 +65,28 @@ public class ProjectPlanning {
               inProject, rs.getString("rung"), rs.getInt("minutes"), r == null ? null : ProjectQueries.dueOn(r)));
         });
     return out;
+  }
+
+  /** A question still in use and where the learner stands with it, for the progress page. */
+  public record QuestionStanding(long questionId, long projectId, String projectName, String rung, String prompt,
+      Stage.Standing standing) {}
+
+  /**
+   * Every question still in use (neither it nor its project retired), in the order of the My
+   * projects page and each project's ladder, with its stage as of {@code today} in India time.
+   */
+  public List<QuestionStanding> standings(long learnerId, LocalDate today) {
+    Map<Long, List<Rehearsal>> rehearsals = projects.rehearsals(learnerId);
+    return jdbc.query(
+        "select q.id, q.project_id, p.name, q.rung, q.prompt from project_question q"
+            + " join experience_project p on p.id = q.project_id"
+            + " where p.learner_id = :learner and not p.retired and not q.retired"
+            + " order by p.sort_order, p.id, q.sort_order, q.id",
+        new MapSqlParameterSource("learner", learnerId),
+        (rs, i) -> new QuestionStanding(rs.getLong("id"), rs.getLong("project_id"), rs.getString("name"),
+            rs.getString("rung"), rs.getString("prompt"),
+            Stage.of(rehearsals.getOrDefault(rs.getLong("id"), List.of()).stream().map(Rehearsal::step).toList(),
+                today)));
   }
 
   /** Every rating this learner has given, oldest first, including those of retired questions. */
