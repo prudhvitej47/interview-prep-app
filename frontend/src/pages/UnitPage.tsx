@@ -6,7 +6,7 @@ import { NoteEditor } from "../unit/NoteEditor";
 import { NotForMe } from "../unit/NotForMe";
 import { PlanNav } from "./PlanNav";
 import { ProgressPanel } from "../unit/ProgressPanel";
-import { splitSections, TYPE_LABEL } from "../unit/sections";
+import { splitFolds, splitSections, TYPE_LABEL } from "../unit/sections";
 import { CodingPractice } from "../practice/CodingPractice";
 import { SqlPractice } from "../practice/SqlPractice";
 
@@ -54,16 +54,16 @@ export function UnitPage() {
       {sections.map((section, i) => [
         i === practiceAt && practice,
         section.heading === null ? (
-          <Markdown key={i}>{section.body}</Markdown>
+          <SectionBody key={i} body={section.body} />
         ) : section.folded ? (
           <details key={i} className="folded">
             <summary>Show {section.heading.toLowerCase()}</summary>
-            <Markdown>{section.body}</Markdown>
+            <SectionBody body={section.body} />
           </details>
         ) : (
           <section key={i}>
             <h3>{section.heading}</h3>
-            <Markdown>{section.body}</Markdown>
+            <SectionBody body={section.body} />
           </section>
         ),
       ])}
@@ -107,5 +107,22 @@ export function UnitPage() {
       )}
       <NoteEditor unitId={unit.id} />
     </article>
+  );
+}
+
+/**
+ * A section's Markdown, with its deep dives and pause-and-think answers folded (see splitFolds).
+ * They use the same dashed fold as a spoiler section, so layout-check opens them before measuring.
+ */
+function SectionBody({ body }: { body: string }) {
+  return splitFolds(body).map((block, i) =>
+    block.kind === "text" ? (
+      <Markdown key={i}>{block.body}</Markdown>
+    ) : (
+      <details key={i} className="folded">
+        <summary>{block.summary}</summary>
+        <Markdown>{block.body}</Markdown>
+      </details>
+    ),
   );
 }

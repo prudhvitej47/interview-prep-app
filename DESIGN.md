@@ -243,7 +243,9 @@ buttons, chips). Bars use 4px so a 0.5rem-tall track still reads as a bar rather
 
 Borders are 1px, always ink mixed into the background. One deliberate exception carries meaning: a
 **dashed** border marks a folded spoiler — hints, a solution, an expected diagnosis — so a section the
-reader is meant to open looks different from one that is simply grouped.
+reader is meant to open looks different from one that is simply grouped. The same fold holds a unit's
+in-section `### Deep dive: …` blocks and `### Answer` blocks after a "Pause and think" question; its
+summary is the heading text, and it may sit inside a folded section.
 
 ## Components
 
