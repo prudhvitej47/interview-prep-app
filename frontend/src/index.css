@@ -210,6 +210,13 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
    ("Commu nication"). Inline code keeps `anywhere`, since those tokens have no break points at all. */
 .unit td, .unit th { overflow-wrap: break-word; }
 .unit code { overflow-wrap: anywhere; }
+/* Except in a table. There `anywhere` lets a column shrink to one character, so on a phone a key
+   column read "s / k" down the page and `EmbeddedRocksDBStateBackend` broke every four letters. A table
+   already scrolls sideways in .table-scroll, so a cell's code keeps its identifiers whole (it still
+   wraps at a space) and the table grows wider instead. On a phone a column is also never narrower than
+   8ch, so a prose column wraps at spaces into lines worth reading; a desktop table that fits is untouched. */
+.unit td code, .unit th code { overflow-wrap: normal; }
+@media (max-width: 560px) { .unit td, .unit th { min-width: 8ch; } }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
 .folded:hover { border-color: color-mix(in srgb, var(--fg) 40%, transparent); }
