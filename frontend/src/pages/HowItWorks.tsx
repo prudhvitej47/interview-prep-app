@@ -105,7 +105,9 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
             solved, a design case is drawn, a scenario is diagnosed.
           </li>
           <li>
-            Hints, solutions and diagnoses are folded until you open them, so you can try first.
+            Hints, solutions and diagnoses are folded until you open them, so you can try first. So are
+            the answers to <em>Pause and think</em> questions, and deep dives into details you can skip on
+            a first read.
           </li>
           <li>
             SQL problems run in your browser on a small sample database: <strong>Try it</strong>, and

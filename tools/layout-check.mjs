@@ -188,8 +188,9 @@ async function main() {
           if (await evaluate(ready)) break;
           await sleep(200);
         }
-        // Open the folded sections: a question unit's diagram usually sits in one, and a closed
-        // section draws at zero size, so it would never be measured.
+        // Open the folded sections, deep dives and pause-and-think answers (all details.folded): a
+        // question unit's diagram usually sits in one, and a closed fold draws at zero size, so it
+        // would never be measured.
         await evaluate(`document.querySelectorAll('details.folded').forEach((d) => { d.open = true; })`);
         for (let i = 0; i < 40; i++) {
           const pending = await evaluate(`document.querySelectorAll('.diagram[aria-busy="true"]').length`);

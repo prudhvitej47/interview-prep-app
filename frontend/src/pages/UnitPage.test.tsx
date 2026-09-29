@@ -65,6 +65,38 @@ describe("UnitPage", () => {
     expect(screen.getByText("Reverse a list.").closest("details")).toBeNull();
   });
 
+  it("folds a deep dive and a pause-and-think answer, keeping the question in view", async () => {
+    show(unit({
+      markdown: [
+        "## How it works",
+        "Every lamp change is logged.",
+        "### Deep dive: How the log survives a storm",
+        "Copied to the mainland nightly.",
+        "### Keeping watch",
+        "Checked hourly.",
+        "## Check yourself",
+        "> **Pause and think.** Why does the lamp turn?",
+        "",
+        "### Answer: the short version",
+        "So ships can tell lighthouses apart.",
+      ].join("\n"),
+    }));
+    const dive = (await screen.findByText("Deep dive: How the log survives a storm")).closest("details")!;
+    expect(dive).toHaveClass("folded");
+    expect(dive).not.toHaveAttribute("open");
+    expect(within(dive).getByText("Copied to the mainland nightly.")).toBeInTheDocument();
+    // The next ### heading is outside the fold and renders as a heading, as before.
+    expect(screen.getByRole("heading", { name: "Keeping watch" }).closest("details")).toBeNull();
+    expect(screen.getByText("Checked hourly.").closest("details")).toBeNull();
+
+    expect(screen.getByText(/Why does the lamp turn\?/).closest("details")).toBeNull();
+    const answer = screen.getByText("Answer: the short version").closest("details")!;
+    expect(answer).not.toHaveAttribute("open");
+    expect(within(answer).getByText("So ships can tell lighthouses apart.")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Answer: the short version"));
+    expect(answer).toHaveAttribute("open");
+  });
+
   it("puts a coding problem's cases before its hints, and never shows the hidden ones", async () => {
     show(unit({
       type: "coding",
