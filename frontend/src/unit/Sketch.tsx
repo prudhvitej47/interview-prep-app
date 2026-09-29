@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fitToReadable } from "./Mermaid";
 import { useOverflow } from "./overflow";
-// @font-face rules for Excalifont, generated from the pinned package by vite.config.ts.
-import "virtual:excalifont.css";
+// Excalifont's files and unicode-ranges, read from the pinned package by vite.config.ts.
+import excalifontFaces from "virtual:excalifont";
 
 declare global {
   interface Window {
@@ -34,6 +34,18 @@ export function parseSketch(source: string): SketchSpec {
   if (typeof title !== "string" || !title.trim()) throw new Error("a sketch needs a title");
   if (!Array.isArray(elements) || elements.length === 0) throw new Error("a sketch needs elements");
   return { title: title.trim(), elements };
+}
+
+let excalifontAdded = false;
+
+/** Registers Excalifont on the page once. Nothing downloads until a sketch's text needs a file. */
+function addExcalifont() {
+  if (excalifontAdded || typeof FontFace === "undefined" || !document.fonts) return;
+  for (const face of excalifontFaces) {
+    document.fonts.add(new FontFace("Excalifont", `url("${face.url}") format("woff2")`,
+      { unicodeRange: face.unicodeRange, display: "swap" }));
+  }
+  excalifontAdded = true;
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -111,6 +123,7 @@ export function Sketch({ source }: { source: string }) {
       const { convertToExcalidrawElements, exportToSvg } = await import("@excalidraw/excalidraw");
       // The converter sizes every label by measuring it in Excalifont; measured in a fallback font
       // before the real one arrives, labels would be laid out for the wrong widths.
+      addExcalifont();
       await document.fonts?.load('20px "Excalifont"');
       const elements = convertToExcalidrawElements(routeArrows(spec.elements) as never, { regenerateIds: false });
       // No background of its own, so the sketch sits on the page's diagram panel in either theme.
@@ -120,7 +133,7 @@ export function Sketch({ source }: { source: string }) {
         appState: { exportBackground: false, exportWithDarkMode: dark },
         files: null,
         exportPadding: 12,
-        // The page declares the font instead (see vite.config.ts), which keeps Excalidraw's
+        // The page registers the font instead (addExcalifont), which keeps Excalidraw's
         // font-subsetting engine, about 735 kB, from ever being fetched.
         skipInliningFonts: true,
       });

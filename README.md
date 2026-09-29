@@ -100,8 +100,9 @@ form. `src/unit/Sketch.tsx` turns it into a static SVG in the browser; nobody ca
 An arrow that names a `start` and `end` box and has no `points` is drawn edge to edge between them.
 
 The font, Excalifont, needs no download step. The Vite build copies its files from the pinned
-`@excalidraw/excalidraw` package into `dist/assets/excalidraw/fonts/`, and writes one `@font-face`
-rule per file with the package's own `unicode-range` (see `vite.config.ts`). The dev server serves
+`@excalidraw/excalidraw` package into `dist/assets/excalidraw/fonts/`, and hands the page one font
+face per file with the package's own `unicode-range`, which `Sketch.tsx` registers (see
+`vite.config.ts`). The dev server serves
 the same files straight from `node_modules`. Nothing is fetched from outside the app. After
 upgrading the package, run a build: if the font list inside the package has changed shape, the
 build fails and says so.
