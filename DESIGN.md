@@ -382,6 +382,7 @@ goal bar above is the only green on the page.
 - **Don't** animate. There is no transition or keyframe in the system: a control answers by changing
   weight, not by moving, and motion needs a reason stronger than polish.
 - **Don't** leave a long token to push the page sideways — inline code wraps anywhere, table cells
-  break only when a word genuinely does not fit.
+  break only when a word genuinely does not fit. Inside a table, code stays whole and the table
+  scrolls in its own box instead of crushing a column to one character per line.
 - **Don't** let a bare `<p>` carry important prose on a reading page without opting back into full
   contrast; muted is the default for a reason.
