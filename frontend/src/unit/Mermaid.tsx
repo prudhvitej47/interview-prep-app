@@ -85,7 +85,7 @@ export function drawnWidth(natural: number, smallestFont: number): { min: number
 }
 
 /** Sizes a drawn SVG by `drawnWidth`, reading its natural width and its smallest label. */
-function fitToReadable(svg: SVGSVGElement) {
+export function fitToReadable(svg: SVGSVGElement) {
   const natural = svg.viewBox?.baseVal?.width ?? 0;
   let smallest = Infinity;
   // SVG text, and the HTML labels Mermaid puts in foreignObject (mindmaps, flowcharts); both report

@@ -43,6 +43,12 @@ it("still hands a mermaid fence to the diagram instead of the highlighter", () =
   expect(container.querySelector(".diagram")).toBeInTheDocument();
 });
 
+it("hands an excalidraw fence to the sketch instead of showing it as code", () => {
+  const container = show('```excalidraw\n{"title": "t", "elements": [{"type": "rectangle", "x": 0, "y": 0}]}\n```');
+  expect(container.querySelector("pre")).toBeNull();
+  expect(container.querySelector(".diagram")).toBeInTheDocument();
+});
+
 it("puts a table in its own scrolling box, so a wide one cannot push the page sideways", () => {
   const { container } = render(<Markdown>{"| a | b |\n| --- | --- |\n| 1 | 2 |\n"}</Markdown>);
   const table = container.querySelector("table");

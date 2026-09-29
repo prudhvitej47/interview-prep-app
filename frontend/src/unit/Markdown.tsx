@@ -8,6 +8,7 @@ import sql from "highlight.js/lib/languages/sql";
 import yaml from "highlight.js/lib/languages/yaml";
 import properties from "highlight.js/lib/languages/properties";
 import { Mermaid } from "./Mermaid";
+import { Sketch } from "./Sketch";
 import { useOverflow } from "./overflow";
 
 /**
@@ -19,7 +20,8 @@ import { useOverflow } from "./overflow";
 const lowlight = createLowlight({ java, sql, yaml, properties });
 
 /**
- * Renders unit Markdown. A ```mermaid fence becomes a diagram, a fence in a language we highlight
+ * Renders unit Markdown. A ```mermaid fence becomes a diagram, an ```excalidraw fence a hand-drawn
+ * sketch, a fence in a language we highlight
  * becomes marked-up code, and everything else is ordinary Markdown. Raw HTML in the source is not
  * rendered — react-markdown's default, and the right one.
  */
@@ -31,6 +33,7 @@ export function Markdown({ children }: { children: string }) {
         code({ className, children: code, ...rest }) {
           const language = languageOf(className);
           if (language === "mermaid") return <Mermaid chart={String(code).trim()} />;
+          if (language === "excalidraw") return <Sketch source={String(code).trim()} />;
           if (language && lowlight.registered(language)) {
             // Rendered as elements rather than a string of HTML: nothing here ever sets innerHTML.
             const tree = lowlight.highlight(language, String(code).replace(/\n$/, ""));
@@ -45,7 +48,7 @@ export function Markdown({ children }: { children: string }) {
         },
         // A diagram replaces its code block entirely instead of sitting inside a <pre>.
         pre({ children: inner }) {
-          return isMermaid(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
+          return isDiagram(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
         },
       }}
     >
@@ -82,8 +85,9 @@ function languageOf(className: string | undefined): string | null {
 // react-markdown hands <pre> the element for its <code> child. That element's type is the code
 // override above, not Mermaid — Mermaid is only what the override returns once rendered — so the
 // fence is recognised by its language instead.
-function isMermaid(node: ReactNode): boolean {
-  return isValidElement<{ className?: string }>(node) && node.props.className === "language-mermaid";
+function isDiagram(node: ReactNode): boolean {
+  if (!isValidElement<{ className?: string }>(node)) return false;
+  return node.props.className === "language-mermaid" || node.props.className === "language-excalidraw";
 }
 
 /** lowlight returns a hast tree of nested spans; this turns it into React elements. */
