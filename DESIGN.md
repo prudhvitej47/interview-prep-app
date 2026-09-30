@@ -163,6 +163,12 @@ about state.
 correct, amber for attention wanted, red for wrong. There is no brand hue, no fourth colour, and no
 colour used because a section needed livening up.
 
+**The Figures Rule.** A sketch inside a unit (an ```` ```excalidraw ```` figure) is content, not interface,
+and uses the categorical palette recorded in the content repository's `COURSE_MAP.md` §4: one colour per
+kind of component, so a reader can tell a datastore from a service before reading a label. It is the one
+exception to the State-Only Rule, and it stops at the sketch's frame: the page around it, all text, and
+Mermaid diagrams keep the rules above. Inside a sketch, red still means only failure.
+
 **The Quiet Highlighter Rule.** A code block is marked up with weight and quietness before colour.
 Comments drop to `--muted` and italic; keywords, annotations and configuration keys take
 `font-weight: 600` and keep the ink they already had; only literal values take Literal Blue, and

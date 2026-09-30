@@ -92,6 +92,24 @@ halves the run, and `--base` points at another host. It exits non-zero when anyt
 A whole-curriculum run is a few hundred page loads and takes several minutes; a slice takes
 seconds. Run the slice during review and the whole curriculum before a batch lands.
 
+## Hand-drawn sketches
+
+A unit can hold an ` ```excalidraw ` fence beside its ` ```mermaid ` ones: a JSON object with a
+`title` (the figure's name for screen readers) and `elements`, in Excalidraw's compact "skeleton"
+form. `src/unit/Sketch.tsx` turns it into a static SVG in the browser; nobody can edit or pan it.
+An arrow that names a `start` and `end` box and has no `points` is drawn edge to edge between them.
+
+The font, Excalifont, needs no download step. The Vite build copies its files from the pinned
+`@excalidraw/excalidraw` package into `dist/assets/excalidraw/fonts/`, and hands the page one font
+face per file with the package's own `unicode-range`, which `Sketch.tsx` registers (see
+`vite.config.ts`). The dev server serves
+the same files straight from `node_modules`. Nothing is fetched from outside the app. After
+upgrading the package, run a build: if the font list inside the package has changed shape, the
+build fails and says so.
+
+A page with a sketch loads about 390 kB (compressed) the first time: the Excalidraw code and the
+25 kB Latin font file. Both are cached for a year after that.
+
 ## How it fits together
 
 The React app is built into `BOOT-INF/classes/static` inside the jar and served by Spring on the
