@@ -4,70 +4,68 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
+import { fontFaces } from "./sketchFonts";
+
 /**
- * The hand-drawn font sketches are lettered in. Excalidraw can embed the font inside each SVG, but
- * only through a font-subsetting engine of about 735 kB compressed; instead Sketch.tsx registers
- * Excalifont on the page once (FontFace) and the SVGs name it. The app loads over a private network
- * with no outside requests, so the files are served from our own /assets, copied from the pinned
- * package on every build rather than committed, and so always matching the library that draws with
- * them. The faces go to the page as data, not CSS: a CSS url() to a file the build emits itself makes
- * Vite warn, once per file, that it "didn't resolve at build time".
+ * The fonts sketches are lettered in: Excalifont (hand-drawn, the default) and Nunito (the "clean"
+ * style for dense architecture pictures). Excalidraw can embed a font inside each SVG, but only
+ * through a font-subsetting engine of about 735 kB compressed; instead Sketch.tsx registers these
+ * faces on the page once (FontFace) and the SVGs name them. The app loads over a private network with
+ * no outside requests, so the files are served from our own /assets, copied from the pinned package on
+ * every build rather than committed, and so always matching the library that draws with them. The
+ * faces go to the page as data, not CSS: a CSS url() to a file the build emits itself makes Vite warn,
+ * once per file, that it "didn't resolve at build time".
  */
 const EXCALIDRAW_PROD = fileURLToPath(new URL("./node_modules/@excalidraw/excalidraw/dist/prod/", import.meta.url));
-const EXCALIFONT_DIR = EXCALIDRAW_PROD + "fonts/Excalifont/";
-const EXCALIFONT_URL = "assets/excalidraw/fonts/Excalifont/";
-const EXCALIFONT_FILE = /^Excalifont-Regular-[0-9a-f]+\.woff2$/;
-const EXCALIFONT_MODULE = "virtual:excalifont";
+const SKETCH_FONTS = ["Excalifont", "Nunito"];
+const FONTS_URL = "assets/excalidraw/fonts/";
+const FONTS_MODULE = "virtual:sketch-fonts";
+const fontFile = (family: string) => new RegExp(`^${family}-Regular-[A-Za-z0-9]+\\.woff2$`);
+const filesOf = (family: string) => readdirSync(`${EXCALIDRAW_PROD}fonts/${family}/`).filter((name) => fontFile(family).test(name));
 
-/**
- * One face per file, each with the unicode-range the package gives it, so a browser fetches only the
- * files for the characters on the page (Latin is one 25 kB file). The ranges live only in the
- * package's own code, so they are read from there, and the build fails loudly if that stops matching
- * every font file, as an upgrade could make it.
- */
-function excalifontFaces(): { url: string; unicodeRange: string }[] {
-  const files = readdirSync(EXCALIFONT_DIR).filter((name) => EXCALIFONT_FILE.test(name));
+/** Every face of every sketch font, each with the unicode-range the package gives it. */
+function sketchFontFaces() {
   const code = readdirSync(EXCALIDRAW_PROD).filter((name) => name.endsWith(".js"))
     .map((name) => readFileSync(EXCALIDRAW_PROD + name, "utf8")).join("\n");
-  const faces = files.map((file) => {
-    const variable = new RegExp(`var (\\w+)="\\./fonts/Excalifont/${file.replace(".", "\\.")}"`).exec(code)?.[1];
-    const range = variable && new RegExp(`\\{uri:${variable},descriptors:\\{unicodeRange:"([^"]+)"`).exec(code)?.[1];
-    if (!range) throw new Error(`excalifont: no unicode-range found for ${file}; check the package's font list`);
-    return { url: `/${EXCALIFONT_URL}${file}`, unicodeRange: range };
+  return SKETCH_FONTS.flatMap((family) => {
+    const files = filesOf(family);
+    if (files.length === 0) throw new Error(`${family}: no font files in the Excalidraw package`);
+    return fontFaces(family, files, code, `/${FONTS_URL}${family}/`);
   });
-  if (faces.length === 0) throw new Error(`excalifont: no font files in ${EXCALIFONT_DIR}`);
-  return faces;
 }
 
-function excalifont(): Plugin {
+function sketchFonts(): Plugin {
   return {
-    name: "excalifont",
+    name: "sketch-fonts",
     resolveId(id) {
-      return id === EXCALIFONT_MODULE ? "\0" + EXCALIFONT_MODULE : undefined;
+      return id === FONTS_MODULE ? "\0" + FONTS_MODULE : undefined;
     },
     load(id) {
-      return id === "\0" + EXCALIFONT_MODULE ? `export default ${JSON.stringify(excalifontFaces())};` : undefined;
+      return id === "\0" + FONTS_MODULE ? `export default ${JSON.stringify(sketchFontFaces())};` : undefined;
     },
     // The dev server serves the files straight from the package.
     configureServer(server) {
-      server.middlewares.use(`/${EXCALIFONT_URL}`, (req, res, next) => {
-        const file = (req.url ?? "").split("?")[0].replace(/^\//, "");
-        if (!EXCALIFONT_FILE.test(file)) return next();
+      server.middlewares.use(`/${FONTS_URL}`, (req, res, next) => {
+        const [family, file] = (req.url ?? "").split("?")[0].replace(/^\//, "").split("/");
+        if (!SKETCH_FONTS.includes(family) || !fontFile(family).test(file ?? "")) return next();
         res.setHeader("Content-Type", "font/woff2");
-        res.end(readFileSync(EXCALIFONT_DIR + file));
+        res.end(readFileSync(`${EXCALIDRAW_PROD}fonts/${family}/${file}`));
       });
     },
     // A build copies them into dist/assets, which Spring serves.
     generateBundle() {
-      for (const file of readdirSync(EXCALIFONT_DIR).filter((name) => EXCALIFONT_FILE.test(name))) {
-        this.emitFile({ type: "asset", fileName: EXCALIFONT_URL + file, source: readFileSync(EXCALIFONT_DIR + file) });
+      for (const family of SKETCH_FONTS) {
+        for (const file of filesOf(family)) {
+          this.emitFile({ type: "asset", fileName: `${FONTS_URL}${family}/${file}`,
+            source: readFileSync(`${EXCALIDRAW_PROD}fonts/${family}/${file}`) });
+        }
       }
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), excalifont()],
+  plugins: [react(), sketchFonts()],
   server: {
     // In development the SPA runs on Vite's dev server and the API on Spring, so /api is
     // proxied. In production both are served by Spring from one origin and this does nothing.

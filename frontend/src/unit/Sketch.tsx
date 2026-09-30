@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fitToReadable } from "./Mermaid";
 import { useOverflow } from "./overflow";
-// Excalifont's files and unicode-ranges, read from the pinned package by vite.config.ts.
-import excalifontFaces from "virtual:excalifont";
+import { expandMacros } from "./sketchMacros";
+// The sketch fonts' files and unicode-ranges, read from the pinned package by vite.config.ts.
+import sketchFontFaces from "virtual:sketch-fonts";
 
 declare global {
   interface Window {
@@ -20,6 +21,8 @@ export const SKETCH_ASSET_PATH = "/assets/excalidraw/";
 export interface SketchSpec {
   title: string;
   elements: Record<string, unknown>[];
+  /** "clean": smooth lines and Nunito, for dense architecture pictures. Hand-drawn otherwise. */
+  style?: "clean";
 }
 
 /**
@@ -30,22 +33,37 @@ export interface SketchSpec {
 export function parseSketch(source: string): SketchSpec {
   const spec: unknown = JSON.parse(source);
   if (typeof spec !== "object" || spec === null) throw new Error("a sketch is a JSON object");
-  const { title, elements } = spec as Partial<SketchSpec>;
+  const { title, elements, style } = spec as Partial<SketchSpec> & { style?: unknown };
   if (typeof title !== "string" || !title.trim()) throw new Error("a sketch needs a title");
   if (!Array.isArray(elements) || elements.length === 0) throw new Error("a sketch needs elements");
-  return { title: title.trim(), elements };
+  if (style !== undefined && style !== "clean") throw new Error(`unknown sketch style ${String(style)}`);
+  return { title: title.trim(), elements, ...(style ? { style } : {}) };
 }
 
-let excalifontAdded = false;
+let sketchFontsAdded = false;
 
-/** Registers Excalifont on the page once. Nothing downloads until a sketch's text needs a file. */
-function addExcalifont() {
-  if (excalifontAdded || typeof FontFace === "undefined" || !document.fonts) return;
-  for (const face of excalifontFaces) {
-    document.fonts.add(new FontFace("Excalifont", `url("${face.url}") format("woff2")`,
-      { unicodeRange: face.unicodeRange, display: "swap" }));
+/** Registers the sketch fonts on the page once. Nothing downloads until a sketch's text needs a file. */
+function addSketchFonts() {
+  if (sketchFontsAdded || typeof FontFace === "undefined" || !document.fonts) return;
+  for (const face of sketchFontFaces) {
+    document.fonts.add(new FontFace(face.family, `url("${face.url}") format("woff2")`,
+      { unicodeRange: face.unicodeRange, display: "swap", ...(face.weight ? { weight: face.weight } : {}) }));
   }
-  excalifontAdded = true;
+  sketchFontsAdded = true;
+}
+
+/** Excalidraw's number for Nunito, the clean style's font. */
+const NUNITO = 6;
+
+/** The clean style: every element and label smooth (roughness 0) and in Nunito. */
+export function applyStyle(elements: Record<string, unknown>[], style: SketchSpec["style"]): Record<string, unknown>[] {
+  if (style !== "clean") return elements;
+  return elements.map((e) => ({
+    ...e,
+    roughness: 0,
+    fontFamily: NUNITO,
+    ...(typeof e.label === "object" && e.label !== null ? { label: { ...(e.label as object), fontFamily: NUNITO } } : {}),
+  }));
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -61,6 +79,14 @@ const ARROW_GAP = 6;
  * from the edge of one box to the edge of the other, aimed centre to centre. An author who wants a
  * bend gives the points and is left alone.
  */
+/**
+ * Everything a fence needs before Excalidraw sees it: building blocks (`x-db`, `x-log`…) become plain
+ * skeletons first, so the arrows routed next can aim at them.
+ */
+export function prepareElements(elements: Record<string, unknown>[]): Record<string, unknown>[] {
+  return routeArrows(expandMacros(elements));
+}
+
 export function routeArrows(elements: Record<string, unknown>[]): Record<string, unknown>[] {
   const boxes = new Map<string, Box>();
   for (const e of elements) {
@@ -123,9 +149,9 @@ export function Sketch({ source }: { source: string }) {
       const { convertToExcalidrawElements, exportToSvg } = await import("@excalidraw/excalidraw");
       // The converter sizes every label by measuring it in Excalifont; measured in a fallback font
       // before the real one arrives, labels would be laid out for the wrong widths.
-      addExcalifont();
-      await document.fonts?.load('20px "Excalifont"');
-      const elements = convertToExcalidrawElements(routeArrows(spec.elements) as never, { regenerateIds: false });
+      addSketchFonts();
+      await document.fonts?.load(spec.style === "clean" ? '20px "Nunito"' : '20px "Excalifont"');
+      const elements = convertToExcalidrawElements(applyStyle(prepareElements(spec.elements), spec.style) as never, { regenerateIds: false });
       // No background of its own, so the sketch sits on the page's diagram panel in either theme.
       // Dark mode is Excalidraw's own: it inverts the drawing and turns the hues back round.
       const svg = await exportToSvg({
@@ -133,7 +159,7 @@ export function Sketch({ source }: { source: string }) {
         appState: { exportBackground: false, exportWithDarkMode: dark },
         files: null,
         exportPadding: 12,
-        // The page registers the font instead (addExcalifont), which keeps Excalidraw's
+        // The page registers the fonts instead (addSketchFonts), which keeps Excalidraw's
         // font-subsetting engine, about 735 kB, from ever being fetched.
         skipInliningFonts: true,
       });

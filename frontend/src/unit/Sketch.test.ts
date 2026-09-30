@@ -44,3 +44,31 @@ describe("routing arrows", () => {
     expect(second).toBe(dangling);
   });
 });
+
+describe("preparing a sketch for drawing", () => {
+  it("expands building blocks before routing arrows, so an arrow can aim at a block", async () => {
+    const { prepareElements } = await import("./Sketch");
+    const out = prepareElements([
+      { type: "x-db", id: "pg", x: 0, y: 200, label: "Postgres" },
+      { type: "x-box", id: "api", x: 0, y: 0, label: "API", kind: "service" },
+      { type: "arrow", start: { id: "api" }, end: { id: "pg" } },
+    ]);
+    expect(out.some((e) => e.type === "x-db")).toBe(false);
+    expect(out[out.length - 1].points).toBeDefined();
+  });
+});
+
+describe("the clean style", () => {
+  it("draws every element and label smoothly in Nunito, and leaves the default style hand-drawn", async () => {
+    const { applyStyle } = await import("./Sketch");
+    const elements = [{ type: "rectangle", x: 0, y: 0, label: { text: "API" } }, { type: "text", x: 0, y: 0, text: "t" }];
+    const clean = applyStyle(elements, "clean");
+    expect(clean.every((e) => e.roughness === 0 && e.fontFamily === 6)).toBe(true);
+    expect((clean[0].label as Record<string, unknown>).fontFamily).toBe(6);
+    expect(applyStyle(elements, undefined)).toEqual(elements);
+  });
+
+  it("refuses a style it does not know", () => {
+    expect(() => parseSketch('{"title": "t", "style": "fancy", "elements": [{"type": "text"}]}')).toThrow("unknown sketch style fancy");
+  });
+});
