@@ -44,3 +44,16 @@ describe("routing arrows", () => {
     expect(second).toBe(dangling);
   });
 });
+
+describe("preparing a sketch for drawing", () => {
+  it("expands building blocks before routing arrows, so an arrow can aim at a block", async () => {
+    const { prepareElements } = await import("./Sketch");
+    const out = prepareElements([
+      { type: "x-db", id: "pg", x: 0, y: 200, label: "Postgres" },
+      { type: "x-box", id: "api", x: 0, y: 0, label: "API", kind: "service" },
+      { type: "arrow", start: { id: "api" }, end: { id: "pg" } },
+    ]);
+    expect(out.some((e) => e.type === "x-db")).toBe(false);
+    expect(out[out.length - 1].points).toBeDefined();
+  });
+});

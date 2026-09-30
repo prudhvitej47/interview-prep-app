@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fitToReadable } from "./Mermaid";
 import { useOverflow } from "./overflow";
+import { expandMacros } from "./sketchMacros";
 // Excalifont's files and unicode-ranges, read from the pinned package by vite.config.ts.
 import excalifontFaces from "virtual:excalifont";
 
@@ -61,6 +62,14 @@ const ARROW_GAP = 6;
  * from the edge of one box to the edge of the other, aimed centre to centre. An author who wants a
  * bend gives the points and is left alone.
  */
+/**
+ * Everything a fence needs before Excalidraw sees it: building blocks (`x-db`, `x-log`…) become plain
+ * skeletons first, so the arrows routed next can aim at them.
+ */
+export function prepareElements(elements: Record<string, unknown>[]): Record<string, unknown>[] {
+  return routeArrows(expandMacros(elements));
+}
+
 export function routeArrows(elements: Record<string, unknown>[]): Record<string, unknown>[] {
   const boxes = new Map<string, Box>();
   for (const e of elements) {
@@ -125,7 +134,7 @@ export function Sketch({ source }: { source: string }) {
       // before the real one arrives, labels would be laid out for the wrong widths.
       addExcalifont();
       await document.fonts?.load('20px "Excalifont"');
-      const elements = convertToExcalidrawElements(routeArrows(spec.elements) as never, { regenerateIds: false });
+      const elements = convertToExcalidrawElements(prepareElements(spec.elements) as never, { regenerateIds: false });
       // No background of its own, so the sketch sits on the page's diagram panel in either theme.
       // Dark mode is Excalidraw's own: it inverts the drawing and turns the hues back round.
       const svg = await exportToSvg({
