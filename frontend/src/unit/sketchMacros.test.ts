@@ -266,3 +266,10 @@ describe("found on the contact sheet", () => {
     expect(0.707 * (byId(els, "h/a").width as number) - 10).toBeGreaterThanOrEqual(digitsAt18px);
   });
 });
+
+describe("x-box follows the legend", () => {
+  it("sends datastores to x-db and queues to x-log, as COURSE_MAP section 4 draws them", () => {
+    expect(() => expandMacros([{ type: "x-box", id: "d", x: 0, y: 0, label: "DB", kind: "datastore" }])).toThrow("use x-db");
+    expect(() => expandMacros([{ type: "x-box", id: "q", x: 0, y: 0, label: "Q", kind: "queue" }])).toThrow("use x-log");
+  });
+});

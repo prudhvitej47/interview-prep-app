@@ -97,6 +97,9 @@ function pointerArrow(cx: number, top: number, label: string, colour: string): E
 
 function box(e: El): El[] {
   const kind = kindOf(e, "x-box");
+  // The legend draws these two as shapes of their own, so a box of either kind would read as something else.
+  if (kind === "datastore") throw new Error("x-box kind datastore: use x-db, the cylinder");
+  if (kind === "queue") throw new Error("x-box kind queue: use x-log, the strip of records");
   const { fill, stroke } = KINDS[kind];
   return [{
     type: "rectangle", id: e.id, x: num(e.x), y: num(e.y), width: num(e.width, 160), height: num(e.height, 70),
