@@ -117,7 +117,11 @@ function db(e: El): El[] {
     line(x, y + cap, 0, h - 2 * cap, stroke),
     line(x + w, y + cap, 0, h - 2 * cap, stroke),
     { type: "ellipse", x, y, width: w, height: 2 * cap, ...shape },
-    ...anchor(e.id, x, y, w, h, { label: lbl(e.label, num(e.fontSize, LABEL)) }),
+    // The label rides on a box over the whole cylinder: the anchor when there is an id, a bare box otherwise.
+    ...(typeof e.id === "string"
+      ? anchor(e.id, x, y, w, h, { label: lbl(e.label, num(e.fontSize, LABEL)) })
+      : [{ type: "rectangle", x, y, width: w, height: h, strokeColor: "transparent", backgroundColor: "transparent",
+        label: lbl(e.label, num(e.fontSize, LABEL)) }]),
   ];
 }
 
@@ -198,8 +202,9 @@ function tree(e: El): El[] {
   const levelGap = num(e.levelGap, 90), gap = num(e.siblingGap, 24);
   const id = String(e.id);
   const nodes = (Array.isArray(e.nodes) ? e.nodes : []) as { id: string; label: string; parent?: string }[];
-  // Every node as wide as the longest label needs. An ellipse lays text out in about 70% of its width.
-  const width = Math.max(size, ...nodes.map((n) => Math.ceil((textWidth(String(n.label), NOTE) + 12) / 0.7)));
+  // Every node as wide as its longest label needs. An ellipse lays text out in about 0.707 of its width,
+  // less padding, and Excalifont's digits measure up to about 0.72em, wider than textWidth's average.
+  const width = Math.max(size, ...nodes.map((n) => Math.ceil((String(n.label).length * NOTE * 0.72 + 12) / 0.707)));
   const known = new Set(nodes.map((n) => n.id));
   for (const n of nodes) {
     if (n.parent !== undefined && !known.has(n.parent)) throw new Error(`x-tree ${id}: node ${n.id} has unknown parent ${n.parent}`);

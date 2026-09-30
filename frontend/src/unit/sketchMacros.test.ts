@@ -253,3 +253,16 @@ describe("x-log's box for arrows", () => {
     expect(box.y as number).toBeLessThanOrEqual(offset.y as number);
   });
 });
+
+describe("found on the contact sheet", () => {
+  it("keeps a cylinder's label when it has no id", () => {
+    const els = expandMacros([{ type: "x-db", x: 0, y: 0, label: "datastore" }]);
+    expect(els.some((e) => (e.label as Record<string, unknown> | undefined)?.text === "datastore")).toBe(true);
+  });
+
+  it("fits a six-digit value in a tree node: an ellipse lays text out in about 0.707 of its width, less padding", () => {
+    const els = expandMacros([{ type: "x-tree", id: "h", x: 0, y: 0, nodes: [{ id: "a", label: "250000" }] }]);
+    const digitsAt18px = 6 * 18 * 0.72;  // Excalifont's digits measure up to about 0.72em (seen on the contact sheet)
+    expect(0.707 * (byId(els, "h/a").width as number) - 10).toBeGreaterThanOrEqual(digitsAt18px);
+  });
+});
