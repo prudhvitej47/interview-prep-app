@@ -137,7 +137,9 @@ function log(e: El): El[] {
   for (const p of (e.pointers as { at: number; label: string }[] | undefined) ?? []) {
     out.push(...pointerArrow(x + p.at * w + w / 2, y + h, p.label, INK));
   }
-  return [...out, ...anchor(e.id, x, y, cells.length * w, h)];
+  // The arrow box includes the offsets row, so an arrow from above stops before the numbers.
+  const above = typeof e.offsets === "number" ? 28 : 0;
+  return [...out, ...anchor(e.id, x, y - above, cells.length * w, h + above)];
 }
 
 /** An array with indices above, pointers below, and the DSA colours for current, answer and ruled out. */

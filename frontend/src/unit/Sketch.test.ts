@@ -57,3 +57,18 @@ describe("preparing a sketch for drawing", () => {
     expect(out[out.length - 1].points).toBeDefined();
   });
 });
+
+describe("the clean style", () => {
+  it("draws every element and label smoothly in Nunito, and leaves the default style hand-drawn", async () => {
+    const { applyStyle } = await import("./Sketch");
+    const elements = [{ type: "rectangle", x: 0, y: 0, label: { text: "API" } }, { type: "text", x: 0, y: 0, text: "t" }];
+    const clean = applyStyle(elements, "clean");
+    expect(clean.every((e) => e.roughness === 0 && e.fontFamily === 6)).toBe(true);
+    expect((clean[0].label as Record<string, unknown>).fontFamily).toBe(6);
+    expect(applyStyle(elements, undefined)).toEqual(elements);
+  });
+
+  it("refuses a style it does not know", () => {
+    expect(() => parseSketch('{"title": "t", "style": "fancy", "elements": [{"type": "text"}]}')).toThrow("unknown sketch style fancy");
+  });
+});

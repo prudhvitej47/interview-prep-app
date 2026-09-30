@@ -244,3 +244,12 @@ describe("found by rendering", () => {
     expect(end).toBeLessThan(84 - 10);        // clear of the second, centred at 84
   });
 });
+
+describe("x-log's box for arrows", () => {
+  it("covers the offsets row, so an arrow from above stops before the numbers", () => {
+    const els = expandMacros([{ type: "x-log", id: "p0", x: 0, y: 100, cells: ["a"], offsets: 7 }]);
+    const box = byId(els, "p0");
+    const offset = byType(els, "text")[0];
+    expect(box.y as number).toBeLessThanOrEqual(offset.y as number);
+  });
+});
