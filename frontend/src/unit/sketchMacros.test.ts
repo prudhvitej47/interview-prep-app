@@ -273,3 +273,46 @@ describe("x-box follows the legend", () => {
     expect(() => expandMacros([{ type: "x-box", id: "q", x: 0, y: 0, label: "Q", kind: "queue" }])).toThrow("use x-log");
   });
 });
+
+describe("x-plot", () => {
+  const plot = { type: "x-plot", id: "p", x: 100, y: 50, width: 400, height: 200,
+    xAxis: { label: "event time (s)", min: 0, max: 10 }, yAxis: { label: "arrival (s)", min: 0, max: 20 } };
+  const centre = (e: El) => [(e.x as number) + (e.width as number) / 2, (e.y as number) + (e.height as number) / 2];
+
+  it("puts the axes' minimum at the bottom-left corner and their maximum at the top-right", () => {
+    const els = expandMacros([{ ...plot, points: [{ x: 0, y: 0, id: "lo" }, { x: 10, y: 20, id: "hi" }] }]);
+    expect(centre(byId(els, "lo"))).toEqual([100, 250]);
+    expect(centre(byId(els, "hi"))).toEqual([500, 50]);
+  });
+
+  it("labels both axes", () => {
+    const texts = byType(expandMacros([plot]), "text").map((t) => t.text);
+    expect(texts).toEqual(expect.arrayContaining(["event time (s)", "arrival (s)"]));
+  });
+
+  it("colours points by kind or state from the palette", () => {
+    const els = expandMacros([{ ...plot, points: [{ x: 5, y: 5, id: "a", kind: "cache" }, { x: 6, y: 6, id: "b", state: "failure" }] }]);
+    expect(byId(els, "a").backgroundColor).toBe(KINDS.cache.fill);
+    expect(byId(els, "b").strokeColor).toBe(STATE.failure);
+  });
+
+  it("draws a line through data points, and a dashed reference line across the plot", () => {
+    const els = expandMacros([{ ...plot, lines: [{ points: [[0, 0], [5, 10], [10, 20]], label: "on time" }],
+      refs: [{ axis: "y", at: 10, label: "watermark" }] }]);
+    const data = byType(els, "line").find((l) => (l.points as number[][]).length === 3) as El;
+    expect(data.x).toBe(100);
+    expect((data.points as number[][])[2]).toEqual([400, -200]);
+    const ref = byType(els, "line").find((l) => l.strokeStyle === "dashed") as El;
+    expect(ref.y).toBe(150);
+  });
+
+  it("shades a band between two values", () => {
+    const els = expandMacros([{ ...plot, bands: [{ axis: "x", from: 2, to: 4, label: "allowed lateness" }] }]);
+    const band = byType(els, "rectangle").find((r) => r.id === undefined) as El;
+    expect(band).toMatchObject({ x: 180, y: 50, width: 80, height: 200 });
+  });
+
+  it("refuses a point outside its axes, so a number is never drawn off the scale", () => {
+    expect(() => expandMacros([{ ...plot, points: [{ x: 11, y: 5 }] }])).toThrow("x-plot p: point (11, 5) is outside the axes");
+  });
+});

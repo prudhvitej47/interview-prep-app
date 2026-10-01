@@ -1,4 +1,4 @@
-import { CAST, DSA, INK, KINDS, MUTED, STATE, type Kind, type State } from "./sketchPalette";
+import { CAST, DSA, INK, KINDS, MUTED, STATE, ZONE_TINTS, type Kind, type State } from "./sketchPalette";
 
 type El = Record<string, unknown>;
 
@@ -34,6 +34,7 @@ const MACROS: Record<string, (e: El) => El[]> = {
   "x-lock": lock,
   "x-cross": (e) => cross(num(e.x), num(e.y), num(e.size, 24)),
   "x-actor": actor,
+  "x-plot": plot,
 };
 
 const LABEL = 20;   // box labels
@@ -353,3 +354,66 @@ function actor(e: El): El[] {
     ...anchor(e.id, x, y, s, s),
   ];
 }
+
+/**
+ * A 2-D plot on real axes: points, lines through data, dashed reference lines and shaded bands, all placed by
+ * their values, so the picture is drawn from the unit's numbers and can't drift from them. A point outside the
+ * axes is refused rather than drawn off the scale.
+ */
+function plot(e: El): El[] {
+  const x = num(e.x), y = num(e.y), w = num(e.width, 420), h = num(e.height, 260);
+  const id = String(e.id);
+  const xa = (e.xAxis ?? {}) as El, ya = (e.yAxis ?? {}) as El;
+  const [x0, x1, y0, y1] = [num(xa.min), num(xa.max, 1), num(ya.min), num(ya.max, 1)];
+  const px = (v: number) => Math.round(x + ((v - x0) / (x1 - x0)) * w);
+  const py = (v: number) => Math.round(y + h - ((v - y0) / (y1 - y0)) * h);
+  const inside = (vx: number, vy: number) => vx >= x0 && vx <= x1 && vy >= y0 && vy <= y1;
+  const out: El[] = [];
+  for (const b of (e.bands as El[] | undefined) ?? []) {
+    const [a, c] = [num(b.from), num(b.to)];
+    const rect = b.axis === "y"
+      ? { x, y: py(c), width: w, height: py(a) - py(c) }
+      : { x: px(a), y, width: px(c) - px(a), height: h };
+    out.push({ type: "rectangle", ...rect, backgroundColor: ZONE_TINTS[1], strokeColor: "transparent", fillStyle: "solid" });
+    if (b.label) out.push(text(String(b.label), rect.x + 6, rect.y + 6, SMALL, MUTED));
+  }
+  out.push(line(x, y + h, w, 0, INK), line(x, y, 0, h, INK));
+  out.push(centredText(String(xa.label ?? ""), x + w / 2, y + h + 26, SMALL, INK));
+  out.push(text(String(ya.label ?? ""), x, y - 28, SMALL, INK));
+  for (const v of (xa.ticks as number[] | undefined) ?? [x0, x1]) out.push(centredText(String(v), px(v), y + h + 4, SMALL, MUTED));
+  for (const v of (ya.ticks as number[] | undefined) ?? [y0, y1]) out.push(text(String(v), x - textWidth(String(v), SMALL) - 8, py(v) - SMALL / 2, SMALL, MUTED));
+  for (const r of (e.refs as El[] | undefined) ?? []) {
+    const colour = stateColour(r.state) ?? MUTED;
+    if (r.axis === "x") {
+      out.push(line(px(num(r.at)), y, 0, h, colour, { strokeStyle: "dashed" }));
+      if (r.label) out.push(text(String(r.label), px(num(r.at)) + 6, y, SMALL, colour));
+    } else {
+      out.push(line(x, py(num(r.at)), w, 0, colour, { strokeStyle: "dashed" }));
+      if (r.label) out.push(text(String(r.label), x + w + 8, py(num(r.at)) - SMALL / 2, SMALL, colour));
+    }
+  }
+  for (const l of (e.lines as El[] | undefined) ?? []) {
+    const pts = ((l.points as number[][] | undefined) ?? []);
+    for (const [vx, vy] of pts) if (!inside(vx, vy)) throw new Error(`x-plot ${id}: point (${vx}, ${vy}) is outside the axes`);
+    if (pts.length < 2) continue;
+    const [sx, sy] = [px(pts[0][0]), py(pts[0][1])];
+    out.push({ type: "line", x: sx, y: sy, points: pts.map(([vx, vy]) => [px(vx) - sx, py(vy) - sy]),
+      strokeColor: stateColour(l.state) ?? INK, ...(l.dashed ? { strokeStyle: "dashed" } : {}) });
+    if (l.label) {
+      const [lx, ly] = pts[pts.length - 1];
+      out.push(text(String(l.label), px(lx) + 6, py(ly) - SMALL, SMALL, stateColour(l.state) ?? INK));
+    }
+  }
+  for (const pt of (e.points as El[] | undefined) ?? []) {
+    const [vx, vy] = [num(pt.x), num(pt.y)];
+    if (!inside(vx, vy)) throw new Error(`x-plot ${id}: point (${vx}, ${vy}) is outside the axes`);
+    const { fill, stroke } = KINDS[kindOf(pt, "x-plot point")];
+    const state = stateColour(pt.state);
+    const size = 12;
+    out.push({ type: "ellipse", ...(typeof pt.id === "string" ? { id: pt.id } : {}), x: px(vx) - size / 2, y: py(vy) - size / 2,
+      width: size, height: size, backgroundColor: state ?? fill, strokeColor: state ?? stroke, fillStyle: "solid" });
+    if (pt.label) out.push(text(String(pt.label), px(vx) + 10, py(vy) - SMALL / 2 - 2, SMALL, INK));
+  }
+  return [...out, ...anchor(e.id, x, y, w, h)];
+}
+
