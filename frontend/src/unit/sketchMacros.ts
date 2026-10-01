@@ -121,11 +121,11 @@ function db(e: El): El[] {
     line(x, y + cap, 0, h - 2 * cap, stroke),
     line(x + w, y + cap, 0, h - 2 * cap, stroke),
     { type: "ellipse", x, y, width: w, height: 2 * cap, ...shape },
-    // The label rides on a box over the whole cylinder: the anchor when there is an id, a bare box otherwise.
-    ...(typeof e.id === "string"
-      ? anchor(e.id, x, y, w, h, { label: lbl(e.label, num(e.fontSize, LABEL)) })
-      : [{ type: "rectangle", x, y, width: w, height: h, strokeColor: "transparent", backgroundColor: "transparent",
-        label: lbl(e.label, num(e.fontSize, LABEL)) }]),
+    // The label rides on an invisible box over the body, below the top cap, so on a short cylinder it never sits
+    // on the cap's line. Arrows bind to the anchor, which covers the whole cylinder.
+    { type: "rectangle", x, y: y + 2 * cap, width: w, height: h - 2 * cap, strokeColor: "transparent",
+      backgroundColor: "transparent", label: lbl(e.label, num(e.fontSize, LABEL)) },
+    ...anchor(e.id, x, y, w, h),
   ];
 }
 
