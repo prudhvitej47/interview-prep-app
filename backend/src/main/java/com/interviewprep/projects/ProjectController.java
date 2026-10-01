@@ -34,8 +34,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * A learner's projects and the questions about them: reading them, writing an answer, and saying
- * how a rehearsal went. Adding and changing questions is done by re-importing the file
- * ({@link ProjectFileController}), not here.
+ * how a rehearsal went. Adding and changing projects and questions is {@link ProjectEditController};
+ * the file round trip is {@link ProjectFileController}.
  */
 @RestController
 class ProjectController {
@@ -61,7 +61,11 @@ class ProjectController {
   record Question(long id, String rung, String prompt, String probes, String strongAnswer,
       List<UnitLink> units, int minutes, String answer, OffsetDateTime answeredAt, Progress progress) {}
 
-  record Project(long id, String name, String summary, List<String> topics, List<Question> questions) {}
+  /** A question hidden by the learner or by an import, listed so it can be restored. */
+  record HiddenQuestion(long id, String prompt) {}
+
+  record Project(long id, String name, String summary, List<String> topics, List<Question> questions,
+      List<HiddenQuestion> hidden) {}
 
   record AnswerBody(String answer) {}
 
@@ -122,7 +126,7 @@ class ProjectController {
             params,
             (rs, i) -> new Project(rs.getLong("id"), rs.getString("name"),
                 rs.getString("summary") == null ? "" : rs.getString("summary"),
-                strings(rs.getArray("topic_ids")), List.of()))
+                strings(rs.getArray("topic_ids")), List.of(), List.of()))
         .stream().findFirst()
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
@@ -150,7 +154,10 @@ class ProjectController {
             r.minutes(), r.answer(), r.answeredAt(),
             Progress.of(rehearsals.getOrDefault(r.id(), List.of()))))
         .toList();
-    return new Project(head.id(), head.name(), head.summary(), head.topics(), questions);
+    List<HiddenQuestion> hidden = jdbc.query(
+        "select id, prompt from project_question where project_id = :project and retired order by sort_order, id",
+        params, (rs, i) -> new HiddenQuestion(rs.getLong("id"), rs.getString("prompt")));
+    return new Project(head.id(), head.name(), head.summary(), head.topics(), questions, hidden);
   }
 
   /** The answer box saves itself as the learner types. Clearing it clears the answer. */

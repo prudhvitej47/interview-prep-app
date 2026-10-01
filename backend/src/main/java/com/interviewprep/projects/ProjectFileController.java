@@ -31,32 +31,33 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A learner's question file in and out. The file is theirs, kept outside Git; this is the only way
- * questions reach the app.
+ * A learner's question file in and out. The file is theirs, kept outside Git. Questions can also be
+ * added and changed in the app ({@link ProjectEditController}); the export carries both.
  *
  * <p>Importing again is safe: projects and questions are matched by their keys, so a reworded prompt
  * updates in place and keeps the answer and ratings, and a question missing from the new file is
- * retired (hidden), never deleted. Nothing here logs a request body: it is someone's career.
+ * retired (hidden), never deleted, unless the learner added it in the app: a file speaks only for what
+ * it brought. Nothing here logs a request body: it is someone's career.
  */
 @RestController
 class ProjectFileController {
 
   static final int VERSION = 1;
   static final int MAX_BYTES = 1024 * 1024;
-  static final int MAX_PROJECTS = 30;
-  static final int MAX_QUESTIONS = 30;
-  static final Set<String> RUNGS = Set.of("walkthrough", "why", "scale", "failure", "change", "story");
+  static final int MAX_PROJECTS = ProjectFields.MAX_PROJECTS;
+  static final int MAX_QUESTIONS = ProjectFields.MAX_QUESTIONS;
+  static final Set<String> RUNGS = ProjectFields.RUNGS;
 
-  // Caps per field: generous for what each holds, and a stop for a file that is not what it seems.
-  private static final int MAX_NAME = 200;
-  private static final int MAX_SUMMARY = 20_000;
-  private static final int MAX_PROMPT = 2_000;
-  private static final int MAX_PROBES = 10_000;
-  private static final int MAX_STRONG_ANSWER = 20_000;
-  private static final int MAX_LINKS = 20;
-  private static final int MAX_ID = 200;
+  // The caps per field are shared with editing in the app (ProjectFields).
+  private static final int MAX_NAME = ProjectFields.MAX_NAME;
+  private static final int MAX_SUMMARY = ProjectFields.MAX_SUMMARY;
+  private static final int MAX_PROMPT = ProjectFields.MAX_PROMPT;
+  private static final int MAX_PROBES = ProjectFields.MAX_PROBES;
+  private static final int MAX_STRONG_ANSWER = ProjectFields.MAX_STRONG_ANSWER;
+  private static final int MAX_LINKS = ProjectFields.MAX_LINKS;
+  private static final int MAX_ID = ProjectFields.MAX_ID;
   private static final int MAX_PROBLEMS_SHOWN = 20;
-  private static final Pattern KEY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,99}");
+  private static final Pattern KEY = ProjectFields.KEY;
 
   private final NamedParameterJdbcTemplate jdbc;
   private final TransactionTemplate transaction;
@@ -220,13 +221,13 @@ class ProjectFileController {
       }
       n[5] += jdbc.update(
           "update project_question set retired = true, updated_at = now() where project_id = :project"
-              + " and not retired and key not in (select jsonb_array_elements_text(cast(:keys as jsonb)))",
+              + " and not retired and not added_in_app and key not in (select jsonb_array_elements_text(cast(:keys as jsonb)))",
           new MapSqlParameterSource().addValue("project", project.id()).addValue("keys", toJson(questionKeys)));
     }
     // A whole project missing from the file is hidden the same way, with its questions and answers kept.
     n[2] = jdbc.update(
         "update experience_project set retired = true, updated_at = now() where learner_id = :learner"
-            + " and not retired and key not in (select jsonb_array_elements_text(cast(:keys as jsonb)))",
+            + " and not retired and not added_in_app and key not in (select jsonb_array_elements_text(cast(:keys as jsonb)))",
         new MapSqlParameterSource().addValue("learner", me.id()).addValue("keys", toJson(projectKeys)));
     return new Imported(n[0], n[1], n[2], n[3], n[4], n[5], List.copyOf(unknown));
   }

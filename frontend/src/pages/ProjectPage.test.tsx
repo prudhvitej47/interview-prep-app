@@ -36,6 +36,7 @@ const project = (questions: object[]) => ({
   summary: "Built the posting service.",
   topics: ["hld.payments"],
   questions,
+  hidden: [],
 });
 
 function show(routes: Record<string, { status?: number; body?: unknown }>, at = "/projects/1") {
@@ -167,5 +168,62 @@ describe("ReviewsDue", () => {
     expect(screen.getByText(/Example gateway · When it fails · due/)).toBeInTheDocument();
     // No unit has been rated, so the unit reviews say nothing at all.
     expect(screen.queryByRole("heading", { name: /^Reviews due/ })).not.toBeInTheDocument();
+  });
+
+  describe("editing in the app", () => {
+    const bodyOf = (fetchMock: ReturnType<typeof show>, url: string) =>
+      JSON.parse(fetchMock.mock.calls.find(([u]) => u === url)![1]!.body as string);
+
+    it("adds a question and reports unit ids that are not in the curriculum", async () => {
+      const fetchMock = show({
+        "/api/projects/1": { body: project([question()]) },
+        "/api/projects/1/questions": { body: { id: 12, unknownUnits: ["no.such.unit"] } },
+      });
+      fireEvent.click(await screen.findByRole("button", { name: "Add a question" }));
+      fireEvent.change(screen.getByLabelText("Angle"), { target: { value: "failure" } });
+      fireEvent.change(screen.getByLabelText("The question"), { target: { value: "What if the ledger is down?" } });
+      fireEvent.change(screen.getByLabelText(/Units that teach/), { target: { value: "ds.transactions.idempotency, no.such.unit" } });
+      fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+      expect(await screen.findByText(/left out of the links: no.such.unit/)).toBeInTheDocument();
+      expect(bodyOf(fetchMock, "/api/projects/1/questions")).toEqual({
+        rung: "failure", prompt: "What if the ledger is down?", probes: "", strongAnswer: "",
+        units: ["ds.transactions.idempotency", "no.such.unit"], minutes: 15,
+      });
+    });
+
+    it("opens a question's form with what it says now, and lists problems the server finds", async () => {
+      show({
+        "/api/projects/1": { body: project([question()]) },
+        "/api/projects/questions/11": { status: 422, body: { problems: ["The question is empty."] } },
+      });
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText("The question")).toHaveValue("What fails first at ten times the load?");
+      expect(screen.getByLabelText(/Units that teach/)).toHaveValue("ds.transactions.idempotency");
+      fireEvent.click(screen.getByRole("button", { name: "Save question" }));
+      expect(await screen.findByText("The question is empty.")).toBeInTheDocument();
+      expect(screen.getByText("Not saved. Fix these and try again:")).toBeInTheDocument();
+    });
+
+    it("moves a question down by sending the whole new order", async () => {
+      const fetchMock = show({
+        "/api/projects/1": { body: project([question(), question({ id: 12, prompt: "Second?" })]) },
+        "/api/projects/1/order": { status: 204 },
+      });
+      fireEvent.click(await screen.findByRole("button", { name: "Move down" }));
+      await waitFor(() => expect(bodyOf(fetchMock, "/api/projects/1/order")).toEqual({ questionIds: [12, 11] }));
+      // The first question can't move up, and the last can't move down.
+      expect(screen.getAllByRole("button", { name: "Move up" })).toHaveLength(1);
+    });
+
+    it("lists hidden questions so they can be restored", async () => {
+      const fetchMock = show({
+        "/api/projects/1": { body: { ...project([question()]), hidden: [{ id: 13, prompt: "An old question?" }] } },
+        "/api/projects/questions/13/restore": { status: 204 },
+      });
+      fireEvent.click(await screen.findByText("Hidden questions (1)"));
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.find(([u]) => u === "/api/projects/questions/13/restore")![1]!.method).toBe("POST"));
+    });
   });
 });

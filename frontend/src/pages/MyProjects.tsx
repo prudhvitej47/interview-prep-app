@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
-import { exportProjects, fetchProjects, importProjects, type ProjectImport, type ProjectSummary } from "../api";
+import { Link, useNavigate } from "react-router";
+import {
+  addProject,
+  exportProjects,
+  fetchHiddenProjects,
+  fetchProjects,
+  importProjects,
+  restoreProject,
+  type ProjectImport,
+  type ProjectSummary,
+} from "../api";
+import { ProjectForm } from "../projects/QuestionForm";
 
 const MAX_BYTES = 1024 * 1024;
 
@@ -25,20 +35,35 @@ export function importSummary(r: ProjectImport): string {
 
 /**
  * Questions an interviewer would ask about the learner's own projects, and their answers. They come
- * from a file the learner keeps outside Git and imports here; importing it again after an edit is
- * safe, since answers and ratings are kept.
+ * from a file the learner keeps outside Git and imports here, or are added in the app; importing a
+ * file again is safe, since answers and ratings are kept and what was added here is never hidden.
  */
 export function MyProjects() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [hidden, setHidden] = useState<{ id: number; name: string }[]>([]);
   const picker = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const load = () =>
-    fetchProjects()
-      .then(setProjects)
+    Promise.all([fetchProjects(), fetchHiddenProjects()])
+      .then(([shown, gone]) => {
+        setProjects(shown);
+        setHidden(gone);
+      })
       .catch((e: Error) => setError(e.message));
+
+  async function restore(id: number) {
+    try {
+      await restoreProject(id);
+      await load();
+    } catch (e) {
+      setOutcome({ kind: "failed", message: (e as Error).message });
+    }
+  }
 
   useEffect(() => {
     load();
@@ -89,7 +114,10 @@ export function MyProjects() {
         Questions an interviewer asks about your own work, and your answers to them. Only you can see these.
       </p>
       <div className="note-actions">
-        <button type="button" disabled={busy} onClick={() => picker.current?.click()}>
+        <button type="button" disabled={busy || adding} onClick={() => setAdding(true)}>
+          New project
+        </button>
+        <button type="button" className="secondary" disabled={busy} onClick={() => picker.current?.click()}>
           {busy ? "Importing…" : "Import a question file"}
         </button>
         <button type="button" className="secondary" disabled={busy || !projects?.length} onClick={download}>
@@ -110,6 +138,22 @@ export function MyProjects() {
           }}
         />
       </div>
+
+      {adding && (
+        <ProjectForm
+          initial={{ name: "", summary: "" }}
+          submitLabel="Add project"
+          save={addProject}
+          onSaved={(saved) => navigate(`/projects/${saved.id}`)}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+      {projects && projects.length > 0 && (
+        <p className="hint">
+          Importing a file puts its own wording back on the questions it holds, so export first if you have
+          changed any here and want to keep the changes in your file.
+        </p>
+      )}
 
       {outcome?.kind === "imported" && (
         <div className="import-result" role="status">
@@ -138,7 +182,7 @@ export function MyProjects() {
       {!projects && !error && <p>Loading…</p>}
       {projects?.length === 0 && (
         <p className="hint">
-          No projects yet. Import your question file to start; <Link to="/how-it-works#h-projects">How this
+          No projects yet. Add one, or import your question file; <Link to="/how-it-works#h-projects">How this
           works</Link> describes it.
         </p>
       )}
@@ -154,6 +198,19 @@ export function MyProjects() {
             </li>
           ))}
         </ul>
+      )}
+      {hidden.length > 0 && (
+        <details className="folded">
+          <summary>Hidden projects ({hidden.length})</summary>
+          <p className="hint">Hidden by you or by an import. Their questions and answers are kept.</p>
+          <ul className="hidden-items">
+            {hidden.map((h) => (
+              <li key={h.id}>
+                {h.name} <button className="link" onClick={() => restore(h.id)}>Restore</button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </article>
   );

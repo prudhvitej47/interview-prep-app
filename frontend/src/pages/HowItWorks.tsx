@@ -185,7 +185,12 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         </p>
         <ul>
           <li>
-            They arrive as a question file you <strong>import</strong>: a JSON file with <code>"version": 1</code> and
+            Add them in the app: <strong>New project</strong> on My projects, then <strong>Add a question</strong> on
+            the project's page. Each question can be edited, moved up or down, or hidden; a hidden one keeps its
+            answer and ratings, and <strong>Restore</strong> brings it back.
+          </li>
+          <li>
+            Or they arrive as a question file you <strong>import</strong>: a JSON file with <code>"version": 1</code> and
             a list of projects, each with a <code>key</code>, <code>name</code>, <code>summary</code> and
             its <code>questions</code> (<code>key</code>, <code>rung</code>, <code>prompt</code>,{" "}
             <code>probes</code>, <code>strong_answer</code>, <code>units</code>, <code>minutes</code>). Up to 30
@@ -193,7 +198,9 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           </li>
           <li>
             Importing an edited file again is safe: questions are matched by their key, so your answers and ratings
-            stay. One missing from the new file is hidden, not deleted.
+            stay. An imported question missing from the new file is hidden, not deleted; one you added in the app is
+            never hidden by an import. A file's wording replaces in-app edits to the questions it holds, so export
+            first if you want to keep them.
           </li>
           <li>
             Your answer saves as you type. The follow-ups and what a strong answer covers stay closed until you have

@@ -447,7 +447,15 @@ export type ProjectQuestion = {
   progress: Progress;
 };
 
-export type Project = { id: number; name: string; summary: string; topics: string[]; questions: ProjectQuestion[] };
+export type Project = {
+  id: number;
+  name: string;
+  summary: string;
+  topics: string[];
+  questions: ProjectQuestion[];
+  /** Hidden by the learner or by an import; listed so they can be restored. */
+  hidden: { id: number; prompt: string }[];
+};
 
 export type ProjectImport = {
   projectsAdded: number;
@@ -496,3 +504,44 @@ export async function exportProjects(): Promise<Blob> {
   if (!response.ok) throw new Error(`Could not export (${response.status})`);
   return response.blob();
 }
+
+/** What a learner types to add or change a question. Unit ids not in the curriculum are dropped and reported. */
+export type QuestionDraft = {
+  rung: Rung;
+  prompt: string;
+  probes: string;
+  strongAnswer: string;
+  units: string[];
+  minutes: number;
+};
+
+export type Saved = { id: number; unknownUnits: string[] };
+
+/** Saved, or (422, or 409 for a stale reorder) the list of what to fix. */
+async function sendChecked(method: string, url: string, body?: object): Promise<Saved | { problems: string[] }> {
+  const response = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: body && JSON.stringify(body),
+  });
+  if (response.status === 422 || response.status === 409) return response.json();
+  if (!response.ok) throw new Error(`Could not save that (${response.status})`);
+  return response.status === 204 ? { id: 0, unknownUnits: [] } : response.json();
+}
+
+export const addProject = (project: { name: string; summary: string }) =>
+  sendChecked("POST", "/api/projects", project);
+export const changeProject = (id: number, project: { name: string; summary: string }) =>
+  sendChecked("PUT", `/api/projects/${id}`, project);
+export const hideProject = (id: number) => send("DELETE", `/api/projects/${id}`);
+export const restoreProject = (id: number) => send("POST", `/api/projects/${id}/restore`);
+export const fetchHiddenProjects = () => getJson<{ id: number; name: string }[]>("/api/projects/hidden");
+
+export const addQuestion = (projectId: number, question: QuestionDraft) =>
+  sendChecked("POST", `/api/projects/${projectId}/questions`, question);
+export const changeQuestion = (id: number, question: QuestionDraft) =>
+  sendChecked("PUT", `/api/projects/questions/${id}`, question);
+export const hideQuestion = (id: number) => send("DELETE", `/api/projects/questions/${id}`);
+export const restoreQuestion = (id: number) => send("POST", `/api/projects/questions/${id}/restore`);
+export const reorderQuestions = (projectId: number, questionIds: number[]) =>
+  sendChecked("PUT", `/api/projects/${projectId}/order`, { questionIds });
