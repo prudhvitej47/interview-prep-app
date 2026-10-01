@@ -42,7 +42,7 @@ describe("MyProjects", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("lists the projects in order with what is answered and due", async () => {
-    mockFetch({ "/api/projects": { body: PROJECTS } });
+    mockFetch({ "/api/projects": { body: PROJECTS }, "/api/projects/hidden": { body: [] } });
     show();
     expect(await screen.findByRole("link", { name: "Example ledger" })).toHaveAttribute("href", "/projects/1");
     expect(screen.getByText("6 questions · 2 answered · 1 due")).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe("MyProjects", () => {
   });
 
   it("explains where to start when there is nothing yet", async () => {
-    mockFetch({ "/api/projects": { body: [] } });
+    mockFetch({ "/api/projects": { body: [] }, "/api/projects/hidden": { body: [] } });
     show();
     expect(await screen.findByText(/No projects yet/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
@@ -59,7 +59,7 @@ describe("MyProjects", () => {
 
   it("sends the chosen file as it is and says what the import changed", async () => {
     const fetchMock = mockFetch({
-      "/api/projects": { body: PROJECTS },
+      "/api/projects": { body: PROJECTS }, "/api/projects/hidden": { body: [] },
       "/api/projects/import": { body: IMPORTED },
     });
     show();
@@ -79,7 +79,7 @@ describe("MyProjects", () => {
 
   it("lists every problem when a file is refused", async () => {
     mockFetch({
-      "/api/projects": { body: PROJECTS },
+      "/api/projects": { body: PROJECTS }, "/api/projects/hidden": { body: [] },
       "/api/projects/import": { status: 422, body: { problems: ['"version" must be 1.', "Project 1: \"key\" is missing."] } },
     });
     show();
@@ -91,7 +91,7 @@ describe("MyProjects", () => {
   });
 
   it("refuses a file over 1 MB without sending it", async () => {
-    const fetchMock = mockFetch({ "/api/projects": { body: PROJECTS } });
+    const fetchMock = mockFetch({ "/api/projects": { body: PROJECTS }, "/api/projects/hidden": { body: [] } });
     show();
     await screen.findByRole("link", { name: "Example ledger" });
     choose("x".repeat(1024 * 1024 + 1));
@@ -104,5 +104,32 @@ describe("MyProjects", () => {
       .toBe("Imported. Nothing had changed since the last import.");
     expect(importSummary({ ...IMPORTED, projectsAdded: 0, projectsUpdated: 1, questionsAdded: 0, questionsUpdated: 0, questionsRetired: 0 }))
       .toBe("Imported: 1 project updated.");
+  });
+
+  it("adds a project without a file", async () => {
+    const fetchMock = mockFetch({
+      "/api/projects": { body: PROJECTS },
+      "/api/projects/hidden": { body: [] },
+    });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "New project" }));
+    fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "Example gateway" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    await waitFor(() => {
+      const posted = fetchMock.mock.calls.filter(([u, init]) => u === "/api/projects" && init?.method === "POST");
+      expect(JSON.parse(posted[0][1]!.body as string)).toEqual({ name: "Example gateway", summary: "" });
+    });
+  });
+
+  it("lists hidden projects so they can be restored", async () => {
+    const fetchMock = mockFetch({
+      "/api/projects": { body: PROJECTS },
+      "/api/projects/hidden": { body: [{ id: 9, name: "An old project" }] },
+      "/api/projects/9/restore": { status: 204 },
+    });
+    show();
+    fireEvent.click(await screen.findByText("Hidden projects (1)"));
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(fetchMock.mock.calls.map(([u]) => u)).toContain("/api/projects/9/restore"));
   });
 });

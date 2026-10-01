@@ -239,6 +239,12 @@ summary:hover { text-decoration: underline; }
 .project-question { margin-top: 1.6rem; padding-top: 0.4rem; border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
 .unit .project-question h3 { margin: 0.2rem 0 0.8rem; }
 .project-question .progress { margin: 1rem 0 0; }
+.question-tools { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.6rem 0 0; }
+.project-form { margin: 0.8rem 0; }
+.project-form fieldset.plain label { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.5rem 0; font-size: 0.9rem; }
+.project-form input[type="number"] { width: 6rem; }
+.hidden-items { padding-left: 1.1rem; }
+.hidden-items li { margin: 0.4rem 0; }
 .progress h4 { margin: 0 0 0.3rem; }
 .answer label { display: block; font-weight: 600; margin-bottom: 0.3rem; }
 .my-projects .note-actions { flex-wrap: wrap; margin: 1rem 0; }
