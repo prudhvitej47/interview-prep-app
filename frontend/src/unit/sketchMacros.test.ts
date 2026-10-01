@@ -41,7 +41,8 @@ describe("x-db", () => {
     for (const cap of byType(els, "ellipse")) {
       expect(cap).toMatchObject({ backgroundColor: KINDS.datastore.fill, strokeColor: KINDS.datastore.stroke });
     }
-    expect(byId(els, "pg")).toMatchObject({ x: 100, y: 50, width: 140, height: 100, label: { text: "Postgres" } });
+    expect(byId(els, "pg")).toMatchObject({ x: 100, y: 50, width: 140, height: 100 });
+    expect(els.some((e) => (e.label as Record<string, unknown> | undefined)?.text === "Postgres")).toBe(true);
   });
 });
 
@@ -314,5 +315,22 @@ describe("x-plot", () => {
 
   it("refuses a point outside its axes, so a number is never drawn off the scale", () => {
     expect(() => expandMacros([{ ...plot, points: [{ x: 11, y: 5 }] }])).toThrow("x-plot p: point (11, 5) is outside the axes");
+  });
+});
+
+describe("x-db label placement (found on slice 0)", () => {
+  it("centres the label in the body, below the top cap, so it never sits on the cap's line", () => {
+    for (const height of [60, 80, 100]) {
+      const els = expandMacros([{ type: "x-db", id: "d", x: 0, y: 0, width: 140, height, label: "database" }]);
+      const topCap = byType(els, "ellipse").find((e) => e.y === 0) as El;
+      const labelled = els.find((e) => (e.label as Record<string, unknown> | undefined)?.text === "database") as El;
+      expect(labelled.y as number).toBeGreaterThanOrEqual(topCap.height as number);
+      expect((labelled.y as number) + (labelled.height as number)).toBeLessThanOrEqual(height);
+    }
+  });
+
+  it("still lets an arrow bind to the whole cylinder by its id", () => {
+    const els = expandMacros([{ type: "x-db", id: "d", x: 0, y: 0, width: 140, height: 100, label: "db" }]);
+    expect(byId(els, "d")).toMatchObject({ y: 0, height: 100 });
   });
 });
