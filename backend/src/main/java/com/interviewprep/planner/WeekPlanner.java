@@ -20,7 +20,7 @@ import java.util.function.ToDoubleFunction;
  * testable without a database:
  *
  * <ol>
- *   <li><b>Budget</b>: 90% of the stated hours; up to a fifth of that for reviews that fall due; the
+ *   <li><b>Budget</b>: 90% of the stated hours; up to a tenth of that for reviews that fall due; the
  *       goal is 80% of the plan, so one bad day still makes the week (F1).
  *   <li><b>Shares</b>: each domain's weight × a weakness factor from 1.5 (rated 0) down to 0.7 (rated
  *       5), capped at half to double the weight, normalised over domains that have units (F2).
@@ -28,20 +28,21 @@ import java.util.function.ToDoubleFunction;
  *       reports on the topic; gap is 1 − strength/5; a unit more than one step above the learner's
  *       level counts half. A unit is ready once its prerequisites are done or already in this week
  *       (F3).
- *   <li><b>Mix</b>: one item from each required group first, then minutes go to whichever domain is
- *       furthest behind its share (weighted fair queuing); at most two heavy units (75+ minutes)
- *       and never two on one day; DSA spread over separate days where possible (F4).
+ *   <li><b>Mix</b>: minutes go to whichever domain is furthest behind its share (weighted fair
+ *       queuing), so a domain gets what its weight says: no domain is guaranteed a unit, and a short
+ *       unit from a small domain gets in when its turn comes and it fits; at most two heavy units (75+
+ *       minutes) and never two on one day; DSA spread over separate days where possible (F4).
  *   <li><b>Placement</b>: least-loaded day, never before a prerequisite, heavy units towards the
  *       weekend.
  * </ol>
  *
- * <p>Units a learner placed "now" are taken first; then last week's unfinished learning, up to
- * {@link #CARRY_SHARE} of the week (the caller stops carrying an item after two carry-overs); units
- * placed "later" never reach this function.
+ * <p>Units a learner placed "now" are taken first; units placed "later" never reach this function.
+ * Last week's unfinished learning gets no priority: those units rejoin the pool at their designed
+ * minutes and compete by rank and share like any other.
  *
  * <p><b>Project questions</b> (the learner's own projects) come off the top like reviews, up to
  * {@link #PROJECT_SHARE} of the week, and never two on one day: last week's unrated ones first
- * (sharing the carry-over share with learning), then those due for another rehearsal, earliest
+ * (the caller stops carrying one after two carry-overs), then those due for another rehearsal, earliest
  * first, then new ones in ladder order, one project at a time (a project already started comes
  * before one not yet begun). Taking them off the top, rather than making projects a domain, keeps
  * each domain's share meaning what the learner set: a project question is payments, databases and
@@ -53,14 +54,13 @@ import java.util.function.ToDoubleFunction;
  */
 final class WeekPlanner {
 
-  static final int VERSION = 1;
+  static final int VERSION = 2;
   static final double PLANNED_SHARE_OF_HOURS = 0.9;
-  static final double REVIEW_SHARE = 0.2;
+  static final double REVIEW_SHARE = 0.1;
   static final double GOAL_SHARE = 0.8;
   static final int HEAVY_MINUTES = 75;
   static final int MAX_HEAVY = 2;
-  /** Last week's unfinished learning takes at most this share of the new week's learning time. */
-  static final double CARRY_SHARE = 0.3;
+  /** Marks a project question carried over from an earlier plan; the caller counts these. */
   static final String CARRIED = "Carried over from last week";
   /** Project questions take at most this share of the planned minutes, off the top like reviews. */
   static final double PROJECT_SHARE = 0.1;
@@ -91,15 +91,15 @@ final class WeekPlanner {
    */
   record Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
       double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
-      List<DueReview> reviews, Set<String> startNow, List<String> carryOver,
-      List<ProjectQuestion> projectQuestions, List<Long> carriedQuestions) {
+      List<DueReview> reviews, Set<String> startNow, List<ProjectQuestion> projectQuestions,
+      List<Long> carriedQuestions) {
 
     /** A learner with no project questions. */
     Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
         double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
-        List<DueReview> reviews, Set<String> startNow, List<String> carryOver) {
+        List<DueReview> reviews, Set<String> startNow) {
       this(weekStart, fromDay, studyDays, hoursPerWeek, loadFactor, domains, candidates, done, reviews,
-          startNow, carryOver, List.of(), List.of());
+          startNow, List.of(), List.of());
     }
   }
 
@@ -114,24 +114,6 @@ final class WeekPlanner {
 
   record Plan(int plannedMinutes, int goalMinutes, List<Item> items, List<Share> shares,
       List<String> notes) {}
-
-  // The label reads in both "Required every week: X" and "No X units to learn yet".
-  private record Group(String label, Predicate<Candidate> member) {}
-
-  // F4: every week has one of each, when the curriculum has one to give.
-  private static final List<Group> REQUIRED = List.of(
-      new Group("DSA", c -> c.domainId().equals("dsa")),
-      new Group("Java or Spring", c -> Set.of("java", "spring").contains(c.domainId())),
-      new Group("databases or distributed systems",
-          c -> Set.of("databases", "data", "distributed").contains(c.domainId())),
-      new Group("low-level design", c -> c.domainId().equals("lld")),
-      new Group("system design", c -> c.domainId().equals("hld")),
-      // By type for scenarios and projects, which live in every domain; by domain for behavioural,
-      // whose question and concept units are the same practice under another shape. Matching the
-      // type alone left all but one behavioural unit out of this slot.
-      new Group("scenario, project or behavioural",
-          c -> Set.of("scenario", "project", "behavioral").contains(c.type())
-              || c.domainId().equals("behavioral")));
 
   private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK);
 
@@ -169,10 +151,8 @@ final class WeekPlanner {
           + " review list on the home page.");
     }
 
-    // Project questions next, also off the top. Carried ones share learning's carry-over share.
-    int carryBudget = (int) ((planned - reviewMinutes) * CARRY_SHARE);
-    ProjectPick projects = pickProjects(in, planned, days.size(), carryBudget, notes);
-    carryBudget -= projects.carriedMinutes();
+    // Project questions next, also off the top, within their own share.
+    ProjectPick projects = pickProjects(in, planned, days.size(), notes);
     int learnBudget = planned - reviewMinutes - projects.minutes();
 
     // Shares, over the domains that have something to learn and a weight above zero.
@@ -184,7 +164,7 @@ final class WeekPlanner {
     Map<String, String> domainNames = new HashMap<>();
     in.domains().forEach(d -> domainNames.put(d.id(), d.name()));
 
-    // Learning: required groups first, then the domain furthest behind its share.
+    // Learning: units placed "now" first, then the domain furthest behind its share.
     List<Candidate> ranked = in.candidates().stream()
         .filter(c -> share.containsKey(c.domainId()))
         .sorted(Comparator.comparingDouble(WeekPlanner::score).reversed()
@@ -199,39 +179,6 @@ final class WeekPlanner {
       if (in.startNow().contains(c.unitId()) && picker.canTake(c)) {
         picker.take(c, DashboardController.NOW_REASON);
       }
-    }
-    // Then last week's unfinished learning, oldest first, so a started topic gets finished. Capped,
-    // so one bad week cannot crowd out the next; what doesn't fit stays in the pool below.
-    Map<String, Candidate> byId = new HashMap<>();
-    ranked.forEach(c -> byId.put(c.unitId(), c));
-    int carriedOut = projects.carriedOut();
-    for (String id : in.carryOver()) {
-      Candidate c = byId.get(id);
-      if (c == null) {
-        continue;  // done since, retired, or placed "later"
-      }
-      if (c.minutes() <= carryBudget && picker.canTake(c)) {
-        picker.take(c, CARRIED);
-        carryBudget -= c.minutes();
-      } else {
-        carriedOut++;
-      }
-    }
-    if (carriedOut > 0) {
-      notes.add(carriedOut + " unfinished item" + (carriedOut == 1 ? "" : "s") + " from last week did not"
-          + " fit in the carry-over share; they compete with everything else this week.");
-    }
-    for (Group g : REQUIRED) {
-      List<Candidate> members = ranked.stream().filter(g.member()).toList();
-      if (members.isEmpty()) {
-        if (in.candidates().stream().noneMatch(g.member())) {
-          notes.add("No " + g.label() + " units to learn yet, so this week has none.");
-        }
-        continue;
-      }
-      members.stream().filter(picker::canTake).findFirst().ifPresentOrElse(
-          c -> picker.take(c, "Required every week: " + g.label()),
-          () -> notes.add("No " + g.label() + " unit fitted this week."));
     }
     Map<String, Double> target = new HashMap<>();
     share.forEach((id, s) -> target.put(id, s * learnBudget));
@@ -333,7 +280,7 @@ final class WeekPlanner {
 
   private record TakenQuestion(ProjectQuestion question, String reason) {}
 
-  private record ProjectPick(List<TakenQuestion> taken, int minutes, int carriedMinutes, int carriedOut) {}
+  private record ProjectPick(List<TakenQuestion> taken, int minutes) {}
 
   private static final Map<String, String> RUNG = Map.of(
       "walkthrough", "the walk-through", "why", "why it was built this way", "scale", "what happens at scale",
@@ -345,11 +292,10 @@ final class WeekPlanner {
    * taken, a rung that does not fit ends the walk rather than being skipped, so the next week picks
    * the ladder up where this one stopped.
    */
-  private static ProjectPick pickProjects(Input in, int planned, int dayCount, int carryBudget,
-      List<String> notes) {
+  private static ProjectPick pickProjects(Input in, int planned, int dayCount, List<String> notes) {
     List<ProjectQuestion> all = in.projectQuestions();
     if (all.isEmpty()) {
-      return new ProjectPick(List.of(), 0, 0, 0);
+      return new ProjectPick(List.of(), 0);
     }
     int cap = (int) (planned * PROJECT_SHARE);
     LocalDate lastDay = in.weekStart().plusDays(6);
@@ -366,19 +312,21 @@ final class WeekPlanner {
       used[0] += q.minutes();
     };
 
-    int carriedMinutes = 0;
     int carriedOut = 0;
     for (Long id : in.carriedQuestions()) {
       ProjectQuestion q = byId.get(id);
       if (q == null || takenIds.contains(id)) {
         continue;  // retired since, or listed twice
       }
-      if (q.minutes() <= carryBudget - carriedMinutes && fits.test(q)) {
+      if (fits.test(q)) {
         take.accept(q, CARRIED + ": " + about(q) + ".");
-        carriedMinutes += q.minutes();
       } else {
         carriedOut++;
       }
+    }
+    if (carriedOut > 0) {
+      notes.add(carriedOut + " unrated project question" + (carriedOut == 1 ? "" : "s") + " from last week did"
+          + " not fit in the projects' share; they compete with the rest of your project questions.");
     }
 
     List<ProjectQuestion> due = all.stream()
@@ -430,7 +378,7 @@ final class WeekPlanner {
       notes.add(dueLeftOut + " project question" + (dueLeftOut == 1 ? "" : "s") + " due for rehearsal did not"
           + " fit; they stay on the home page.");
     }
-    return new ProjectPick(List.copyOf(taken), used[0], carriedMinutes, carriedOut);
+    return new ProjectPick(List.copyOf(taken), used[0]);
   }
 
   private static String about(ProjectQuestion q) {

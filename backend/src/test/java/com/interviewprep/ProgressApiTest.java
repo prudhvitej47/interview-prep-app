@@ -96,14 +96,14 @@ class ProgressApiTest extends PostgresTestBase {
     return "$.units[?(@.unitId == '" + id + "')]." + field;
   }
 
-  /** Four "good" reviews ending three days ago: a 16-day gap, so solid until it comes round. */
+  /** Four "good" reviews ending three days ago: a 35-day gap, so solid until it comes round. */
   private void makeProgress() throws Exception {
     mvc.perform(as(get("/api/me"), TESTER)).andExpect(status().isOk());  // registers the learner
     attempt("tester", "dsa.window.concept", "good", 10);
     attempt("tester", "dsa.window.concept", "good", 9);
     attempt("tester", "dsa.window.concept", "good", 6);
     attempt("tester", "dsa.window.concept", "good", 3);
-    attempt("tester", "dsa.window.p1", "good", 1);  // one day's gap, due today
+    attempt("tester", "dsa.window.p1", "good", 3);  // a three-day gap, due today
     attempt("tester", "dsa.window.old", "good", 1);  // retired: left out everywhere
     send(post("/api/units/db.sql.joins/attempts"), TESTER, "{\"rating\": \"good\"}").andExpect(status().isOk());
   }
@@ -116,7 +116,7 @@ class ProgressApiTest extends PostgresTestBase {
         .andExpect(jsonPath("$.today").value(today.toString()))
         .andExpect(jsonPath(unitPath("dsa.window.concept", "stage")).value("solid"))
         .andExpect(jsonPath(unitPath("dsa.window.concept", "reviews")).value(3))
-        .andExpect(jsonPath(unitPath("dsa.window.concept", "dueOn")).value(today.plusDays(13).toString()))
+        .andExpect(jsonPath(unitPath("dsa.window.concept", "dueOn")).value(today.plusDays(32).toString()))
         .andExpect(jsonPath(unitPath("dsa.window.p1", "stage")).value("review-due"))
         .andExpect(jsonPath(unitPath("dsa.window.p1", "dueOn")).value(today.toString()))
         .andExpect(jsonPath(unitPath("db.sql.joins", "stage")).value("learned"))
@@ -186,7 +186,7 @@ class ProgressApiTest extends PostgresTestBase {
         .andExpect(jsonPath("$.projects[0].stages.notStarted").value(1))
         .andExpect(jsonPath("$.projects[0].questions[0].questionId").value(walk))
         .andExpect(jsonPath("$.projects[0].questions[0].stage").value("learned"))
-        .andExpect(jsonPath("$.projects[0].questions[0].dueOn").value(today.plusDays(3).toString()))
+        .andExpect(jsonPath("$.projects[0].questions[0].dueOn").value(today.plusDays(16).toString()))
         .andExpect(jsonPath("$.projects[0].questions[1].prompt").value("Why double entry?"))
         .andExpect(jsonPath("$.projects[0].questions[1].stage").value("not-started"));
     mvc.perform(as(get("/api/progress"), OTHER)).andExpect(jsonPath("$.projects").isEmpty());

@@ -334,10 +334,10 @@ class ProjectsApiTest extends PostgresTestBase {
       long q = questionId("ledger-walk");
       rate(TESTER, q, "good")
           .andExpect(jsonPath("$.attempts").value(1))
-          .andExpect(jsonPath("$.dueOn").value(today.plusDays(1).toString()))
+          .andExpect(jsonPath("$.dueOn").value(today.plusDays(3).toString()))
           .andExpect(jsonPath("$.reviewDue").value(false));
-      // Good puts it on the ladder's first step, easy climbs two more: 7 days.
-      rate(TESTER, q, "easy").andExpect(jsonPath("$.dueOn").value(today.plusDays(7).toString()));
+      // Good puts it on the ladder's first step (3 days), easy climbs two more: 16 days.
+      rate(TESTER, q, "easy").andExpect(jsonPath("$.dueOn").value(today.plusDays(16).toString()));
       mvc.perform(as(delete("/api/projects/questions/" + q + "/attempts/latest"), TESTER)
               .with(RealCsrf.token(mvc, TESTER)))
           .andExpect(jsonPath("$.attempts").value(1))
@@ -351,9 +351,9 @@ class ProjectsApiTest extends PostgresTestBase {
     void theReviewQueueHoldsDueQuestionsOldestFirst() throws Exception {
       importAs(TESTER, FILE);
       mvc.perform(as(get("/api/projects/reviews"), TESTER)).andExpect(jsonPath("$.due.length()").value(0));
-      rehearsedDaysAgo("ledger-hot", "good", 5);     // due 4 days ago
-      rehearsedDaysAgo("gateway-why", "good", 1);    // due today
-      rehearsedDaysAgo("ledger-walk", "easy", 0);    // due in 3 days
+      rehearsedDaysAgo("ledger-hot", "good", 7);     // due 4 days ago
+      rehearsedDaysAgo("gateway-why", "good", 3);    // due today
+      rehearsedDaysAgo("ledger-walk", "good", 0);    // due in 3 days
 
       mvc.perform(as(get("/api/projects/reviews"), TESTER))
           .andExpect(jsonPath("$.due.length()").value(2))

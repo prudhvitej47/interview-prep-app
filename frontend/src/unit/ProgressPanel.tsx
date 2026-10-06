@@ -3,7 +3,7 @@ import { fetchProgress, recordAttempt, undoAttempt, type Progress, type Rating }
 import { moveFocusTo } from "../navigation";
 
 const RATINGS: { rating: Rating; label: string; hint: string }[] = [
-  { rating: "again", label: "Again", hint: "I couldn't do it; show it again tomorrow" },
+  { rating: "again", label: "Again", hint: "I couldn't do it; show it again in a few days" },
   { rating: "hard", label: "Hard", hint: "Got there, with effort or a peek" },
   { rating: "good", label: "Good", hint: "Did it, with some thought" },
   { rating: "easy", label: "Easy", hint: "Straightforward" },

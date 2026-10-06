@@ -7,9 +7,10 @@ import java.util.Set;
 /**
  * When a unit is next due for review, worked out from how each attempt at it went.
  *
- * <p>The ladder from the proposal (F6): roughly 1, 3, 7, 16 and 35 days, stretched or shrunk by the
- * rating. "Good" climbs one step, "easy" two, "hard" repeats the current step and "again" starts
- * over. Past the top, each good review roughly doubles the gap, up to a year.
+ * <p>The ladder: 3, 7, 16, 35 and 75 days (the proposal's F6 started at 1 day; that gave a unit
+ * learned this week up to three reviews in two weeks, which crowded the plan). "Good" climbs one
+ * step, "easy" two (three on a first attempt, so it lands on 16 days), "hard" repeats the current
+ * step and "again" starts over. Past the top, each good review roughly doubles the gap, up to a year.
  *
  * <p>ponytail: a fixed ladder, not FSRS. It needs no tuning data, which two learners will not have
  * for months; switch to FSRS if reviews start feeling badly timed.
@@ -22,7 +23,7 @@ public final class ReviewSchedule {
   /** The four answers to "how did it go?", the same wherever the question is asked. */
   public static final Set<String> RATINGS = Set.of("again", "hard", "good", "easy");
 
-  static final int[] LADDER = {1, 3, 7, 16, 35};
+  static final int[] LADDER = {3, 7, 16, 35, 75};
   private static final int MAX_DAYS = 365;
 
   /** One rating, and the day (in {@link ProgressQueries#STUDY_ZONE}) it was given. */
@@ -49,7 +50,9 @@ public final class ReviewSchedule {
         case "again" -> 0;
         case "hard" -> Math.max(step, 0);
         case "good" -> step + 1;
-        case "easy" -> step + 2;
+        // A first "easy" lands on the third rung (16 days), so something already known does not
+        // come back within the week; later "easy" answers climb two rungs.
+        case "easy" -> step < 0 ? 2 : step + 2;
         default -> throw new IllegalArgumentException("unknown rating " + a.rating());
       };
     }

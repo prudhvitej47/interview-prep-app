@@ -279,7 +279,7 @@ class CurriculumAndNotesTest extends PostgresTestBase {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.attempts").value(1))
           .andExpect(jsonPath("$.lastRating").value("good"))
-          .andExpect(jsonPath("$.dueOn").value(today.plusDays(1).toString()))
+          .andExpect(jsonPath("$.dueOn").value(today.plusDays(3).toString()))
           .andExpect(jsonPath("$.reviewDue").value(false));
     }
 
@@ -300,9 +300,9 @@ class CurriculumAndNotesTest extends PostgresTestBase {
     void theQueueHoldsWhatIsDueOldestFirstAndSaysWhenTheNextOneIs() throws Exception {
       // A learner's row is created on their first request; the backdated rows below need it.
       mvc.perform(as(get("/api/reviews"), TESTER)).andExpect(jsonPath("$.due.length()").value(0));
-      attemptedDaysAgo(UNIT, "good", 5);                           // due 4 days ago
-      attemptedDaysAgo("ds.transactions.sagas.intro", "good", 1);  // due today
-      attemptedDaysAgo(PRIVATE_UNIT, "easy", 0);                   // due in 3 days
+      attemptedDaysAgo(UNIT, "good", 7);                           // due 4 days ago
+      attemptedDaysAgo("ds.transactions.sagas.intro", "good", 3);  // due today
+      attemptedDaysAgo(PRIVATE_UNIT, "good", 0);                   // due in 3 days
       attemptedDaysAgo("ds.transactions.old", "good", 30);         // retired: left out
 
       mvc.perform(as(get("/api/reviews"), TESTER))

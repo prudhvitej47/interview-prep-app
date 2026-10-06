@@ -31,21 +31,23 @@ class ReviewScheduleTest {
 
   @Test
   void goodReviewsClimbTheLadder() {
-    assertThat(gap("good")).isEqualTo(1);
-    assertThat(gap("good", "good")).isEqualTo(3);
-    assertThat(gap("good", "good", "good")).isEqualTo(7);
-    assertThat(gap("good", "good", "good", "good")).isEqualTo(16);
-    assertThat(gap("good", "good", "good", "good", "good")).isEqualTo(35);
+    assertThat(gap("good")).isEqualTo(3);
+    assertThat(gap("good", "good")).isEqualTo(7);
+    assertThat(gap("good", "good", "good")).isEqualTo(16);
+    assertThat(gap("good", "good", "good", "good")).isEqualTo(35);
+    assertThat(gap("good", "good", "good", "good", "good")).isEqualTo(75);
     // Past the top the gap roughly doubles.
-    assertThat(gap("good", "good", "good", "good", "good", "good")).isEqualTo(77);
+    assertThat(gap("good", "good", "good", "good", "good", "good")).isEqualTo(165);
   }
 
   @Test
   void easySkipsAStepHardRepeatsOneAgainStartsOver() {
-    assertThat(gap("easy")).isEqualTo(3);
-    assertThat(gap("good", "good", "hard")).isEqualTo(3);
-    assertThat(gap("hard")).isEqualTo(1);
-    assertThat(gap("good", "good", "good", "again")).isEqualTo(1);
+    assertThat(gap("easy")).isEqualTo(16);  // a first "easy" skips three rungs
+    assertThat(gap("good", "easy")).isEqualTo(16);  // later ones skip two: 3 -> 16
+    assertThat(gap("again", "easy")).isEqualTo(16);
+    assertThat(gap("good", "good", "hard")).isEqualTo(7);
+    assertThat(gap("hard")).isEqualTo(3);
+    assertThat(gap("good", "good", "good", "again")).isEqualTo(3);
   }
 
   @Test
