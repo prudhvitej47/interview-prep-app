@@ -13,7 +13,7 @@ const plan = {
   doneMinutes: 25,
   items: [
     { unitId: "dsa.window.concept", title: "Sliding window", type: "concept", day: 1, kind: "learn", minutes: 25,
-      reason: "Required every week: DSA; DSA is 30% of this week; you are at 2.0/5 in Sliding window.", done: true },
+      reason: "DSA is 30% of this week; you are at 2.0/5 in Sliding window.", done: true },
     { unitId: "db.sql.joins", title: "Unsettled payments", type: "sql", day: 3, kind: "learn", minutes: 20,
       reason: "Databases is 12% of this week.", done: false },
     { unitId: "ds.idem", title: "Idempotency keys", type: "concept", day: 3, kind: "review", minutes: 15,
@@ -130,7 +130,7 @@ describe("WeekPage", () => {
     show();
     const monday = (await screen.findByRole("heading", { name: heading(2026, 9, 28) })).closest("section")!;
     expect(within(monday).getByLabelText("done")).toBeInTheDocument();
-    expect(monday).toHaveTextContent("Required every week: DSA");
+    expect(monday).toHaveTextContent("DSA is 30% of this week");
     const wednesday = screen.getByRole("heading", { name: heading(2026, 9, 30) }).closest("section")!;
     expect(wednesday).toHaveTextContent("Review · 15 min");
     expect(screen.getByText(/25 of 389 goal minutes done/)).toBeInTheDocument();

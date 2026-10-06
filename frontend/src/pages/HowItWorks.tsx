@@ -39,9 +39,9 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         </p>
         <ul>
           <li>
-            It plans 90% of your hours, leaving room for a busy day. Reviews take up to a fifth of that, and
+            It plans 90% of your hours, leaving room for a busy day. Reviews take up to a tenth of that, and
             questions about <Link to="/projects">your own projects</Link> up to a tenth, before the areas share the
-            rest.
+            rest. Reviews that do not fit wait their turn and come first next week.
           </li>
           <li>
             Each area gets a share of the time from its <strong>weight</strong>, multiplied by how weak you are in
@@ -53,15 +53,16 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
             rank higher.
           </li>
           <li>
-            Every week mixes DSA with Java or Spring, databases or distributed systems, low-level design, system
-            design and a scenario or story. At most two long units (75 minutes or more) a week.
+            An area gets the share its weight says, so an area you weight at 50% gets about half of the learning
+            time. A small area gets a unit only when its turn comes and a unit short enough still fits, so it may
+            skip a week. At most two long units (75 minutes or more) a week.
           </li>
           <li>
-            Units you did not finish last week come back first, using up to 30% of the time, and each comes back
-            at most twice. After that it waits its turn like any other unit.
+            Units you did not finish last week go back into the pool at their full length and compete like any
+            other unit.
           </li>
           <li>
-            Project questions: those you did not rate last week come back first (sharing that 30%), then those due
+            Project questions: those you did not rate last week come back first, then those due
             for another rehearsal, then the next rungs of one project's ladder, finishing a project you have started
             before beginning another. Never two on one day, and at least one a week when a tenth of it has room for
             one.
@@ -122,14 +123,14 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         <h3 id="h-reviews">4. Marking it done, and reviews</h3>
         <p>
           At the bottom of a unit, say how it went. That marks it done and decides when it comes back for a short
-          review. Reviews space out roughly 1, 3, 7, 16 and 35 days, then keep stretching:
+          review. Reviews space out roughly 3, 7, 16, 35 and 75 days, then keep stretching:
         </p>
         <table>
           <tbody>
-            <tr><th>Again</th><td>You could not do it. Starts over: back tomorrow.</td></tr>
+            <tr><th>Again</th><td>You could not do it. Starts over: back in 3 days.</td></tr>
             <tr><th>Hard</th><td>Managed with effort or a peek. Same gap again.</td></tr>
             <tr><th>Good</th><td>Done with some thought. One step further out.</td></tr>
-            <tr><th>Easy</th><td>Straightforward. Two steps further out.</td></tr>
+            <tr><th>Easy</th><td>Straightforward. Two steps further out; a first Easy goes straight to 16 days.</td></tr>
           </tbody>
         </table>
         <p>Reviews that are due show at the top of the home page.</p>

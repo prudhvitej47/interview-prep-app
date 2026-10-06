@@ -66,7 +66,7 @@ class WeekPlannerTest {
 
   private static Plan plan(double hours, List<Candidate> units, List<DueReview> reviews) {
     return WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, hours, 1.0, domains(2.5), units, Set.of(),
-        reviews, Set.of(), List.of()));
+        reviews, Set.of()));
   }
 
   private static Set<String> units(Plan p) {
@@ -101,16 +101,37 @@ class WeekPlannerTest {
     assertThat(used).isBetween(486 - 30, 486);
   }
 
+  private static int learnMinutes(Plan p, String domainPrefix) {
+    return p.items().stream().filter(i -> i.kind().equals("learn"))
+        .filter(i -> domainPrefix == null || i.unitId().startsWith(domainPrefix))
+        .mapToInt(Item::minutes).sum();
+  }
+
   @Test
-  void everyRequiredGroupAppearsOnce() {
+  void aDomainGetsTheShareItsWeightPromises() {
     Plan p = plan(9, curriculum(), List.of());
-    assertThat(p.items()).anyMatch(i -> i.unitId().startsWith("dsa."));
-    assertThat(p.items()).anyMatch(i -> i.unitId().startsWith("java.") || i.unitId().startsWith("spring."));
-    assertThat(p.items()).anyMatch(i -> i.unitId().startsWith("lld."));
-    assertThat(p.items()).anyMatch(i -> i.unitId().startsWith("hld."));
-    assertThat(p.items()).anyMatch(i -> i.unitId().equals("beh.ladder") || i.unitId().equals("ds.scenario"));
-    assertThat(p.items()).filteredOn(i -> i.reason().startsWith("Required every week")).hasSize(6);
-    assertThat(p.notes()).isEmpty();
+    // The biggest DSA unit is 30 minutes, so the plan can be at most one unit away from the share.
+    double target = share(p, "dsa") / 100.0 * learnMinutes(p, null);
+    assertThat((double) learnMinutes(p, "dsa.")).isBetween(target - 30, target + 30);
+    assertThat(p.items()).noneMatch(i -> i.reason().startsWith("Required every week"));
+  }
+
+  @Test
+  void aHeavilyWeightedDomainIsNotSqueezedOutByTheSmallOnes() {
+    // A learner who put half her week on DSA, with a small week: six hours.
+    Map<String, Integer> weights = Map.ofEntries(
+        Map.entry("dsa", 50), Map.entry("java", 5), Map.entry("spring", 5), Map.entry("databases", 2),
+        Map.entry("data", 2), Map.entry("networking", 2), Map.entry("distributed", 5), Map.entry("cloud", 5),
+        Map.entry("lld", 5), Map.entry("hld", 10), Map.entry("agentic", 5), Map.entry("behavioral", 4));
+    List<Domain> ds = weights.entrySet().stream().sorted(Map.Entry.comparingByKey())
+        .map(e -> new Domain(e.getKey(), e.getKey().toUpperCase(), e.getValue(), 2.5)).toList();
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 6, 1.0, ds, curriculum(), Set.of(), List.of(),
+        Set.of()));
+    int learning = learnMinutes(p, null);
+    assertThat(share(p, "dsa")).isEqualTo(50);
+    assertThat(learnMinutes(p, "dsa.")).isGreaterThanOrEqualTo((int) (0.4 * learning));
+    assertThat(p.items().stream().filter(i -> i.unitId() != null && i.unitId().startsWith("dsa.")).count())
+        .isGreaterThanOrEqualTo(5);
   }
 
   @Test
@@ -150,24 +171,24 @@ class WeekPlannerTest {
   void aDonePrerequisiteUnlocksItsProblems() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 2, 1.0, domains(2.5),
         List.of(unit("dsa.window.p1", "dsa", "coding", 25, "dsa.window.concept")),
-        Set.of("dsa.window.concept"), List.of(), Set.of(), List.of()));
+        Set.of("dsa.window.concept"), List.of(), Set.of()));
     assertThat(units(p)).containsExactly("dsa.window.p1");
   }
 
   @Test
-  void reviewsComeFirstUpToAFifthOfTheWeekOldestFirstAndNotBeforeTheyAreDue() {
+  void reviewsComeFirstUpToATenthOfTheWeekOldestFirstAndNotBeforeTheyAreDue() {
     List<DueReview> due = new ArrayList<>();
     for (int i = 0; i < 12; i++) {
       due.add(new DueReview("done.r" + i, "concept", 30, MONDAY.plusDays(i % 7).minusDays(3)));
     }
     Plan p = plan(9, curriculum(), due);
     List<Item> reviews = p.items().stream().filter(i -> i.kind().equals("review")).toList();
-    assertThat(reviews.stream().mapToInt(Item::minutes).sum()).isLessThanOrEqualTo((int) (486 * 0.2));
-    assertThat(reviews).hasSize(6);
-    assertThat(p.notes()).anyMatch(n -> n.startsWith("6 due reviews did not fit"));
-    // The six overdue ones (Fri, Sat, Sun before this week) fill the allowance; those due this week wait.
-    assertThat(reviews).extracting(Item::unitId)
-        .containsExactlyInAnyOrder("done.r0", "done.r7", "done.r1", "done.r8", "done.r2", "done.r9");
+    assertThat(reviews.stream().mapToInt(Item::minutes).sum()).isLessThanOrEqualTo((int) (486 * 0.1));
+    // Each 30-minute concept is reviewed in 15, so three fit in 48 minutes.
+    assertThat(reviews).hasSize(3);
+    assertThat(p.notes()).anyMatch(n -> n.startsWith("9 due reviews did not fit"));
+    // The longest overdue come first (Friday's two, then Saturday's first); the rest wait in the queue.
+    assertThat(reviews).extracting(Item::unitId).containsExactlyInAnyOrder("done.r0", "done.r7", "done.r1");
     assertThat(reviews).allMatch(r -> r.reason().startsWith("Review overdue since"));
   }
 
@@ -183,7 +204,7 @@ class WeekPlannerTest {
     List<Domain> ds = new ArrayList<>(domains(2.5));
     ds.replaceAll(d -> d.id().equals("lld") ? new Domain("lld", "LLD", 10, 1.0)
         : d.id().equals("databases") ? new Domain("databases", "DB", 10, 4.5) : d);
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of(), List.of()));
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of()));
     int lld = share(p, "lld");
     int db = share(p, "databases");
     assertThat(lld).isGreaterThan(db);
@@ -192,10 +213,10 @@ class WeekPlannerTest {
   }
 
   @Test
-  void aWeightOfZeroRemovesADomainEvenFromTheRequiredGroups() {
+  void aWeightOfZeroRemovesADomain() {
     List<Domain> ds = new ArrayList<>(domains(2.5));
     ds.replaceAll(d -> d.id().equals("hld") ? new Domain("hld", "HLD", 0, 2.5) : d);
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of(), List.of()));
+    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, ds, curriculum(), Set.of(), List.of(), Set.of()));
     assertThat(p.items()).noneMatch(i -> i.unitId().startsWith("hld."));
     assertThat(p.shares()).noneMatch(s -> s.domainId().equals("hld"));
   }
@@ -215,19 +236,8 @@ class WeekPlannerTest {
   }
 
   @Test
-  void aBehaviouralQuestionFillsTheScenarioSlotWhenNoScenarioIsLeft() {
-    List<Candidate> units = new ArrayList<>(curriculum());
-    units.removeIf(u -> u.unitId().equals("beh.ladder") || u.unitId().equals("ds.scenario"));
-    units.add(unit("beh.disagreement", "behavioral", "question", 30));
-    Plan p = plan(9, units, List.of());
-    assertThat(item(p, "beh.disagreement").reason()).startsWith("Required every week: scenario, project or behavioural");
-    assertThat(p.notes()).isEmpty();
-  }
-
-  @Test
-  void whatIsMissingIsSaidNotHidden() {
+  void unplannedTimeIsSaidNotHidden() {
     Plan p = plan(9, List.of(unit("dsa.window.concept", "dsa", "concept", 30)), List.of());
-    assertThat(p.notes()).contains("No system design units to learn yet, so this week has none.");
     assertThat(p.notes()).anyMatch(n -> n.endsWith("minutes are unplanned: nothing else to learn is ready yet."));
   }
 
@@ -236,7 +246,7 @@ class WeekPlannerTest {
     Plan p = plan(9, curriculum(), List.of());
     assertThat(p.items()).allMatch(i -> i.reason().contains("% of this week") || i.kind().equals("review"));
     assertThat(item(p, "dsa.window.concept").reason())
-        .startsWith("Required every week: DSA; DSA is ").contains("you are at 2.5/5 in dsa topic");
+        .startsWith("DSA is ").contains("you are at 2.5/5 in dsa topic");
   }
 
   @Test
@@ -247,14 +257,14 @@ class WeekPlannerTest {
   @Test
   void onlyTheStudyDaysAreUsed() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 1, List.of(2, 4, 6), 6, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(), Set.of(), List.of()));
+        Set.of(), List.of(), Set.of()));
     assertThat(p.items()).allMatch(i -> Set.of(2, 4, 6).contains(i.day()));
   }
 
   @Test
   void aWeekFirstOpenedMidweekUsesOnlyTheDaysLeftAndShrinksToMatch() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 3, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(new DueReview("done.x", "concept", 30, MONDAY.minusDays(2))), Set.of(), List.of()));
+        Set.of(), List.of(new DueReview("done.x", "concept", 30, MONDAY.minusDays(2))), Set.of()));
     assertThat(p.items()).allMatch(i -> i.day() >= 3);
     assertThat(p.plannedMinutes()).isEqualTo((int) Math.round(486 * 5 / 7.0));
     assertThat(p.notes()).contains("Made mid-week, so it covers the 5 study days left.");
@@ -263,7 +273,7 @@ class WeekPlannerTest {
   @Test
   void aWeekWithNoStudyDaysLeftIsEmptyAndSaysSo() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 7, List.of(1, 2, 3), 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(), Set.of(), List.of()));
+        Set.of(), List.of(), Set.of()));
     assertThat(p.items()).isEmpty();
     assertThat(p.notes()).containsExactly("No study days are left this week; the next plan starts on Monday.");
   }
@@ -271,39 +281,8 @@ class WeekPlannerTest {
   @Test
   void aUnitPlacedNowComesFirstWhateverItsArea() {
     Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(), Set.of("agentic.u4"), List.of()));
+        Set.of(), List.of(), Set.of("agentic.u4")));
     assertThat(item(p, "agentic.u4").reason()).startsWith("You chose to start it now");
-  }
-
-  @Test
-  void lastWeeksUnfinishedItemsComeFirstUpToTheirShare() {
-    // Three items left over; together they need more than 30% of a 3-hour week (162 minutes: 48 allowed).
-    List<String> leftOver = List.of("java.u1", "spring.u1", "databases.u1");
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 3, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(), Set.of(), leftOver));
-    assertThat(item(p, "java.u1").reason()).startsWith("Carried over from last week");
-    long carried = p.items().stream().filter(i -> i.reason().startsWith("Carried over")).count();
-    assertThat(carried).isEqualTo(1);  // 30 + 30 > 48, so only the first fits
-    assertThat(p.notes()).anyMatch(n -> n.startsWith("2 unfinished items from last week did not fit"));
-  }
-
-  @Test
-  void aCarriedItemThatIsNoLongerACandidateIsSkippedQuietly() {
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(),
-        Set.of(), List.of(), Set.of(), List.of("done.elsewhere", "java.u2")));
-    assertThat(item(p, "java.u2").reason()).startsWith("Carried over from last week");
-    assertThat(p.notes()).noneMatch(n -> n.contains("unfinished"));
-  }
-
-  @Test
-  void aCarriedProblemStillWaitsForItsConcept() {
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5),
-        List.of(unit("dsa.window.p1", "dsa", "coding", 25, "dsa.window.concept"),
-            unit("dsa.window.concept", "dsa", "concept", 30)),
-        Set.of(), List.of(), Set.of(), List.of("dsa.window.p1")));
-    // Not ready when the carry-over runs, so it is not carried; it still lands after its concept.
-    assertThat(item(p, "dsa.window.p1").reason()).doesNotStartWith("Carried over");
-    assertThat(item(p, "dsa.window.p1").day()).isGreaterThanOrEqualTo(item(p, "dsa.window.concept").day());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -335,7 +314,7 @@ class WeekPlannerTest {
   private static Plan withProjects(double hours, int fromDay, List<Integer> days, List<ProjectQuestion> qs,
       List<Long> carried) {
     return WeekPlanner.plan(new Input(MONDAY, fromDay, days, hours, 1.0, domains(2.5), curriculum(), Set.of(),
-        List.of(), Set.of(), List.of(), qs, carried));
+        List.of(), Set.of(), qs, carried));
   }
 
   private static List<Item> projectItems(Plan p) {
@@ -350,7 +329,7 @@ class WeekPlannerTest {
   void aLearnerWithNoProjectsGetsExactlyThePlanTheyGotBefore() {
     Plan before = plan(9, curriculum(), List.of(new DueReview("done.x", "concept", 30, MONDAY)));
     Plan now = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 9, 1.0, domains(2.5), curriculum(), Set.of(),
-        List.of(new DueReview("done.x", "concept", 30, MONDAY)), Set.of(), List.of(), List.of(), List.of()));
+        List.of(new DueReview("done.x", "concept", 30, MONDAY)), Set.of(), List.of(), List.of()));
     assertThat(now).isEqualTo(before);
     assertThat(projectItems(now)).isEmpty();
     assertThat(now.notes()).noneMatch(n -> n.contains("project question") || n.contains("your projects"));
@@ -456,15 +435,12 @@ class WeekPlannerTest {
   }
 
   @Test
-  void carriedQuestionsShareTheCarryOverShareWithLearning() {
-    // 3 hours: 162 planned, 48 minutes of carry-over. A carried 15-minute question leaves 33,
-    // so only one of the two 30-minute units still fits.
-    List<ProjectQuestion> qs = ladder(100, 1, "Example ledger", 0, 2);
-    Plan p = WeekPlanner.plan(new Input(MONDAY, 1, EVERY_DAY, 3, 1.0, domains(2.5), curriculum(), Set.of(),
-        List.of(), Set.of(), List.of("java.u1", "spring.u1"), qs, List.of(100L)));
+  void carriedQuestionsAreBoundedByTheProjectShareAndTheRestAreCounted() {
+    // 3 hours: 162 planned, 16 minutes for projects: one of three carried 15-minute questions fits.
+    List<ProjectQuestion> qs = ladder(100, 1, "Example ledger", 0, 3);
+    Plan p = withProjects(3, 1, EVERY_DAY, qs, List.of(100L, 101L, 102L));
     assertThat(questionIds(p)).containsExactly(100L);
-    assertThat(p.items()).filteredOn(i -> i.reason().startsWith("Carried over")).hasSize(2);
-    assertThat(p.notes()).anyMatch(n -> n.startsWith("1 unfinished item from last week did not fit"));
+    assertThat(p.notes()).anyMatch(n -> n.startsWith("2 unrated project questions from last week did not fit"));
   }
 
   @Test

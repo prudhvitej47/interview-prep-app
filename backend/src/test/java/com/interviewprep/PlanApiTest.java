@@ -387,25 +387,20 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
-  void unfinishedItemsFromTheLastPlanAreCarriedAndAtMostTwice() throws Exception {
-    // Plenty of time, so every unit is planned: the test is about which ones are marked as carried over.
+  void unfinishedItemsFromTheLastPlanGetNoCarryOverPriority() throws Exception {
+    // Plenty of time, so every unit is planned: the test is about how they are marked.
     send(put("/api/me/week"), TESTER, "{\"hoursPerWeek\": 40, \"studyDays\": [1, 2, 3, 4, 5, 6, 7], \"weights\": {}}");
-    // Two weeks ago: db.sql.joins planned; last week carried once already. dsa.window.concept was done since.
-    earlierPlan(monday.minusWeeks(2), "db.sql.joins", "Databases is 40% of this week.",
-        "dsa.window.p1", "Carried over from last week; DSA is 60% of this week.");
-    earlierPlan(monday.minusWeeks(1), "db.sql.joins", "Carried over from last week; Databases is 40%.",
+    earlierPlan(monday.minusWeeks(1), "db.sql.joins", "Databases is 40% of this week.",
         "dsa.window.concept", "DSA is 60% of this week.",
-        "dsa.window.p1", "Carried over from last week; DSA is 60% of this week.");
+        "dsa.window.p1", "DSA is 60% of this week.");
     send(post("/api/units/dsa.window.concept/attempts"), TESTER, "{\"rating\": \"good\"}");
 
     mvc.perform(as(get("/api/plan"), TESTER))
-        // Carried once so far: carried again.
-        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')].reason",
-            hasItem(startsWith("Carried over from last week"))))
-        // Carried twice already: back to the normal ranking (still planned, but not as a carry-over).
-        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'dsa.window.p1')].reason",
+        // Unfinished: back in the pool, planned on rank and share, not marked as carried over.
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isNotEmpty())
+        .andExpect(jsonPath("$.plan.items[?(@.kind == 'learn')].reason",
             org.hamcrest.Matchers.not(hasItem(startsWith("Carried over")))))
-        // Done since: now a review, not carried learning.
+        // Done since: no longer learning.
         .andExpect(jsonPath("$.plan.items[?(@.unitId == 'dsa.window.concept' && @.kind == 'learn')]").isEmpty());
   }
 }
