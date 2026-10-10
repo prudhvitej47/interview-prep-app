@@ -216,6 +216,45 @@ describe("WeekPage", () => {
     expect(await screen.findByText(/Goal met: this week counts towards your streak/)).toBeInTheDocument();
   });
 
+  it("offers more for today once the whole plan is done, without touching the goal", async () => {
+    const finished = { ...plan, doneMinutes: 60, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
+    const extra = { unitId: "db.sql.groupby", title: "Group by", type: "sql", day: 3, kind: "learn", minutes: 20,
+      reason: "Added after you finished early; Databases is 12% of this week.", done: false };
+    const fetchMock = mockFetch({
+      "/api/plan": { body: week(finished) },
+      "/api/plan/extra": { body: week({ ...finished, items: [...finished.items, extra], canAddMore: false }) },
+    });
+    show();
+    const offer = await screen.findByRole("group", { name: "Add more to today" });
+    expect(offer).toHaveTextContent("Finished this week's plan early?");
+    fireEvent.click(within(offer).getByRole("button", { name: "60 min" }));
+
+    expect(await screen.findByRole("link", { name: "Group by" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Add more to today" })).not.toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe("/api/plan/extra");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(init!.body as string)).toEqual({ minutes: 60 });
+    expect(screen.getByText(/60 of 389 goal minutes done/)).toBeInTheDocument();
+  });
+
+  it("offers nothing more while the plan has items to do", async () => {
+    mockFetch({ "/api/plan": { body: week({ ...plan, canAddMore: false }) } });
+    show();
+    await screen.findByRole("link", { name: "Sliding window" });
+    expect(screen.queryByText(/Finished this week's plan early/)).toBeNull();
+  });
+
+  it("says so when more could not be added, and lets the learner try again", async () => {
+    const finished = { ...plan, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
+    mockFetch({ "/api/plan": { body: week(finished) }, "/api/plan/extra": { status: 409, body: {} } });
+    show();
+    const offer = await screen.findByRole("group", { name: "Add more to today" });
+    fireEvent.click(within(offer).getByRole("button", { name: "30 min" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save that (409)");
+    expect(within(offer).getByRole("button", { name: "30 min" })).toBeEnabled();
+  });
+
   it("takes a future week off", async () => {
     const breaks = { thisWeek: false, upcoming: [
       { weekStart: "2026-10-05", taken: false, available: true },

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
-  fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, previewShares, rateTopics, saveWeekSettings, takeBreak,
+  addMore, fetchBreaks, fetchDomains, fetchWeek, giveBackBreak, previewShares, rateTopics, saveWeekSettings, takeBreak,
   type Breaks, type Domain, type PlanView, type ShareDetail, type Week, type WeekSettings,
 } from "../api";
 import { formatDay } from "../unit/ProgressPanel";
@@ -65,7 +65,7 @@ export function WeekPage() {
         />
       ) : (
         <>
-          <Plan plan={week.plan} weekStart={week.weekStart} />
+          <Plan plan={week.plan} weekStart={week.weekStart} onAdded={setWeek} />
           <TopicCard plan={week.plan} />
           <p>
             <button ref={change} className="link" onClick={() => setEditing(true)}>Change my hours, days or weights</button>
@@ -77,7 +77,7 @@ export function WeekPage() {
   );
 }
 
-function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
+function Plan({ plan, weekStart, onAdded }: { plan: PlanView; weekStart: string; onAdded: (w: Week) => void }) {
   const days = [...new Set(plan.items.map((i) => i.day))].sort();
   const percent = plan.goalMinutes === 0 ? 0 : Math.min(100, Math.round((plan.doneMinutes / plan.goalMinutes) * 100));
   const projectMinutes = plan.items.filter((i) => i.kind === "project").reduce((sum, i) => sum + i.minutes, 0);
@@ -95,6 +95,7 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
           for a bad day). An item counts once you mark it done or record its review
           {projectMinutes > 0 && ", and a project question once you rate it"}.
         </p>
+        {plan.canAddMore && <AddMore onAdded={onAdded} />}
       </section>
 
       {plan.items.length === 0 && <p>Nothing to plan yet: the curriculum has no units ready for you.</p>}
@@ -141,6 +142,39 @@ function Plan({ plan, weekStart }: { plan: PlanView; weekStart: string }) {
           <ul>{plan.notes.map((n) => <li key={n} className="hint">{n}</li>)}</ul>
         )}
       </details>
+    </>
+  );
+}
+
+/**
+ * Offered once every item is done. Extras land on today and leave the week's planned minutes and
+ * goal as they are, so finishing early never makes the week look worse.
+ */
+function AddMore({ onAdded }: { onAdded: (w: Week) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function add(minutes: 30 | 60 | 90) {
+    setSaving(true);
+    setError(null);
+    try {
+      onAdded(await addMore(minutes));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="note-actions add-more" role="group" aria-label="Add more to today">
+        <span>Finished this week's plan early? Add more for today:</span>
+        {([30, 60, 90] as const).map((m) => (
+          <button key={m} className="secondary" disabled={saving} onClick={() => add(m)}>{m} min</button>
+        ))}
+      </div>
+      {error && <p role="alert">{error}</p>}
     </>
   );
 }
@@ -280,7 +314,7 @@ function SettingsForm({ initial, firstTime, onSaved, onCancel }: {
         <button type="submit" disabled={!valid || saving}>{firstTime ? "Plan my week" : "Save and rebuild this week"}</button>
         {onCancel && <button type="button" className="secondary" onClick={onCancel}>Cancel</button>}
       </div>
-      {!firstTime && <p className="hint">Rebuilding keeps everything you have done; only the plan is redrawn.</p>}
+      {!firstTime && <p className="hint">Rebuilding keeps what you have done this week; only the rest of the plan is redrawn.</p>}
       {error && <p role="alert">{error}</p>}
     </form>
   );

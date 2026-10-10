@@ -248,6 +248,7 @@ summary:hover { text-decoration: underline; }
 .progress h4 { margin: 0 0 0.3rem; }
 .answer label { display: block; font-weight: 600; margin-bottom: 0.3rem; }
 .my-projects .note-actions { flex-wrap: wrap; margin: 1rem 0; }
+.add-more { flex-wrap: wrap; gap: 0.5rem 1rem; }
 .import-result p { margin: 0.4rem 0; }
 
 .practice textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
