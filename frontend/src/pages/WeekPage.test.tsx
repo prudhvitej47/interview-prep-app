@@ -247,11 +247,12 @@ describe("WeekPage", () => {
 
   it("says so when more could not be added, and lets the learner try again", async () => {
     const finished = { ...plan, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
-    mockFetch({ "/api/plan": { body: week(finished) }, "/api/plan/extra": { status: 409, body: {} } });
+    mockFetch({ "/api/plan": { body: week(finished) },
+      "/api/plan/extra": { status: 409, body: { problems: ["Nothing else to learn fits in 30 minutes."] } } });
     show();
     const offer = await screen.findByRole("group", { name: "Add more to today" });
     fireEvent.click(within(offer).getByRole("button", { name: "30 min" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save that (409)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Nothing else to learn fits in 30 minutes.");
     expect(within(offer).getByRole("button", { name: "30 min" })).toBeEnabled();
   });
 

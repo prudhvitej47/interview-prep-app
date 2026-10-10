@@ -227,7 +227,16 @@ export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
  * minutes or goal; done, it still counts.
  */
 export async function addMore(minutes: 30 | 60 | 90): Promise<Week> {
-  return (await send("POST", "/api/plan/extra", { minutes })).json();
+  const response = await fetch("/api/plan/extra", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ minutes }),
+  });
+  if (response.ok) return response.json();
+  // 400 and 409 say why in words, as the projects pages' refusals do.
+  const why = response.status === 400 || response.status === 409
+    ? ((await response.json()) as { problems?: string[] }).problems?.join(" ") : undefined;
+  throw new Error(why || `Could not add more (${response.status})`);
 }
 
 /** Each area's share of the week with these weight overrides, exactly as the next plan would use it. */

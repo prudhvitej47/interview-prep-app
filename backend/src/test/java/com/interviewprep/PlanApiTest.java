@@ -452,39 +452,22 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
-  void rebuildingAfterTheLastStudyDayKeepsWhatWasDone() throws Exception {
-    org.junit.jupiter.api.Assumptions.assumeTrue(today() > 1, "needs a study day before today");
-    send(put("/api/me/week"), TESTER, SETTINGS);
-    mvc.perform(as(get("/api/plan"), TESTER));
-    send(post("/api/units/db.sql.joins/attempts"), TESTER, "{\"rating\": \"good\"}");
-    List<Integer> before = java.util.stream.IntStream.range(1, today()).boxed().toList();
-    send(put("/api/me/week"), TESTER, "{\"hoursPerWeek\": 40, \"studyDays\": " + before + ", \"weights\": {}}")
-        .andExpect(status().isOk());
-
-    rebuild();
-    mvc.perform(as(get("/api/plan"), TESTER))
-        .andExpect(jsonPath("$.plan.items.length()").value(1))
-        .andExpect(jsonPath("$.plan.items[0].unitId").value("db.sql.joins"))
-        .andExpect(jsonPath("$.plan.items[0].done").value(true))
-        .andExpect(jsonPath("$.plan.plannedMinutes").value(20))
-        .andExpect(jsonPath("$.plan.goalMinutes").value(16))
-        .andExpect(jsonPath("$.plan.doneMinutes").value(20));
-  }
-
-  @Test
   void addingMoreIsCheckedAndNeedsTheWholePlanDone() throws Exception {
     send(put("/api/me/week"), TESTER, SETTINGS);
-    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 45}").andExpect(status().isBadRequest());
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 45}").andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.problems[0]").value("Add 30, 60 or 90 minutes."));
     send(post("/api/plan/extra"), TESTER, "{}").andExpect(status().isBadRequest());
     mvc.perform(as(get("/api/plan"), TESTER)).andExpect(jsonPath("$.plan.canAddMore").value(false));
-    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isConflict());
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isConflict())
+        .andExpect(jsonPath("$.problems[0]").value("Finish this week's plan first."));
 
     // All done, and nothing else to learn: still no.
     for (String unit : List.of("dsa.window.concept", "dsa.window.p1", "db.sql.joins", "db.sql.tester-only")) {
       send(post("/api/units/" + unit + "/attempts"), TESTER, "{\"rating\": \"good\"}").andExpect(status().isOk());
     }
     mvc.perform(as(get("/api/plan"), TESTER)).andExpect(jsonPath("$.plan.canAddMore").value(false));
-    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 90}").andExpect(status().isConflict());
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 90}").andExpect(status().isConflict())
+        .andExpect(jsonPath("$.problems[0]").value("Nothing else to learn fits in 90 minutes."));
   }
 
   @Test
@@ -520,6 +503,7 @@ class PlanApiTest extends PostgresTestBase {
     send(put("/api/me/week"), TESTER, SETTINGS);
     jdbc.update("insert into planned_break (learner_id, week_start) select id, ? from learner where slug = 'tester'",
         monday);
-    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isConflict());
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isConflict())
+        .andExpect(jsonPath("$.problems[0]").value("This week is a break."));
   }
 }

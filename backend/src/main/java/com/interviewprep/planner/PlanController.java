@@ -22,6 +22,7 @@ import com.interviewprep.progress.ProgressQueries.Attempt;
 import com.interviewprep.projects.ProjectPlanning;
 import com.interviewprep.projects.ProjectPlanning.QuestionRef;
 import com.interviewprep.projects.ProjectPlanning.Rated;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -75,8 +77,9 @@ class PlanController {
   private final PlanQueries plans;
   private final PlacementService placements;
   private final ProjectPlanning projects;
+  private final Clock clock;
 
-  PlanController(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
+  PlanController(Clock clock, NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
       CurriculumQueries curriculum, DomainCatalog domains, LearnerProfile profile,
       ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans,
       PlacementService placements, ProjectPlanning projects) {
@@ -91,6 +94,12 @@ class PlanController {
     this.plans = plans;
     this.placements = placements;
     this.projects = projects;
+    this.clock = clock;
+  }
+
+  /** Today in India time, from the clock a test can fix. */
+  private LocalDate today() {
+    return LocalDate.now(clock.withZone(STUDY_ZONE));
   }
 
   /**
@@ -128,7 +137,7 @@ class PlanController {
 
   @GetMapping("/api/plan")
   Week thisWeek(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = PlanQueries.thisMonday();
+    LocalDate monday = PlanQueries.mondayOf(today());
     WeekSettings settings = profile.week(me.id());
     if (plans.breaks(me.id()).contains(monday)) {
       return new Week(monday, settings, null, true);
@@ -191,7 +200,7 @@ class PlanController {
    */
   @DeleteMapping("/api/plan")
   void rebuild(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = PlanQueries.thisMonday();
+    LocalDate monday = PlanQueries.mondayOf(today());
     WeekSettings settings = profile.week(me.id());
     Long planId = planId(me, monday);
     List<Kept> kept = planId == null || !settings.complete() || plans.breaks(me.id()).contains(monday)
@@ -206,6 +215,13 @@ class PlanController {
 
   record ExtraRequest(Integer minutes) {}
 
+  /** Why a request was refused, in words the page shows as they are (as the projects pages do). */
+  record Problems(List<String> problems) {}
+
+  private static ResponseEntity<Problems> refused(HttpStatus status, String why) {
+    return ResponseEntity.status(status).body(new Problems(List.of(why)));
+  }
+
   private static final Set<Integer> EXTRA_MINUTES = Set.of(30, 60, 90);
 
   /**
@@ -213,30 +229,30 @@ class PlanController {
    * are not added to the plan or its goal (see {@link WeekPlanner#extra}).
    */
   @PostMapping("/api/plan/extra")
-  Week addMore(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody ExtraRequest body) {
+  ResponseEntity<?> addMore(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody ExtraRequest body) {
     if (body == null || body.minutes() == null || !EXTRA_MINUTES.contains(body.minutes())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minutes must be one of " + EXTRA_MINUTES);
+      return refused(HttpStatus.BAD_REQUEST, "Add 30, 60 or 90 minutes.");
     }
-    LocalDate monday = PlanQueries.thisMonday();
+    LocalDate monday = PlanQueries.mondayOf(today());
     WeekSettings settings = profile.week(me.id());
     if (plans.breaks(me.id()).contains(monday)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "This week is a break.");
+      return refused(HttpStatus.CONFLICT, "This week is a break.");
     }
     Long planId = planId(me, monday);
     if (planId == null || !settings.complete()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "There is no plan this week yet.");
+      return refused(HttpStatus.CONFLICT, "There is no plan this week yet.");
     }
-    transaction.executeWithoutResult(status -> {
+    // Nothing is written before a refusal, so returning one needs no rollback.
+    String refusal = transaction.execute(status -> {
       // Locked, so a second click waits and then finds the first one's items not done yet.
       jdbc.query("select id from week_plan where id = :plan for update", new MapSqlParameterSource("plan", planId),
           rs -> {});
       if (!allDone(view(me, planId, monday, settings))) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Finish this week's plan first.");
+        return "Finish this week's plan first.";
       }
       List<Item> extra = extra(me, planId, settings, body.minutes());
       if (extra.isEmpty()) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT,
-            "Nothing else to learn fits in " + body.minutes() + " minutes.");
+        return "Nothing else to learn fits in " + body.minutes() + " minutes.";
       }
       for (Item item : extra) {
         jdbc.update("insert into plan_item (plan_id, unit_id, day, kind, minutes, reason, sort_order)"
@@ -246,8 +262,9 @@ class PlanController {
                 .addValue("day", item.day()).addValue("kind", item.kind()).addValue("minutes", item.minutes())
                 .addValue("reason", item.reason()));
       }
+      return null;
     });
-    return thisWeek(me);
+    return refusal != null ? refused(HttpStatus.CONFLICT, refusal) : ResponseEntity.ok(thisWeek(me));
   }
 
   private static boolean allDone(PlanView plan) {
@@ -256,7 +273,7 @@ class PlanController {
 
   /** What {@link WeekPlanner#extra} would add to this plan in {@code minutes}, placed on today. */
   private List<Item> extra(LearnerPrincipal me, long planId, WeekSettings settings, int minutes) {
-    Pool pool = pool(me, PlanQueries.thisMonday(), Set.of());
+    Pool pool = pool(me, PlanQueries.mondayOf(today()), Set.of());
     Map<String, PlannableUnit> units = new HashMap<>();
     curriculum.plannable(me.slug()).forEach(u -> units.put(u.id(), u));
     Set<String> inPlan = new HashSet<>();
@@ -274,7 +291,7 @@ class PlanController {
             }
           }
         });
-    int today = LocalDate.now(STUDY_ZONE).getDayOfWeek().getValue();
+    int today = today().getDayOfWeek().getValue();
     return WeekPlanner.extra(new WeekPlanner.Extra(today, minutes, planDomains(settings, pool.strength()),
         pool.candidates(), pool.byUnit().keySet(), inPlan, assigned, heavy[0]));
   }
@@ -348,7 +365,7 @@ class PlanController {
     Set<Long> keptQuestions = new HashSet<>();
     int keptMinutes = 0;
     int keptToday = 0;
-    LocalDate today = LocalDate.now(STUDY_ZONE);
+    LocalDate today = today();
     for (Kept k : kept) {
       if (k.item().unitId() != null) {
         keptUnits.add(k.item().unitId());
