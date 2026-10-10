@@ -123,11 +123,14 @@ class PlanController {
   record TopicToRate(String topicId, String name, String domainName, int currentGuess) {}
 
   /**
-   * {@code canAddMore}: every item is done and there is something left to learn that fits the
-   * largest extra, so the page can offer one.
+   * {@code allDone}: every planned item is done (extras aside), the week's "whole plan done", which
+   * its items can reach below {@code plannedMinutes} when nothing else fitted the budget.
+   * {@code canAddMore}: every item, extras too, is done and there is something left to learn that
+   * fits the largest extra, so the page can offer one.
    */
   record PlanView(int plannedMinutes, int goalMinutes, int doneMinutes, List<ItemView> items,
-      List<Share> shares, List<String> notes, List<TopicToRate> topicsToRate, boolean canAddMore) {}
+      List<Share> shares, List<String> notes, List<TopicToRate> topicsToRate, boolean allDone,
+      boolean canAddMore) {}
 
   /**
    * {@code plan} is null until the learner has said how much time they have and on which days, and
@@ -247,7 +250,7 @@ class PlanController {
       // Locked, so a second click waits and then finds the first one's items not done yet.
       jdbc.query("select id from week_plan where id = :plan for update", new MapSqlParameterSource("plan", planId),
           rs -> {});
-      if (!allDone(view(me, planId, monday, settings))) {
+      if (!everyItemDone(view(me, planId, monday, settings))) {
         return "Finish this week's plan first.";
       }
       List<Item> extra = extra(me, planId, settings, body.minutes());
@@ -267,7 +270,7 @@ class PlanController {
     return refusal != null ? refused(HttpStatus.CONFLICT, refusal) : ResponseEntity.ok(thisWeek(me));
   }
 
-  private static boolean allDone(PlanView plan) {
+  private static boolean everyItemDone(PlanView plan) {
     return !plan.items().isEmpty() && plan.items().stream().allMatch(ItemView::done);
   }
 
@@ -371,6 +374,9 @@ class PlanController {
         keptUnits.add(k.item().unitId());
       } else {
         keptQuestions.add(k.item().projectQuestionId());
+      }
+      if (k.item().reason().startsWith(WeekPlanner.EXTRA)) {
+        continue;  // an extra stays an extra: it never adds to the week's planned minutes
       }
       keptMinutes += k.item().minutes();
       if (k.doneOn().equals(today)) {
@@ -619,11 +625,13 @@ class PlanController {
         s.path("name").asString(), s.path("percent").asInt())));
     List<String> notes = new ArrayList<>();
     header.rationale().path("notes").forEach(n -> notes.add(n.asString()));
-    boolean allDone = !items.isEmpty() && items.stream().allMatch(ItemView::done);
+    List<ItemView> planned = items.stream().filter(i -> !i.reason().startsWith(WeekPlanner.EXTRA)).toList();
+    boolean allDone = !planned.isEmpty() && planned.stream().allMatch(ItemView::done);
     // Only worked out once everything is done: the common case pays nothing for it.
-    boolean canAddMore = allDone && !extra(me, planId, settings, Collections.max(EXTRA_MINUTES)).isEmpty();
+    boolean canAddMore = allDone && items.stream().allMatch(ItemView::done)
+        && !extra(me, planId, settings, Collections.max(EXTRA_MINUTES)).isEmpty();
     return new PlanView(header.planned(), header.goal(), doneMinutes, items, shares, notes,
-        topicsToRate(me, learnUnits), canAddMore);
+        topicsToRate(me, learnUnits), allDone, canAddMore);
   }
 
   /**

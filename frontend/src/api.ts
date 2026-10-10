@@ -197,6 +197,8 @@ export type PlanView = {
   shares: { domainId: string; name: string; percent: number }[];
   notes: string[];
   topicsToRate: { topicId: string; name: string; domainName: string; currentGuess: number }[];
+  /** Every planned item is done; extras added after finishing early do not count either way. */
+  allDone?: boolean;
   /** Every item is done and there is more to learn that fits: the page offers extras. */
   canAddMore?: boolean;
 };

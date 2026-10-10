@@ -506,4 +506,69 @@ class PlanApiTest extends PostgresTestBase {
     send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isConflict())
         .andExpect(jsonPath("$.problems[0]").value("This week is a break."));
   }
+
+  @Autowired private com.interviewprep.planner.PlanQueries planQueries;
+
+  private com.interviewprep.planner.PlanQueries.WeekResult thisWeeksResult() {
+    long learner = jdbc.queryForObject("select id from learner where slug = 'tester'", Long.class);
+    return planQueries.results(learner).getLast();
+  }
+
+  @Test
+  void aWeekIsAllDoneWhenEveryPlannedItemIsEvenBelowItsBudget() throws Exception {
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    var before = week();
+    int itemMinutes = before.read("$.plan.items[*].minutes", List.class).stream().mapToInt(m -> (Integer) m).sum();
+    // Nothing else fitted: the four units come to far less than the hours allow.
+    assertThat(itemMinutes).isLessThan(before.read("$.plan.plannedMinutes", Integer.class));
+    for (String unit : List.of("dsa.window.concept", "dsa.window.p1", "db.sql.joins", "db.sql.tester-only")) {
+      send(post("/api/units/" + unit + "/attempts"), TESTER, "{\"rating\": \"good\"}");
+    }
+    mvc.perform(as(get("/api/plan"), TESTER)).andExpect(jsonPath("$.plan.allDone").value(true));
+    assertThat(thisWeeksResult().allDone()).isTrue();
+    assertThat(thisWeeksResult().done()).isEqualTo(itemMinutes);
+  }
+
+  @Test
+  void extrasDoneDoNotMakeTheWeekAllDoneWhileAPlannedItemIsNot() throws Exception {
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    mvc.perform(as(get("/api/plan"), TESTER));
+    for (String unit : List.of("dsa.window.concept", "dsa.window.p1", "db.sql.joins", "db.sql.tester-only")) {
+      send(post("/api/units/" + unit + "/attempts"), TESTER, "{\"rating\": \"good\"}");
+    }
+    long release = jdbc.queryForObject("select id from curriculum_release", Long.class);
+    unit("db.sql.groupby", "db.sql", "sql", 20, "shared", release);
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isOk());
+    send(post("/api/units/db.sql.groupby/attempts"), TESTER, "{\"rating\": \"good\"}");
+    // Taking back a planned item: the extra's minutes still count as done, but the plan is not all done.
+    mvc.perform(as(delete("/api/units/db.sql.joins/attempts/latest"), TESTER).with(RealCsrf.token(mvc, TESTER)))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.allDone").value(false))
+        .andExpect(jsonPath("$.plan.doneMinutes").value(105));
+    assertThat(thisWeeksResult().allDone()).isFalse();
+    assertThat(thisWeeksResult().done()).isEqualTo(105);
+  }
+
+  @Test
+  void rebuildingKeepsADoneExtraWithoutAddingItToThePlannedMinutes() throws Exception {
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    int planned = week().read("$.plan.plannedMinutes", Integer.class);
+    for (String unit : List.of("dsa.window.concept", "dsa.window.p1", "db.sql.joins", "db.sql.tester-only")) {
+      send(post("/api/units/" + unit + "/attempts"), TESTER, "{\"rating\": \"good\"}");
+    }
+    long release = jdbc.queryForObject("select id from curriculum_release", Long.class);
+    unit("db.sql.groupby", "db.sql", "sql", 20, "shared", release);
+    send(post("/api/plan/extra"), TESTER, "{\"minutes\": 30}").andExpect(status().isOk());
+    send(post("/api/units/db.sql.groupby/attempts"), TESTER, "{\"rating\": \"good\"}");
+
+    rebuild();
+    // The four planned units were done today and fit today's share; the extra adds nothing.
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.plannedMinutes").value(planned))
+        .andExpect(jsonPath("$.plan.doneMinutes").value(125))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.groupby')].reason",
+            hasItem(startsWith("Added after you finished early"))))
+        .andExpect(jsonPath("$.plan.allDone").value(true));
+  }
 }

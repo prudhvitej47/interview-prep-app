@@ -54,7 +54,8 @@ import java.util.function.ToDoubleFunction;
  *
  * <p><b>Finished early</b>: {@link #extra} adds learning on today, by the same shares and rules. Its
  * minutes are not added to the plan or its goal, so finishing early can never lower the week's
- * score, the next week's size or a reward; done, they still count as done minutes.
+ * score, the next week's size or a reward; done, they still count as done minutes. Their reason
+ * starts with {@link #EXTRA}, which keeps them out of "the whole plan is done" too.
  *
  * <p>Not yet, and why: the company factor (no target companies are captured yet), the catch-up
  * factor (needs weeks of plans first), progressive difficulty from solve history (F5), interview

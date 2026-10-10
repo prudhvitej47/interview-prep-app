@@ -81,13 +81,15 @@ function Plan({ plan, weekStart, onAdded }: { plan: PlanView; weekStart: string;
   const days = [...new Set(plan.items.map((i) => i.day))].sort();
   const percent = plan.goalMinutes === 0 ? 0 : Math.min(100, Math.round((plan.doneMinutes / plan.goalMinutes) * 100));
   const projectMinutes = plan.items.filter((i) => i.kind === "project").reduce((sum, i) => sum + i.minutes, 0);
+  // Kept here, not in the offer: a refusal reloads the week, which can take the offer away.
+  const [addError, setAddError] = useState<string | null>(null);
   return (
     <>
       <section className="goal" aria-label="This week's goal">
         <div className="bar"><div style={{ width: `${percent}%` }} /></div>
         {plan.goalMinutes > 0 && plan.doneMinutes >= plan.goalMinutes && (
           <p className="verdict right" role="status">
-            ✓ Goal met: this week counts towards your streak{plan.doneMinutes >= plan.plannedMinutes && ", and the whole plan is done"}.
+            ✓ Goal met: this week counts towards your streak{plan.allDone && ", and the whole plan is done"}.
           </p>
         )}
         <p className="hint">
@@ -95,7 +97,8 @@ function Plan({ plan, weekStart, onAdded }: { plan: PlanView; weekStart: string;
           for a bad day). An item counts once you mark it done or record its review
           {projectMinutes > 0 && ", and a project question once you rate it"}.
         </p>
-        {plan.canAddMore && <AddMore onAdded={onAdded} />}
+        {plan.canAddMore && <AddMore onAdded={onAdded} onError={setAddError} />}
+        {addError && <p role="alert">{addError}</p>}
       </section>
 
       {plan.items.length === 0 && <p>Nothing to plan yet: the curriculum has no units ready for you.</p>}
@@ -150,17 +153,18 @@ function Plan({ plan, weekStart, onAdded }: { plan: PlanView; weekStart: string;
  * Offered once every item is done. Extras land on today and leave the week's planned minutes and
  * goal as they are, so finishing early never makes the week look worse.
  */
-function AddMore({ onAdded }: { onAdded: (w: Week) => void }) {
+function AddMore({ onAdded, onError }: { onAdded: (w: Week) => void; onError: (message: string | null) => void }) {
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function add(minutes: 30 | 60 | 90) {
     setSaving(true);
-    setError(null);
+    onError(null);
     try {
       onAdded(await addMore(minutes));
     } catch (err) {
-      setError((err as Error).message);
+      onError((err as Error).message);
+      // The page may be out of date (another tab added more): show the week as it is now.
+      await fetchWeek().then(onAdded).catch(() => undefined);
     } finally {
       setSaving(false);
     }
@@ -174,7 +178,6 @@ function AddMore({ onAdded }: { onAdded: (w: Week) => void }) {
           <button key={m} className="secondary" disabled={saving} onClick={() => add(m)}>{m} min</button>
         ))}
       </div>
-      {error && <p role="alert">{error}</p>}
     </>
   );
 }
