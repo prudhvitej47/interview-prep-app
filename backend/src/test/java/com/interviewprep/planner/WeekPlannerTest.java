@@ -452,4 +452,69 @@ class WeekPlannerTest {
   private static int share(Plan p, String domain) {
     return p.shares().stream().filter(s -> s.domainId().equals(domain)).findFirst().orElseThrow().percent();
   }
+
+  private static Plan rebuilt(List<Integer> studyDays, int keptToday) {
+    return WeekPlanner.plan(new Input(MONDAY, 1, studyDays, 9, 1.0, domains(2.5), curriculum(), Set.of(),
+        List.of(), Set.of(), List.of(), List.of(), keptToday));
+  }
+
+  @Test
+  void workKeptFromTodayTakesUpToTodaysShareOfARebuiltWeek() {
+    // 486 minutes over seven days is 69 a day.
+    assertThat(rebuilt(EVERY_DAY, 60).plannedMinutes()).isEqualTo(426);
+    assertThat(rebuilt(EVERY_DAY, 200).plannedMinutes()).isEqualTo(486 - 69);
+    // Today is not a study day: the days left were not counting on it.
+    assertThat(rebuilt(List.of(2, 3, 4, 5, 6, 7), 60).plannedMinutes()).isEqualTo(486);
+    assertThat(rebuilt(EVERY_DAY, 0)).isEqualTo(plan(9, curriculum(), List.of()));
+  }
+
+  private static final List<Domain> TWO = List.of(new Domain("aa", "Area A", 60, 2.5),
+      new Domain("bb", "Area B", 40, 2.5));
+
+  private static List<Candidate> twoAreas() {
+    List<Candidate> units = new ArrayList<>();
+    for (int i = 1; i <= 4; i++) {
+      units.add(unit("aa.u" + i, "aa", "concept", 30));
+      units.add(unit("bb.u" + i, "bb", "concept", 30));
+    }
+    return units;
+  }
+
+  private static List<Item> extra(int minutes, List<Candidate> units, Set<String> done, Set<String> inPlan,
+      Map<String, Integer> assigned, int heavyInPlan) {
+    return WeekPlanner.extra(new WeekPlanner.Extra(5, minutes, TWO, units, done, inPlan, assigned, heavyInPlan));
+  }
+
+  @Test
+  void extrasPullTheWeekTowardsTheWeights() {
+    // The plan gave B 120 minutes and A none: 60 more puts A's target at 108, so both go to A.
+    List<Item> items = extra(60, twoAreas(), Set.of(), Set.of(), Map.of("bb", 120), 0);
+    assertThat(items).extracting(Item::unitId).containsExactly("aa.u1", "aa.u2");
+    assertThat(items).allMatch(i -> i.day() == 5 && i.kind().equals("learn")
+        && i.reason().startsWith(WeekPlanner.EXTRA + "; Area A is 60% of this week"));
+    // With A already ahead, the extras go to B.
+    assertThat(extra(60, twoAreas(), Set.of(), Set.of(), Map.of("aa", 180), 0))
+        .extracting(Item::unitId).containsExactly("bb.u1", "bb.u2");
+  }
+
+  @Test
+  void extrasStayWithinTheirMinutes() {
+    assertThat(extra(90, twoAreas(), Set.of(), Set.of(), Map.of(), 0)).extracting(Item::minutes)
+        .containsExactly(30, 30, 30);
+    List<Candidate> long45 = List.of(unit("aa.long", "aa", "concept", 45), unit("bb.long", "bb", "concept", 45));
+    assertThat(extra(30, long45, Set.of(), Set.of(), Map.of(), 0)).isEmpty();
+  }
+
+  @Test
+  void extrasSkipWhatIsDoneInThePlanNotReadyOrOverTheHeavyLimit() {
+    List<Candidate> units = List.of(unit("aa.done", "aa", "concept", 30), unit("aa.planned", "aa", "concept", 30),
+        unit("aa.next", "aa", "coding", 30, "bb.case"), unit("aa.after", "aa", "coding", 30, "aa.planned"),
+        unit("bb.case", "bb", "hld", 90), unit("bb.case2", "bb", "hld", 90));
+    // aa.next waits on a heavy unit the limit keeps out; aa.after's prerequisite is in the plan, so it is ready.
+    assertThat(extra(90, units, Set.of("aa.done"), Set.of("aa.planned"), Map.of(), 2))
+        .extracting(Item::unitId).containsExactly("aa.after");
+    // One heavy unit at most, as they all share a day.
+    assertThat(extra(90, units.subList(4, 6), Set.of(), Set.of(), Map.of(), 0))
+        .extracting(Item::unitId).containsExactly("bb.case");
+  }
 }

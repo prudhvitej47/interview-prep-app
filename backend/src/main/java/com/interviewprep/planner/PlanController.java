@@ -22,8 +22,10 @@ import com.interviewprep.progress.ProgressQueries.Attempt;
 import com.interviewprep.projects.ProjectPlanning;
 import com.interviewprep.projects.ProjectPlanning.QuestionRef;
 import com.interviewprep.projects.ProjectPlanning.Rated;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -34,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -50,8 +53,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * This week's plan. It is made the first time the week is opened — there is no Monday job to miss
  * while the VM restarts — and then stays as it is: a curriculum release mid-week changes next week,
- * not this one (proposal F10). "Rebuild" throws it away so the next visit makes a new one, for
- * after changing hours or weights.
+ * not this one (proposal F10). "Rebuild", for after changing hours or weights, redraws what is not
+ * done yet and keeps what is: the week's done items stay in it, with their minutes. A learner who
+ * finishes the whole plan early can add more learning to it ({@code POST /api/plan/extra}).
  */
 @RestController
 class PlanController {
@@ -73,8 +77,9 @@ class PlanController {
   private final PlanQueries plans;
   private final PlacementService placements;
   private final ProjectPlanning projects;
+  private final Clock clock;
 
-  PlanController(NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
+  PlanController(Clock clock, NamedParameterJdbcTemplate jdbc, TransactionTemplate transaction, JsonMapper json,
       CurriculumQueries curriculum, DomainCatalog domains, LearnerProfile profile,
       ProgressQueries progress, EvidenceQueries evidence, PlanQueries plans,
       PlacementService placements, ProjectPlanning projects) {
@@ -89,6 +94,12 @@ class PlanController {
     this.plans = plans;
     this.placements = placements;
     this.projects = projects;
+    this.clock = clock;
+  }
+
+  /** Today in India time, from the clock a test can fix. */
+  private LocalDate today() {
+    return LocalDate.now(clock.withZone(STUDY_ZONE));
   }
 
   /**
@@ -111,8 +122,15 @@ class PlanController {
 
   record TopicToRate(String topicId, String name, String domainName, int currentGuess) {}
 
+  /**
+   * {@code allDone}: every planned item is done (extras aside), the week's "whole plan done", which
+   * its items can reach below {@code plannedMinutes} when nothing else fitted the budget.
+   * {@code canAddMore}: every item, extras too, is done and there is something left to learn that
+   * fits the largest extra, so the page can offer one.
+   */
   record PlanView(int plannedMinutes, int goalMinutes, int doneMinutes, List<ItemView> items,
-      List<Share> shares, List<String> notes, List<TopicToRate> topicsToRate) {}
+      List<Share> shares, List<String> notes, List<TopicToRate> topicsToRate, boolean allDone,
+      boolean canAddMore) {}
 
   /**
    * {@code plan} is null until the learner has said how much time they have and on which days, and
@@ -122,7 +140,7 @@ class PlanController {
 
   @GetMapping("/api/plan")
   Week thisWeek(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = PlanQueries.thisMonday();
+    LocalDate monday = PlanQueries.mondayOf(today());
     WeekSettings settings = profile.week(me.id());
     if (plans.breaks(me.id()).contains(monday)) {
       return new Week(monday, settings, null, true);
@@ -132,9 +150,9 @@ class PlanController {
     }
     Long planId = planId(me, monday);
     if (planId == null) {
-      planId = generate(me, monday, settings);
+      planId = generate(me, monday, settings, null, List.of());
     }
-    return new Week(monday, settings, view(me, planId, monday), false);
+    return new Week(monday, settings, view(me, planId, monday, settings), false);
   }
 
   record SharePreview(Map<String, Integer> weights) {}
@@ -178,11 +196,107 @@ class PlanController {
     return WeekPlanner.shareDetails(planDomains, withUnits);
   }
 
+  /**
+   * Redraws the week from today. Items already done this week are kept, so the week's done minutes,
+   * goal and rewards do not drop; when there are none (or no plan can be made) the plan is simply
+   * deleted and the next visit makes a new one, as on a first visit.
+   */
   @DeleteMapping("/api/plan")
   void rebuild(@AuthenticationPrincipal LearnerPrincipal me) {
-    LocalDate monday = PlanQueries.thisMonday();
-    jdbc.update("delete from week_plan where learner_id = :learner and week_start = :week",
-        new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday));
+    LocalDate monday = PlanQueries.mondayOf(today());
+    WeekSettings settings = profile.week(me.id());
+    Long planId = planId(me, monday);
+    List<Kept> kept = planId == null || !settings.complete() || plans.breaks(me.id()).contains(monday)
+        ? List.of() : kept(me, planId, monday);
+    if (kept.isEmpty()) {
+      jdbc.update("delete from week_plan where learner_id = :learner and week_start = :week",
+          new MapSqlParameterSource().addValue("learner", me.id()).addValue("week", monday));
+      return;
+    }
+    generate(me, monday, settings, planId, kept);
+  }
+
+  record ExtraRequest(Integer minutes) {}
+
+  /** Why a request was refused, in words the page shows as they are (as the projects pages do). */
+  record Problems(List<String> problems) {}
+
+  private static ResponseEntity<Problems> refused(HttpStatus status, String why) {
+    return ResponseEntity.status(status).body(new Problems(List.of(why)));
+  }
+
+  private static final Set<Integer> EXTRA_MINUTES = Set.of(30, 60, 90);
+
+  /**
+   * More learning for a learner who finished this week's plan early, placed on today. Its minutes
+   * are not added to the plan or its goal (see {@link WeekPlanner#extra}).
+   */
+  @PostMapping("/api/plan/extra")
+  ResponseEntity<?> addMore(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody ExtraRequest body) {
+    if (body == null || body.minutes() == null || !EXTRA_MINUTES.contains(body.minutes())) {
+      return refused(HttpStatus.BAD_REQUEST, "Add 30, 60 or 90 minutes.");
+    }
+    LocalDate monday = PlanQueries.mondayOf(today());
+    WeekSettings settings = profile.week(me.id());
+    if (plans.breaks(me.id()).contains(monday)) {
+      return refused(HttpStatus.CONFLICT, "This week is a break.");
+    }
+    Long planId = planId(me, monday);
+    if (planId == null || !settings.complete()) {
+      return refused(HttpStatus.CONFLICT, "There is no plan this week yet.");
+    }
+    // Nothing is written before a refusal, so returning one needs no rollback.
+    String refusal = transaction.execute(status -> {
+      // Locked, so a second click waits and then finds the first one's items not done yet.
+      jdbc.query("select id from week_plan where id = :plan for update", new MapSqlParameterSource("plan", planId),
+          rs -> {});
+      if (!everyItemDone(view(me, planId, monday, settings))) {
+        return "Finish this week's plan first.";
+      }
+      List<Item> extra = extra(me, planId, settings, body.minutes());
+      if (extra.isEmpty()) {
+        return "Nothing else to learn fits in " + body.minutes() + " minutes.";
+      }
+      for (Item item : extra) {
+        jdbc.update("insert into plan_item (plan_id, unit_id, day, kind, minutes, reason, sort_order)"
+                + " values (:plan, :unit, :day, :kind, :minutes, :reason,"
+                + " (select coalesce(max(sort_order), 0) + 1 from plan_item where plan_id = :plan))",
+            new MapSqlParameterSource().addValue("plan", planId).addValue("unit", item.unitId())
+                .addValue("day", item.day()).addValue("kind", item.kind()).addValue("minutes", item.minutes())
+                .addValue("reason", item.reason()));
+      }
+      return null;
+    });
+    return refusal != null ? refused(HttpStatus.CONFLICT, refusal) : ResponseEntity.ok(thisWeek(me));
+  }
+
+  private static boolean everyItemDone(PlanView plan) {
+    return !plan.items().isEmpty() && plan.items().stream().allMatch(ItemView::done);
+  }
+
+  /** What {@link WeekPlanner#extra} would add to this plan in {@code minutes}, placed on today. */
+  private List<Item> extra(LearnerPrincipal me, long planId, WeekSettings settings, int minutes) {
+    Pool pool = pool(me, PlanQueries.mondayOf(today()), Set.of());
+    Map<String, PlannableUnit> units = new HashMap<>();
+    curriculum.plannable(me.slug()).forEach(u -> units.put(u.id(), u));
+    Set<String> inPlan = new HashSet<>();
+    Map<String, Integer> assigned = new HashMap<>();
+    int[] heavy = {0};
+    jdbc.query("select unit_id, kind, minutes from plan_item where plan_id = :plan and unit_id is not null",
+        new MapSqlParameterSource("plan", planId), rs -> {
+          String unit = rs.getString(1);
+          inPlan.add(unit);
+          PlannableUnit u = units.get(unit);
+          if ("learn".equals(rs.getString(2)) && u != null) {
+            assigned.merge(u.domainId(), rs.getInt(3), Integer::sum);
+            if (rs.getInt(3) >= WeekPlanner.HEAVY_MINUTES) {
+              heavy[0]++;
+            }
+          }
+        });
+    int today = today().getDayOfWeek().getValue();
+    return WeekPlanner.extra(new WeekPlanner.Extra(today, minutes, planDomains(settings, pool.strength()),
+        pool.candidates(), pool.byUnit().keySet(), inPlan, assigned, heavy[0]));
   }
 
   private Long planId(LearnerPrincipal me, LocalDate monday) {
@@ -191,7 +305,15 @@ class PlanController {
         rs -> rs.next() ? rs.getLong(1) : null);
   }
 
-  private long generate(LearnerPrincipal me, LocalDate monday, WeekSettings settings) {
+  /**
+   * The learner's units sorted for planning: new ones they can learn ({@code candidates}), and
+   * reviews due by the end of the week except for {@code skipReviews}. Units marked "not for me" are
+   * in neither, and units placed "later" are not candidates.
+   */
+  private record Pool(List<Candidate> candidates, List<DueReview> reviews, Map<String, List<Attempt>> byUnit,
+      Set<String> startNow, Proficiency strength) {}
+
+  private Pool pool(LearnerPrincipal me, LocalDate monday, Set<String> skipReviews) {
     List<PlannableUnit> units = curriculum.plannable(me.slug());
     Map<String, TopicPlace> topics = curriculum.topicPlaces();
     List<Attempt> attempts = progress.attempts(me.id());
@@ -216,7 +338,7 @@ class PlanController {
       }
       if (byUnit.containsKey(u.id())) {
         LocalDate due = ProgressQueries.dueOn(byUnit.get(u.id()));
-        if (!due.isAfter(monday.plusDays(6))) {
+        if (!due.isAfter(monday.plusDays(6)) && !skipReviews.contains(u.id())) {
           reviews.add(new DueReview(u.id(), u.type(), u.estMinutes(), due));
         }
       } else if (!Placements.LATER.equals(placed.get(u.id()))) {
@@ -225,36 +347,85 @@ class PlanController {
             strength.of(u.topicId()).value(), reportsFor(u.topicId(), topics, reports)));
       }
     }
-    List<WeekPlanner.Domain> planDomains = domains.all().stream()
+    return new Pool(candidates, reviews, byUnit, startNow, strength);
+  }
+
+  private List<WeekPlanner.Domain> planDomains(WeekSettings settings, Proficiency strength) {
+    return domains.all().stream()
         .map(d -> new WeekPlanner.Domain(d.id(), d.name(),
             settings.weights().getOrDefault(d.id(), d.weight()), strength.ofDomain(d.id())))
         .toList();
+  }
+
+  /**
+   * Makes this week's plan and saves it. On a rebuild, {@code replacing} is the plan it replaces, in
+   * the same transaction, and {@code kept} that plan's done items, which go into the new one as they
+   * were (their units and questions are not planned again) and add their minutes to it.
+   */
+  private long generate(LearnerPrincipal me, LocalDate monday, WeekSettings settings, Long replacing,
+      List<Kept> kept) {
+    Set<String> keptUnits = new HashSet<>();
+    Set<Long> keptQuestions = new HashSet<>();
+    int keptMinutes = 0;
+    int keptToday = 0;
+    LocalDate today = today();
+    for (Kept k : kept) {
+      if (k.item().unitId() != null) {
+        keptUnits.add(k.item().unitId());
+      } else {
+        keptQuestions.add(k.item().projectQuestionId());
+      }
+      if (k.item().reason().startsWith(WeekPlanner.EXTRA)) {
+        continue;  // an extra stays an extra: it never adds to the week's planned minutes
+      }
+      keptMinutes += k.item().minutes();
+      if (k.doneOn().equals(today)) {
+        keptToday += k.item().minutes();
+      }
+    }
+    Pool pool = pool(me, monday, keptUnits);
     double load = loadFactor(me, monday);
-    int fromDay = LocalDate.now(STUDY_ZONE).getDayOfWeek().getValue();
+    int fromDay = today.getDayOfWeek().getValue();
     List<WeekPlanner.ProjectQuestion> questions = projects.plannable(me.id()).stream()
+        .filter(q -> !keptQuestions.contains(q.questionId()))
         .map(q -> new WeekPlanner.ProjectQuestion(q.questionId(), q.projectId(), q.projectName(),
             q.projectOrder(), q.questionOrder(), q.rung(), q.minutes(), q.dueOn()))
         .toList();
+    List<Long> carried = questions.isEmpty() ? List.of()
+        : carriedQuestions(me, monday).stream().filter(q -> !keptQuestions.contains(q)).toList();
     WeekPlanner.Plan plan = WeekPlanner.plan(new WeekPlanner.Input(monday, fromDay, settings.studyDays(),
-        settings.hoursPerWeek(), load, planDomains, candidates, byUnit.keySet(), reviews, startNow,
-        questions, questions.isEmpty() ? List.of() : carriedQuestions(me, monday)));
+        settings.hoursPerWeek(), load, planDomains(settings, pool.strength()), pool.candidates(),
+        pool.byUnit().keySet(), pool.reviews(), pool.startNow(), questions, carried, keptToday));
+    int planned = plan.plannedMinutes() + keptMinutes;
+    int goal = kept.isEmpty() ? plan.goalMinutes() : (int) Math.round(planned * WeekPlanner.GOAL_SHARE);
+    List<String> notes = new ArrayList<>(plan.notes());
+    if (!kept.isEmpty()) {
+      notes.add("Rebuilt: the " + (kept.size() == 1 ? "item" : kept.size() + " items")
+          + " you had already done stay in it and count towards the week.");
+    }
+    List<Item> items = new ArrayList<>(kept.stream().map(Kept::item).toList());
+    items.addAll(plan.items());
+    items.sort(WeekPlanner.ORDER);
 
     try {
       return transaction.execute(status -> {
+        if (replacing != null) {
+          jdbc.update("delete from week_plan where id = :plan", new MapSqlParameterSource("plan", replacing));
+        }
         long id = jdbc.queryForObject(
             "insert into week_plan (learner_id, week_start, planned_minutes, goal_minutes, load_factor,"
                 + " release_id, planner_version, rationale) values (:learner, :week, :planned, :goal,"
                 + " :load, :release, :version, cast(:rationale as jsonb)) returning id",
             new MapSqlParameterSource()
                 .addValue("learner", me.id()).addValue("week", monday)
-                .addValue("planned", plan.plannedMinutes()).addValue("goal", plan.goalMinutes())
+                .addValue("planned", planned).addValue("goal", goal)
                 .addValue("load", load).addValue("release", curriculum.latestReleaseId())
                 .addValue("version", WeekPlanner.VERSION)
                 .addValue("rationale", json.writeValueAsString(
-                    Map.of("shares", plan.shares(), "notes", plan.notes()))),
+                    Map.of("shares", plan.shares(), "notes", notes))),
             Long.class);
         int order = 0;
-        for (Item item : plan.items()) {
+        for (Item item : items) {
           jdbc.update(
               "insert into plan_item (plan_id, unit_id, project_question_id, day, kind, minutes, reason,"
                   + " sort_order) values (:plan, :unit, :question, :day, :kind, :minutes, :reason, :order)",
@@ -267,9 +438,45 @@ class PlanController {
         return id;
       });
     } catch (DuplicateKeyException e) {
-      // Two tabs opened the new week at once; the other one's plan stands.
+      // Two tabs opened (or rebuilt) the week at once; the other one's plan stands.
       return planId(me, monday);
     }
+  }
+
+  /** An item of the plan being rebuilt, done this week: first on {@code doneOn}. */
+  private record Kept(Item item, LocalDate doneOn) {}
+
+  /**
+   * The plan's items done this week, by the same test as the view and the week's result: the unit
+   * got an attempt, or the project question a rating, during the week.
+   */
+  private List<Kept> kept(LearnerPrincipal me, long planId, LocalDate monday) {
+    Map<String, LocalDate> unitDone = new HashMap<>();
+    for (Attempt a : progress.attempts(me.id())) {
+      if (PlanQueries.mondayOf(a.day()).equals(monday)) {
+        unitDone.merge(a.unitId(), a.day(), (x, y) -> x.isBefore(y) ? x : y);
+      }
+    }
+    Map<Long, LocalDate> questionDone = new HashMap<>();
+    for (Rated r : projects.ratings(me.id())) {
+      if (PlanQueries.mondayOf(r.day()).equals(monday)) {
+        questionDone.merge(r.questionId(), r.day(), (x, y) -> x.isBefore(y) ? x : y);
+      }
+    }
+    List<Kept> kept = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    jdbc.query("select unit_id, project_question_id, day, kind, minutes, reason from plan_item where plan_id = :plan"
+            + " order by sort_order",
+        new MapSqlParameterSource("plan", planId), rs -> {
+          String unit = rs.getString(1);
+          Long question = rs.getObject(2, Long.class);
+          LocalDate doneOn = unit != null ? unitDone.get(unit) : questionDone.get(question);
+          if (doneOn != null && seen.add(unit != null ? unit : "q" + question)) {
+            kept.add(new Kept(new Item(unit, rs.getInt(3), rs.getString(4), rs.getInt(5), rs.getString(6), question),
+                doneOn));
+          }
+        });
+    return kept;
   }
 
   /**
@@ -357,7 +564,7 @@ class PlanController {
     return last;
   }
 
-  private PlanView view(LearnerPrincipal me, long planId, LocalDate monday) {
+  private PlanView view(LearnerPrincipal me, long planId, LocalDate monday, WeekSettings settings) {
     Set<String> doneThisWeek = doneUnits(me, monday);
     List<ItemView> items = new ArrayList<>();
     List<String> learnUnits = new ArrayList<>();
@@ -418,8 +625,13 @@ class PlanController {
         s.path("name").asString(), s.path("percent").asInt())));
     List<String> notes = new ArrayList<>();
     header.rationale().path("notes").forEach(n -> notes.add(n.asString()));
+    List<ItemView> planned = items.stream().filter(i -> !i.reason().startsWith(WeekPlanner.EXTRA)).toList();
+    boolean allDone = !planned.isEmpty() && planned.stream().allMatch(ItemView::done);
+    // Only worked out once everything is done: the common case pays nothing for it.
+    boolean canAddMore = allDone && items.stream().allMatch(ItemView::done)
+        && !extra(me, planId, settings, Collections.max(EXTRA_MINUTES)).isEmpty();
     return new PlanView(header.planned(), header.goal(), doneMinutes, items, shares, notes,
-        topicsToRate(me, learnUnits));
+        topicsToRate(me, learnUnits), allDone, canAddMore);
   }
 
   /**

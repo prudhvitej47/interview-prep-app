@@ -216,6 +216,73 @@ describe("WeekPage", () => {
     expect(await screen.findByText(/Goal met: this week counts towards your streak/)).toBeInTheDocument();
   });
 
+  it("offers more for today once the whole plan is done, without touching the goal", async () => {
+    const finished = { ...plan, doneMinutes: 60, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
+    const extra = { unitId: "db.sql.groupby", title: "Group by", type: "sql", day: 3, kind: "learn", minutes: 20,
+      reason: "Added after you finished early; Databases is 12% of this week.", done: false };
+    const fetchMock = mockFetch({
+      "/api/plan": { body: week(finished) },
+      "/api/plan/extra": { body: week({ ...finished, items: [...finished.items, extra], canAddMore: false }) },
+    });
+    show();
+    const offer = await screen.findByRole("group", { name: "Add more to today" });
+    expect(offer).toHaveTextContent("Finished this week's plan early?");
+    fireEvent.click(within(offer).getByRole("button", { name: "60 min" }));
+
+    expect(await screen.findByRole("link", { name: "Group by" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Add more to today" })).not.toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe("/api/plan/extra");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(init!.body as string)).toEqual({ minutes: 60 });
+    expect(screen.getByText(/60 of 389 goal minutes done/)).toBeInTheDocument();
+  });
+
+  it("offers nothing more while the plan has items to do", async () => {
+    mockFetch({ "/api/plan": { body: week({ ...plan, canAddMore: false }) } });
+    show();
+    await screen.findByRole("link", { name: "Sliding window" });
+    expect(screen.queryByText(/Finished this week's plan early/)).toBeNull();
+  });
+
+  it("says so when more could not be added, and lets the learner try again", async () => {
+    const finished = { ...plan, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
+    const fetchMock = mockFetch({ "/api/plan": { body: week(finished) },
+      "/api/plan/extra": { status: 409, body: { problems: ["Nothing else to learn fits in 30 minutes."] } } });
+    show();
+    const offer = await screen.findByRole("group", { name: "Add more to today" });
+    fireEvent.click(within(offer).getByRole("button", { name: "30 min" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Nothing else to learn fits in 30 minutes.");
+    // The week is reloaded after a refusal; this one is unchanged, so the offer stays.
+    await waitFor(() => expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/plan"));
+    expect(within(offer).getByRole("button", { name: "30 min" })).toBeEnabled();
+  });
+
+  it("reloads an out-of-date week when more is refused, and keeps saying why", async () => {
+    const finished = { ...plan, items: plan.items.map((i) => ({ ...i, done: true })), canAddMore: true };
+    const extra = { unitId: "db.sql.groupby", title: "Group by", type: "sql", day: 3, kind: "learn", minutes: 20,
+      reason: "Added after you finished early; Databases is 12% of this week.", done: false };
+    const fetchMock = mockFetch({ "/api/plan": { body: week(finished) },
+      "/api/plan/extra": { status: 409, body: { problems: ["Finish this week's plan first."] } } });
+    show();
+    const offer = await screen.findByRole("group", { name: "Add more to today" });
+    // Another tab added more in the meantime.
+    fetchMock.mockImplementation(async (url: string) => url === "/api/plan"
+      ? { ok: true, status: 200, json: async () => week({ ...finished, items: [...finished.items, extra], canAddMore: false }) }
+      : { ok: false, status: 409, json: async () => ({ problems: ["Finish this week's plan first."] }) });
+    fireEvent.click(within(offer).getByRole("button", { name: "30 min" }));
+    expect(await screen.findByRole("link", { name: "Group by" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Add more to today" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Finish this week's plan first.");
+  });
+
+  it("says the whole plan is done when every planned item is, even below the planned minutes", async () => {
+    const finished = { ...plan, doneMinutes: 400, items: plan.items.map((i) => ({ ...i, done: true })), allDone: true };
+    mockFetch({ "/api/plan": { body: week(finished) } });
+    show();
+    expect(await screen.findByText(/Goal met/)).toHaveTextContent("and the whole plan is done");
+  });
+
   it("takes a future week off", async () => {
     const breaks = { thisWeek: false, upcoming: [
       { weekStart: "2026-10-05", taken: false, available: true },

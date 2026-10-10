@@ -48,9 +48,20 @@ import java.util.function.ToDoubleFunction;
  * each domain's share meaning what the learner set: a project question is payments, databases and
  * behavioural at once. A learner with no project questions gets exactly the plan they got before.
  *
+ * <p><b>Rebuilding</b> mid-week keeps the old plan's done items (the caller adds them back, with
+ * their minutes) and plans the rest from today, so a rebuild never lowers what the week counts as
+ * done. Work kept from today takes up to today's share ({@link Input#keptToday}).
+ *
+ * <p><b>Finished early</b>: {@link #extra} adds learning on today, by the same shares and rules. Its
+ * minutes are not added to the plan or its goal, so finishing early can never lower the week's
+ * score, the next week's size or a reward; done, they still count as done minutes. Their reason
+ * starts with {@link #EXTRA}, which keeps them out of "the whole plan is done" too.
+ *
  * <p>Not yet, and why: the company factor (no target companies are captured yet), the catch-up
  * factor (needs weeks of plans first), progressive difficulty from solve history (F5), interview
- * mode (F8), and swap/skip/pin (F9). Each arrives when the data it needs exists.
+ * mode (F8), swap/skip/pin (F9), and reviews or project questions as extras (finishing early adds
+ * learning only: due reviews and project questions already have their place in the plan). Each
+ * arrives when the data it needs exists.
  */
 final class WeekPlanner {
 
@@ -92,7 +103,19 @@ final class WeekPlanner {
   record Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
       double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
       List<DueReview> reviews, Set<String> startNow, List<ProjectQuestion> projectQuestions,
-      List<Long> carriedQuestions) {
+      List<Long> carriedQuestions, int keptToday) {
+
+    /**
+     * A week made from nothing. {@code keptToday}, on a rebuild, is the minutes of the old plan's
+     * done items that were done today: the caller keeps them, and they already used some of today.
+     */
+    Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
+        double loadFactor, List<Domain> domains, List<Candidate> candidates, Set<String> done,
+        List<DueReview> reviews, Set<String> startNow, List<ProjectQuestion> projectQuestions,
+        List<Long> carriedQuestions) {
+      this(weekStart, fromDay, studyDays, hoursPerWeek, loadFactor, domains, candidates, done, reviews,
+          startNow, projectQuestions, carriedQuestions, 0);
+    }
 
     /** A learner with no project questions. */
     Input(LocalDate weekStart, int fromDay, List<Integer> studyDays, double hoursPerWeek,
@@ -129,6 +152,11 @@ final class WeekPlanner {
     double weekLeft = (double) days.size() / in.studyDays().size();
     int planned = (int) Math.round(
         in.hoursPerWeek() * 60 * PLANNED_SHARE_OF_HOURS * in.loadFactor() * weekLeft);
+    if (in.keptToday() > 0 && days.getFirst() == in.fromDay()) {
+      // Rebuilt on a study day after doing some of it: what was done today takes up to today's
+      // share, so the kept items and the new ones together do not ask for today twice.
+      planned -= Math.min(in.keptToday(), planned / days.size());
+    }
     int goal = (int) Math.round(planned * GOAL_SHARE);
     if (days.size() < in.studyDays().size()) {
       notes.add("Made mid-week, so it covers the " + days.size() + " study days left.");
@@ -165,11 +193,7 @@ final class WeekPlanner {
     in.domains().forEach(d -> domainNames.put(d.id(), d.name()));
 
     // Learning: units placed "now" first, then the domain furthest behind its share.
-    List<Candidate> ranked = in.candidates().stream()
-        .filter(c -> share.containsKey(c.domainId()))
-        .sorted(Comparator.comparingDouble(WeekPlanner::score).reversed()
-            .thenComparingInt(Candidate::difficulty).thenComparing(Candidate::unitId))
-        .toList();
+    List<Candidate> ranked = ranked(in.candidates(), share);
     Set<String> known = new HashSet<>(in.done());
     in.candidates().forEach(c -> known.add(c.unitId()));
     Picker picker = new Picker(learnBudget, in.done(), known);
@@ -180,29 +204,7 @@ final class WeekPlanner {
         picker.take(c, DashboardController.NOW_REASON);
       }
     }
-    Map<String, Double> target = new HashMap<>();
-    share.forEach((id, s) -> target.put(id, s * learnBudget));
-    while (true) {
-      Candidate next = null;
-      double bestDeficit = Double.NEGATIVE_INFINITY;
-      for (String domain : share.keySet()) {
-        double deficit = target.get(domain) - picker.assigned.getOrDefault(domain, 0);
-        if (deficit <= bestDeficit) {
-          continue;
-        }
-        for (Candidate c : ranked) {
-          if (c.domainId().equals(domain) && picker.canTake(c)) {
-            next = c;
-            bestDeficit = deficit;
-            break;
-          }
-        }
-      }
-      if (next == null) {
-        break;
-      }
-      picker.take(next, null);
-    }
+    fillByShare(picker, ranked, share, learnBudget);
     if (picker.remaining > 30) {
       notes.add(picker.remaining + " minutes are unplanned: nothing else to learn is ready yet.");
     }
@@ -270,12 +272,96 @@ final class WeekPlanner {
       load.merge(day, q.minutes(), Integer::sum);
       items.add(new Item(null, day, "project", q.minutes(), t.reason(), q.questionId()));
     }
-    items.sort(Comparator.comparingInt(Item::day).thenComparingInt(i -> switch (i.kind()) {
-      case "review" -> 1;
-      case "project" -> 2;
-      default -> 0;
-    }));
+    items.sort(ORDER);
     return new Plan(planned, goal, items, shares, notes);
+  }
+
+  /** How a day's items are listed: learning, then reviews, then project questions. */
+  static final Comparator<Item> ORDER = Comparator.comparingInt(Item::day).thenComparingInt(i -> switch (i.kind()) {
+    case "review" -> 1;
+    case "project" -> 2;
+    default -> 0;
+  });
+
+  /** Marks a unit added after the learner finished the week's plan early. */
+  static final String EXTRA = "Added after you finished early";
+
+  /**
+   * More to learn for a learner who finished this week's plan early, all on {@code day}. Chosen as
+   * the week's learning is, but with the targets set over what the plan already gave each domain
+   * plus these {@code minutes}, so extras pull the week towards the learner's weights. The same
+   * rules apply: ready, not done, not in the plan, within the minutes (as in a plan, nothing
+   * overshoots), and the heavy limit counting the plan's own heavy units; at most one heavy unit,
+   * since they all share a day. {@code inPlan} holds the plan's units and {@code assigned} its
+   * learning minutes per domain.
+   */
+  record Extra(int day, int minutes, List<Domain> domains, List<Candidate> candidates, Set<String> done,
+      Set<String> inPlan, Map<String, Integer> assigned, int heavyInPlan) {}
+
+  static List<Item> extra(Extra in) {
+    List<Candidate> pool = in.candidates().stream()
+        .filter(c -> !in.inPlan().contains(c.unitId()) && !in.done().contains(c.unitId())).toList();
+    Set<String> withUnits = new HashSet<>();
+    pool.forEach(c -> withUnits.add(c.domainId()));
+    Map<String, Double> share = shareOf(in.domains(), withUnits);
+    Map<String, String> domainNames = new HashMap<>();
+    in.domains().forEach(d -> domainNames.put(d.id(), d.name()));
+    Set<String> finished = new HashSet<>(in.done());
+    finished.addAll(in.inPlan());
+    Set<String> known = new HashSet<>(finished);
+    pool.forEach(c -> known.add(c.unitId()));
+    Picker picker = new Picker(in.minutes(), finished, known);
+    picker.heavy = Math.max(in.heavyInPlan(), MAX_HEAVY - 1);
+    int before = 0;
+    for (String domain : share.keySet()) {
+      int m = in.assigned().getOrDefault(domain, 0);
+      picker.assigned.put(domain, m);
+      before += m;
+    }
+    fillByShare(picker, ranked(pool, share), share, before + in.minutes());
+    return picker.picked.stream().map(p -> new Item(p.candidate().unitId(), in.day(), "learn",
+        p.candidate().minutes(), reason(p.candidate(), EXTRA, domainNames.get(p.candidate().domainId()),
+            share.get(p.candidate().domainId())))).toList();
+  }
+
+  /** Candidates in a domain with a share, best first: score, then easier, then by id. */
+  private static List<Candidate> ranked(List<Candidate> candidates, Map<String, Double> share) {
+    return candidates.stream()
+        .filter(c -> share.containsKey(c.domainId()))
+        .sorted(Comparator.comparingDouble(WeekPlanner::score).reversed()
+            .thenComparingInt(Candidate::difficulty).thenComparing(Candidate::unitId))
+        .toList();
+  }
+
+  /**
+   * Weighted fair queuing: each domain's target is its share of {@code total}; minutes go to the
+   * domain furthest behind its target (first in {@code share}'s order on a tie), as its best-ranked
+   * unit the picker can take, until no domain has one left.
+   */
+  private static void fillByShare(Picker picker, List<Candidate> ranked, Map<String, Double> share, int total) {
+    Map<String, Double> target = new HashMap<>();
+    share.forEach((id, s) -> target.put(id, s * total));
+    while (true) {
+      Candidate next = null;
+      double bestDeficit = Double.NEGATIVE_INFINITY;
+      for (String domain : share.keySet()) {
+        double deficit = target.get(domain) - picker.assigned.getOrDefault(domain, 0);
+        if (deficit <= bestDeficit) {
+          continue;
+        }
+        for (Candidate c : ranked) {
+          if (c.domainId().equals(domain) && picker.canTake(c)) {
+            next = c;
+            bestDeficit = deficit;
+            break;
+          }
+        }
+      }
+      if (next == null) {
+        break;
+      }
+      picker.take(next, null);
+    }
   }
 
   private record TakenQuestion(ProjectQuestion question, String reason) {}

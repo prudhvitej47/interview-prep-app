@@ -197,6 +197,10 @@ export type PlanView = {
   shares: { domainId: string; name: string; percent: number }[];
   notes: string[];
   topicsToRate: { topicId: string; name: string; domainName: string; currentGuess: number }[];
+  /** Every planned item is done; extras added after finishing early do not count either way. */
+  allDone?: boolean;
+  /** Every item is done and there is more to learn that fits: the page offers extras. */
+  canAddMore?: boolean;
 };
 
 export type Week = { weekStart: string; settings: WeekSettings; plan: PlanView | null; onBreak: boolean };
@@ -213,11 +217,28 @@ async function send(method: string, url: string, body?: object): Promise<Respons
   return response;
 }
 
-/** Saving settings rebuilds this week's plan with them; what is done stays done. */
+/** Saving settings rebuilds this week's plan with them; this week's done items stay in it. */
 export async function saveWeekSettings(settings: WeekSettings): Promise<Week> {
   await send("PUT", "/api/me/week", settings);
   await send("DELETE", "/api/plan");
   return fetchWeek();
+}
+
+/**
+ * More learning on today, for a week whose plan is all done. It does not raise the week's planned
+ * minutes or goal; done, it still counts.
+ */
+export async function addMore(minutes: 30 | 60 | 90): Promise<Week> {
+  const response = await fetch("/api/plan/extra", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ minutes }),
+  });
+  if (response.ok) return response.json();
+  // 400 and 409 say why in words, as the projects pages' refusals do.
+  const why = response.status === 400 || response.status === 409
+    ? ((await response.json()) as { problems?: string[] }).problems?.join(" ") : undefined;
+  throw new Error(why || `Could not add more (${response.status})`);
 }
 
 /** Each area's share of the week with these weight overrides, exactly as the next plan would use it. */
