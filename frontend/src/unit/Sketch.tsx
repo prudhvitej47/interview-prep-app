@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fitToReadable } from "./Mermaid";
-import { useOverflow } from "./overflow";
+import { ScrollsNote, useOverflow } from "./overflow";
 import { expandMacros } from "./sketchMacros";
 // The sketch fonts' files and unicode-ranges, read from the pinned package by vite.config.ts.
 import sketchFontFaces from "virtual:sketch-fonts";
@@ -174,9 +174,12 @@ export function Sketch({ source }: { source: string }) {
   }, [source]);
 
   if (failed) return <pre className="diagram-source">{source}</pre>;
-  if (!drawn) return <div className="diagram" aria-busy="true">Drawing the diagram…</div>;
+  if (!drawn) return <div className="diagram pending" aria-busy="true">Drawing the diagram…</div>;
   return (
-    <div className="diagram sketch" role="figure" aria-label={scrolls ? `${drawn.title}, scrolls sideways` : drawn.title}
-      tabIndex={scrolls ? 0 : undefined} ref={box} dangerouslySetInnerHTML={{ __html: drawn.svg }} />
+    <>
+      <div className="diagram sketch" role="figure" aria-label={scrolls ? `${drawn.title}, scrolls sideways` : drawn.title}
+        tabIndex={scrolls ? 0 : undefined} ref={box} dangerouslySetInnerHTML={{ __html: drawn.svg }} />
+      {scrolls && <ScrollsNote />}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useOverflow } from "./overflow";
+import { ScrollsNote, useOverflow } from "./overflow";
 
 let nextId = 0;
 
@@ -158,11 +158,14 @@ export function Mermaid({ chart }: { chart: string }) {
 
   // A diagram that will not draw still shows its source, rather than leaving a hole in the page.
   if (failed) return <pre className="diagram-source">{chart}</pre>;
-  if (!svg) return <div className="diagram" aria-busy="true">Drawing the diagram…</div>;
+  if (!svg) return <div className="diagram pending" aria-busy="true">Drawing the diagram…</div>;
   // A figure, not an image: role="img" with no name told a screen reader nothing, and hid the
   // labels inside, which are the diagram's words.
   return (
-    <div className="diagram" role="figure" aria-label={scrolls ? "Diagram, scrolls sideways" : "Diagram"}
-      tabIndex={scrolls ? 0 : undefined} ref={box} dangerouslySetInnerHTML={{ __html: svg }} />
+    <>
+      <div className="diagram" role="figure" aria-label={scrolls ? "Diagram, scrolls sideways" : "Diagram"}
+        tabIndex={scrolls ? 0 : undefined} ref={box} dangerouslySetInnerHTML={{ __html: svg }} />
+      {scrolls && <ScrollsNote />}
+    </>
   );
 }

@@ -29,7 +29,8 @@ export const formatMoment = (isoInstant: string) => new Date(isoInstant).toLocal
 export type RatingWords = {
   label: string;
   notDone: string;
-  askFirst: string;
+  /** Said above the ratings before the first one; left out where the page says it once for all. */
+  askFirst?: string;
   doneOn: string;
   undoFirst: string;
 };
@@ -120,7 +121,7 @@ export function RatingPanel({ progress, onProgress, rate, undo, words, howToRevi
       )}
       {asking && (
         <>
-          <p className="hint">{done ? "How did the review go?" : words.askFirst}</p>
+          {(done || words.askFirst) && <p className="hint">{done ? "How did the review go?" : words.askFirst}</p>}
           <div className="ratings" role="group" aria-label="How did it go?">
             {RATINGS.map((r) => (
               <button key={r.rating} title={r.hint} disabled={busy} onClick={() => act(() => rate(r.rating))}>
