@@ -2,9 +2,13 @@ package com.interviewprep.curriculum;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -22,10 +26,22 @@ public class CurriculumQueries {
   // A unit is visible if it is shared, or private to the learner asking.
   private static final String VISIBLE = "(u.visibility = 'shared' or u.visibility = :private)";
 
-  private final NamedParameterJdbcTemplate jdbc;
+  // A fenced block, from its opening ``` or ~~~ line to the matching close. Code in a block is code,
+  // never a link, so it is dropped before looking for ids.
+  private static final Pattern FENCE =
+      Pattern.compile("(?ms)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n.*?^ {0,3}\\1");
 
-  CurriculumQueries(NamedParameterJdbcTemplate jdbc) {
+  // An inline code span holding something shaped like a unit or topic id: dotted lower-case words.
+  // `max.poll.interval.ms` matches too and is then simply not found in the curriculum.
+  private static final Pattern ID_SPAN =
+      Pattern.compile("(?<!`)`([a-z0-9]+(?:\\.[a-z0-9-]+)+)`(?!`)");
+
+  private final NamedParameterJdbcTemplate jdbc;
+  private final UnitsDone unitsDone;
+
+  CurriculumQueries(NamedParameterJdbcTemplate jdbc, UnitsDone unitsDone) {
     this.jdbc = jdbc;
+    this.unitsDone = unitsDone;
   }
 
   public record UnitSummary(String id, String title, String type, int difficulty, int estMinutes) {}
@@ -37,6 +53,13 @@ public class CurriculumQueries {
   public record Source(String kind, String title, String url, String locator) {}
 
   public record Link(String id, String title) {}
+
+  /**
+   * A unit or topic the unit's text names by id in inline code, with what the page needs to show
+   * its title instead. {@code done} is whether this learner has marked the unit done; always false
+   * for a topic.
+   */
+  public record Reference(String id, String kind, String title, String domainName, boolean done) {}
 
   public record TestCase(String name, String input, String expected) {}
 
@@ -52,7 +75,7 @@ public class CurriculumQueries {
       List<String> technologies, String origin, String state, int version, String markdown,
       String topicId, String topicName, String domainId, String domainName,
       List<Source> sources, List<Link> prerequisites, List<TestCase> testCases,
-      int hiddenTestCases, SqlFixture sqlFixture) {}
+      int hiddenTestCases, SqlFixture sqlFixture, List<Reference> references) {}
 
   private static MapSqlParameterSource forLearner(String slug) {
     return new MapSqlParameterSource("private", "learner:" + slug);
@@ -145,8 +168,49 @@ public class CurriculumQueries {
                 p,
                 (rs2, j) -> new SqlFixture(rs2.getString("schema_ddl"), rs2.getString("seed_sql"),
                     rs2.getString("reference_query"), rs2.getBoolean("order_matters")))
-                .stream().findFirst().orElse(null)));
+                .stream().findFirst().orElse(null),
+            references(rs.getString("markdown"), slug)));
     return found.stream().findFirst();
+  }
+
+  /**
+   * The units and topics {@code markdown} names in inline code, outside fenced blocks, in the order
+   * they first appear. Units this learner cannot see, retired units and anything that is not an id
+   * are left out, so the page shows them as the plain code they were. Two queries however many ids
+   * the text holds: one for titles, one for which units are done.
+   */
+  List<Reference> references(String markdown, String slug) {
+    Set<String> ids = new LinkedHashSet<>();
+    Matcher span = ID_SPAN.matcher(FENCE.matcher(markdown == null ? "" : markdown).replaceAll(""));
+    while (span.find()) {
+      ids.add(span.group(1));
+    }
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    record Found(String kind, String title, String domainName) {}
+    Map<String, Found> found = new HashMap<>();
+    jdbc.query(
+        "select u.id, 'unit' as kind, u.title, d.name as domain_name from unit u"
+            + " join topic t on t.id = u.topic_id join domain d on d.id = t.domain_id"
+            + " where u.id in (:ids) and u.state <> 'retired' and " + VISIBLE
+            + " union all select t.id, 'topic', t.name, d.name from topic t"
+            + " join domain d on d.id = t.domain_id where t.id in (:ids)",
+        forLearner(slug).addValue("ids", ids),
+        rs -> {
+          // Should an id ever name both a unit and a topic, the unit wins: it is the thing to read.
+          found.merge(rs.getString("id"),
+              new Found(rs.getString("kind"), rs.getString("title"), rs.getString("domain_name")),
+              (a, b) -> a.kind().equals("unit") ? a : b);
+        });
+    Set<String> done = unitsDone.doneAmong(
+        found.entrySet().stream().filter(e -> e.getValue().kind().equals("unit")).map(Map.Entry::getKey)
+            .toList(),
+        slug);
+    return ids.stream().filter(found::containsKey).map(id -> {
+      Found f = found.get(id);
+      return new Reference(id, f.kind(), f.title(), f.domainName(), done.contains(id));
+    }).toList();
   }
 
   /** A unit the planner can choose from, with what it needs to rank and place it. */

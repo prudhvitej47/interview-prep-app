@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { fetchUnit, NotFoundError, type UnitDetail } from "../api";
+import { fetchUnit, NotFoundError, type Reference, type UnitDetail } from "../api";
 import { Markdown } from "../unit/Markdown";
 import { NoteEditor } from "../unit/NoteEditor";
 import { NotForMe } from "../unit/NotForMe";
@@ -54,16 +54,16 @@ export function UnitPage() {
       {sections.map((section, i) => [
         i === practiceAt && practice,
         section.heading === null ? (
-          <SectionBody key={i} body={section.body} />
+          <SectionBody key={i} body={section.body} references={unit.references} />
         ) : section.folded ? (
           <details key={i} className="folded">
             <summary>Show {section.heading.toLowerCase()}</summary>
-            <SectionBody body={section.body} />
+            <SectionBody body={section.body} references={unit.references} />
           </details>
         ) : (
           <section key={i}>
             <h3>{section.heading}</h3>
-            <SectionBody body={section.body} />
+            <SectionBody body={section.body} references={unit.references} />
           </section>
         ),
       ])}
@@ -113,15 +113,16 @@ export function UnitPage() {
 /**
  * A section's Markdown, with its deep dives and pause-and-think answers folded (see splitFolds).
  * They use the same dashed fold as a spoiler section, so layout-check opens them before measuring.
+ * The unit's references go to every block, so an id reads as its title wherever it is named.
  */
-function SectionBody({ body }: { body: string }) {
+function SectionBody({ body, references }: { body: string; references: Reference[] }) {
   return splitFolds(body).map((block, i) =>
     block.kind === "text" ? (
-      <Markdown key={i}>{block.body}</Markdown>
+      <Markdown key={i} references={references}>{block.body}</Markdown>
     ) : (
       <details key={i} className="folded">
         <summary>{block.summary}</summary>
-        <Markdown>{block.body}</Markdown>
+        <Markdown references={references}>{block.body}</Markdown>
       </details>
     ),
   );

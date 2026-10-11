@@ -1,6 +1,8 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { expect, it } from "vitest";
 import { Markdown } from "./Markdown";
+import type { Reference } from "../api";
 
 const show = (markdown: string) => {
   const { container } = render(<div className="unit"><Markdown>{markdown}</Markdown></div>);
@@ -74,4 +76,53 @@ it("lets a keyboard reach a code block or table only when it scrolls sideways", 
   } finally {
     Object.defineProperty(Element.prototype, "scrollWidth", scrollWidth);
   }
+});
+
+const references: Reference[] = [
+  { id: "ds.transactions.idempotency-keys", kind: "unit", title: "Idempotency keys for safe retries",
+    domainName: "Distributed systems", done: true },
+  { id: "hld.classic.distributed-rate-limiter", kind: "unit", title: "Distributed rate limiter",
+    domainName: "High-level design", done: false },
+  { id: "ds.transactions", kind: "topic", title: "Transactions", domainName: "Distributed systems", done: false },
+];
+
+const linked = (markdown: string, refs?: Reference[]) =>
+  render(<MemoryRouter><div className="unit"><Markdown references={refs}>{markdown}</Markdown></div></MemoryRouter>)
+    .container;
+
+it("shows a unit or topic named by id as a link that reads as its title", () => {
+  const container = linked(
+    "Idempotency: `ds.transactions.idempotency-keys`. Quotas: `hld.classic.distributed-rate-limiter`."
+      + " More in `ds.transactions`.",
+    references,
+  );
+  const unit = screen.getByRole("link", { name: "Idempotency keys for safe retries" });
+  expect(unit).toHaveAttribute("href", "/units/ds.transactions.idempotency-keys");
+  // The id and the domain are one hover away.
+  expect(unit).toHaveAttribute("title", "ds.transactions.idempotency-keys · Distributed systems");
+  expect(screen.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/topics/ds.transactions");
+  expect(container.querySelector("code")).toBeNull();
+  // Only the done unit carries the tick, and it is outside the link so the link's name stays the title.
+  expect(screen.getAllByRole("img", { name: "done" })).toHaveLength(1);
+  expect(unit.nextElementSibling).toHaveTextContent("✓");
+  expect(screen.getByRole("link", { name: "Distributed rate limiter" }).nextElementSibling).not.toHaveClass("reference-done");
+});
+
+it("leaves code that names nothing known as plain code", () => {
+  const container = linked("Set `max.poll.interval.ms`, not `ds.transactions.retired-one`.", references);
+  expect(screen.queryByRole("link")).toBeNull();
+  expect([...container.querySelectorAll("code")].map((c) => c.textContent))
+    .toEqual(["max.poll.interval.ms", "ds.transactions.retired-one"]);
+});
+
+it("never turns a code block into links, even when a line is an id", () => {
+  const container = linked("```\nds.transactions.idempotency-keys\n```\n\n```text\nds.transactions\n```", references);
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(container.querySelectorAll("pre code")).toHaveLength(2);
+});
+
+it("shows ids as plain code where there are no references, as in a note or a project page", () => {
+  const container = linked("See `ds.transactions.idempotency-keys`.");
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(container.querySelector("code")).toHaveTextContent("ds.transactions.idempotency-keys");
 });

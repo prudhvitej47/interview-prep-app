@@ -335,4 +335,67 @@ class CurriculumAndNotesTest extends PostgresTestBase {
           .andExpect(status().isNotFound());
     }
   }
+
+  @Nested
+  class References {
+
+    private static final String UNIT = "hld.payments.ledger";
+
+    @BeforeEach
+    void writeAUnitThatNamesOthers() {
+      long release = jdbc.queryForObject("select max(id) from curriculum_release", Long.class);
+      unit(UNIT, "hld.payments", "concept", "shared", "draft", release,
+          "## How it works\\nRetry with `ds.transactions.idempotency`, see `ds.transactions.sagas`."
+              + " Not `ds.transactions.old`, `" + PRIVATE_UNIT + "`, `no.such.unit` or `max.poll.ms`."
+              + "\\n\\n```text\\nds.transactions.sagas.intro\\n`ds.transactions.sagas.intro`\\n```\\n"
+              + "\\n## Connects to\\n`ds.transactions.idempotency` again, and `ds.transactions.sagas.intro`.");
+    }
+
+    @Test
+    void namedUnitsAndTopicsComeBackTitledInTheOrderTheyAppear() throws Exception {
+      mvc.perform(as(get("/api/units/" + UNIT), OTHER))
+          .andExpect(jsonPath("$.references.length()").value(3))
+          .andExpect(jsonPath("$.references[0].id").value("ds.transactions.idempotency"))
+          .andExpect(jsonPath("$.references[0].kind").value("unit"))
+          .andExpect(jsonPath("$.references[0].title").value("Title of ds.transactions.idempotency"))
+          .andExpect(jsonPath("$.references[0].domainName").value("Distributed systems"))
+          .andExpect(jsonPath("$.references[1].id").value("ds.transactions.sagas"))
+          .andExpect(jsonPath("$.references[1].kind").value("topic"))
+          .andExpect(jsonPath("$.references[1].title").value("Sagas"))
+          .andExpect(jsonPath("$.references[1].done").value(false))
+          // Named inside the code block too, but it counts because Connects to names it inline.
+          .andExpect(jsonPath("$.references[2].id").value("ds.transactions.sagas.intro"));
+    }
+
+    @Test
+    void retiredUnknownAndOtherLearnersPrivateUnitsAreLeftAsCode() throws Exception {
+      mvc.perform(as(get("/api/units/" + UNIT), OTHER))
+          .andExpect(jsonPath("$.references[?(@.id == 'ds.transactions.old')]").isEmpty())
+          .andExpect(jsonPath("$.references[?(@.id == '" + PRIVATE_UNIT + "')]").isEmpty())
+          .andExpect(jsonPath("$.references[?(@.id == 'no.such.unit')]").isEmpty());
+      // The owner of the private unit gets it linked.
+      mvc.perform(as(get("/api/units/" + UNIT), TESTER))
+          .andExpect(jsonPath("$.references[?(@.id == '" + PRIVATE_UNIT + "')].kind").value("unit"));
+    }
+
+    @Test
+    void anIdOnlyInACodeBlockIsNotAReference() throws Exception {
+      jdbc.update("update unit set body = jsonb_build_object('markdown', ?::text) where id = ?",
+          "```text\n`ds.transactions.idempotency`\n```\n", UNIT);
+      mvc.perform(as(get("/api/units/" + UNIT), TESTER)).andExpect(jsonPath("$.references").isEmpty());
+    }
+
+    @Test
+    void aUnitTheLearnerHasDoneIsMarkedForThemAlone() throws Exception {
+      mvc.perform(as(post("/api/units/ds.transactions.idempotency/attempts"), TESTER)
+              .with(RealCsrf.token(mvc, TESTER))
+              .contentType(MediaType.APPLICATION_JSON).content("{\"rating\": \"good\"}"))
+          .andExpect(status().isOk());
+      mvc.perform(as(get("/api/units/" + UNIT), TESTER))
+          .andExpect(jsonPath("$.references[0].done").value(true))
+          .andExpect(jsonPath("$.references[2].done").value(false));
+      mvc.perform(as(get("/api/units/" + UNIT), OTHER))
+          .andExpect(jsonPath("$.references[0].done").value(false));
+    }
+  }
 }

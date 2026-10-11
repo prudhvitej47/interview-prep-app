@@ -217,6 +217,9 @@ nav.sections a.active { color: var(--fg); border-color: color-mix(in srgb, var(-
    8ch, so a prose column wraps at spaces into lines worth reading; a desktop table that fits is untouched. */
 .unit td code, .unit th code { overflow-wrap: normal; }
 @media (max-width: 560px) { .unit td, .unit th { min-width: 8ch; } }
+/* A unit or topic named in the text reads as its title, an ordinary prose link in ink (Markdown.tsx).
+   It wraps at spaces like the sentence around it; a done unit's tick is muted, as on Start here. */
+.reference-done { color: var(--muted); }
 .folded { margin: 1.2rem 0; border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: 6px; padding: 0.5rem 0.9rem; }
 .folded summary { cursor: pointer; font-weight: 600; }
 .folded:hover { border-color: color-mix(in srgb, var(--fg) 40%, transparent); }
