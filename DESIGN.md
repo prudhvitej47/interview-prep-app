@@ -146,6 +146,9 @@ about state.
   banner on a retired unit. It asks for a moment of attention; it never signals an error.
 - **Wrong Red** (`#dc2626`, at 15% mix): one use only, the verdict on an incorrect practice answer.
 
+Text on a tinted verdict banner is full ink, never the muted grey: muted text on the 18% green or 15%
+red fills measures about 4.1–4.3:1 in light mode, under the 4.5:1 that body text needs.
+
 The three are defined once, as `--progress`, `--attention` and `--wrong` on `:root` (the same in both
 schemes), and every rule names the variable, never the hex value.
 - **Literal Blue** (`#2f5d8a` light / `#9fbcdd` dark): the one hue in the system that does not report
