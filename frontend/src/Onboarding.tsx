@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchDomains, saveDomainRatings, type Domain, type Me } from "./api";
 
 // Anchors, so that a 3 means the same thing to both learners and to the planner.
-const SCALE = [
+export const SCALE = [
   "New to me",
   "Heard of it",
   "Used it a little",

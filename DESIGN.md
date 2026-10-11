@@ -145,6 +145,9 @@ about state.
 - **Attention Amber** (`#d97706`, at 12–18% mix): the "how are you with these?" rating card, and the
   banner on a retired unit. It asks for a moment of attention; it never signals an error.
 - **Wrong Red** (`#dc2626`, at 15% mix): one use only, the verdict on an incorrect practice answer.
+
+The three are defined once, as `--progress`, `--attention` and `--wrong` on `:root` (the same in both
+schemes), and every rule names the variable, never the hex value.
 - **Literal Blue** (`#2f5d8a` light / `#9fbcdd` dark): the one hue in the system that does not report
   state, and the only one confined to a single surface. It colours literal values — strings,
   numbers, `true`/`false`/`null` — inside a highlighted code block, and appears nowhere else. It is
@@ -194,11 +197,15 @@ rhythm and contrast, not by the letterforms.
 ### Hierarchy
 
 - **Display** (700, 1.5rem, −0.01em): the app title only, in the header, linking home.
-- **Headline** (browser default `h2`, ~1.5rem): the page's own title — a unit name, a week, a report.
+- **Headline** (`h2`, 1.5rem — the browser default made explicit — at line-height 1.25): the page's
+  own title — a unit name, a week, a report. The tighter leading keeps a title that wraps to two lines
+  reading as one heading.
 - **Title** (600, ~1.17rem `h3`, 1.6rem top margin): section headings inside a unit and card headings.
 - **Body** (400, 16px/1.6): prose. The 44rem column holds it near 70 characters.
 - **Label** (400, 0.875rem, muted): hints, metadata, breadcrumbs, counts, status lines.
 - **Data** (monospace, 0.9rem): SQL and code the learner types, and rendered code blocks.
+- **Tables** in a unit: a header cell is left-aligned like the cells under it, and body cells use
+  `font-variant-numeric: tabular-nums` so a column of numbers lines up digit for digit.
 
 ### Named Rules
 
@@ -223,8 +230,12 @@ grid.
 
 Two responsive rules carry most of the burden: the `.placements` and `.plan-nav` grids collapse below
 560px, and a diagram never shrinks below 640px — it scrolls inside its own frame instead, because a
-scaled-down Mermaid label becomes unreadable before it becomes small. `tools/layout-check.mjs` enforces
-that at 390px and 1000px in both schemes, failing any drawn diagram text under 8.5px.
+scaled-down Mermaid label becomes unreadable before it becomes small. A diagram that does scroll says
+so in a muted label line under its frame, "Scrolls sideways →" (text only, no fade or gradient),
+because on a phone nothing else shows there is more to the right; a screen reader hears the same from
+the frame's name. While a diagram draws, its placeholder frame holds a 12rem minimum height so the
+text below does not jump when the picture lands. `tools/layout-check.mjs` enforces the size floor
+at 390px and 1000px in both schemes, failing any drawn diagram text under 8.5px.
 
 ## Elevation & Depth
 
@@ -262,7 +273,8 @@ summary is the heading text, and it may sit inside a folded section.
   padding, no border. One per view: save, run, submit.
 - **Ghost / secondary:** transparent fill, 1px ink-at-30% border, ink text, same padding.
 - **Link button:** no chrome at all — muted, underlined, 0.875rem, for "change my hours" and other
-  in-flow actions that are not the page's main verb.
+  in-flow actions that are not the page's main verb. At 560px and below it gains 0.3rem of block
+  padding, about a 32px tap height, which draws nothing and so looks the same.
 - **Hover:** the solid fill lightens one step toward the page (`color-mix(in srgb, var(--fg) 86%,
   var(--bg))`); an outlined control fills at 8% ink and strengthens its border to 45%.
 - **Pressed:** one further step in the same direction — fill at 74%, outline fill at 14%.
@@ -274,7 +286,11 @@ summary is the heading text, and it may sit inside a folded section.
 
 - **Style:** 999px, 0.8rem text, transparent fill with a 1px ink-at-25% border.
 - **Selected:** inverts to solid ink on paper. Used for Now / Next week / Later on the "what changed"
-  card, and for the four self-ratings after a unit.
+  card, and for the 0–5 topic ratings on the week's "How are you with these?" card. There the pills
+  sit over native radio buttons, hidden, so the group keeps the browser's arrow keys and is read as a
+  radio group; each radio is named with its anchor from the onboarding scale ("1, Heard of it"), the
+  pill wears the focus ring, and one line above the topics spells out the ends: "0 = new to me … 5 =
+  could teach it".
 - **Hover:** border to 50% ink, fill at 6%; a selected pill lightens like the primary button.
 
 ### Cards and panels
@@ -353,7 +369,9 @@ between list items — is the template for any long reading page.
 ### Signature component: the week's plan
 
 Grouped by day; each row a checked or unchecked mark, the unit's title, its type and minutes in muted
-label text, and the planner's one-line reason underneath. A done row goes line-through and muted. The
+label text, and the planner's one-line reason underneath. The row is a two-column grid, `1.3rem
+minmax(0, 1fr)`: the mark alone in the first column, and the title, its type and minutes and the
+reason all in the second, so they share one left edge however they wrap on a phone. A done row goes line-through and muted. The
 goal bar above is the only green on the page.
 
 ## Do's and Don'ts

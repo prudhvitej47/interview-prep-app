@@ -22,13 +22,17 @@ import { RUNG_LABEL } from "../projects/rungs";
 import { Markdown } from "../unit/Markdown";
 import { RatingPanel, type RatingWords } from "../unit/ProgressPanel";
 
+// Every question asks the same thing, so the page says it once, above the first question
+// (REHEARSE_FIRST), rather than once per question.
 const QUESTION_WORDS: RatingWords = {
   label: "How the rehearsal went",
   notDone: "Rehearsed it?",
-  askFirst: "Say how your answer went. This schedules when the question comes back.",
   doneOn: "First rehearsed",
   undoFirst: "Undo: not rehearsed after all",
 };
+
+const REHEARSE_FIRST =
+  "After you rehearse a question, say how your answer went under “Rehearsed it?”. This schedules when it comes back.";
 
 const HOW_TO_REHEARSE = "Answer it again out loud, from memory, then compare with what you wrote.";
 
@@ -138,7 +142,9 @@ export function ProjectPage() {
         </>
       )}
       {notice && <p role="status" className="hint">{notice}</p>}
-      {project.questions.length === 0 && <p className="hint">This project has no questions yet.</p>}
+      {project.questions.length === 0
+        ? <p className="hint">This project has no questions yet.</p>
+        : <p className="hint rehearse-first">{REHEARSE_FIRST}</p>}
       {project.questions.map((q, i) => (
         <Question key={q.id} n={i + 1} question={q} onChange={(update) => change(q.id, update)}>
           {editing === q.id ? (

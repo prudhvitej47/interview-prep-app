@@ -39,7 +39,8 @@
     "@excalidraw/excalidraw": {
       "nanoid": "^3.3.19",
       "@excalidraw/mermaid-to-excalidraw": {
-        "nanoid": "^5.1.16"
+        "nanoid": "^5.1.16",
+        "mermaid": "$mermaid"
       }
     }
   }

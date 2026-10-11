@@ -57,7 +57,7 @@ export function NoteEditor({ unitId }: { unitId: string }) {
   const locked = status === "loading" || status === "load-failed";
   return (
     <section className="notes">
-      <h2>Your notes</h2>
+      <h3>Your notes</h3>
       <p className="hint">Only you can see these.</p>
       <label htmlFor="note" className="visually-hidden">Your notes on this unit</label>
       <textarea

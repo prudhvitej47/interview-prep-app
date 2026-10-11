@@ -15,3 +15,12 @@ export function useOverflow(box: RefObject<HTMLElement | null>, recheck?: unknow
   }, [box, recheck]);
   return overflows;
 }
+
+/**
+ * Said under a diagram that is wider than its frame. The frame's own name already tells a screen
+ * reader (", scrolls sideways"), so this line is for the eye only: on a phone nothing else shows
+ * there is more of the picture to the right.
+ */
+export function ScrollsNote() {
+  return <p className="hint scrolls-note" aria-hidden="true">Scrolls sideways →</p>;
+}
