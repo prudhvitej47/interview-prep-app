@@ -281,7 +281,9 @@ summary is the heading text, and it may sit inside a folded section.
 
 - **Corners:** 8px. **Background:** ink at 5%. **Border:** none. **Shadow:** none.
 - **Padding:** 0.8rem × 1rem; heading flush to the top (`h3 { margin: 0 0 0.5rem }`).
-- Used for the dashboard's cards, the rewards strip, reviews due, and the start-here guide.
+- Used for the dashboard's cards, reviews due, and the start-here guide. A card is for something to
+  act on: when no review is due, that is one muted line instead, and coverage on the home page is a
+  one-line summary that links to Progress rather than a second copy of its bars.
 
 ### Highlighted code
 

@@ -55,6 +55,36 @@ describe("App", () => {
     expect(screen.queryByText(/Reviews due/)).not.toBeInTheDocument();
   });
 
+  it("puts this week first and says in one line when no review is due", async () => {
+    mockFetch({
+      "/api/me": { body: me({ onboarded: true }) },
+      "/api/domains": { body: homeDomains },
+      "/api/topics": { body: topics },
+      "/api/reviews": { body: { due: [], nextDueOn: "2026-10-14" } },
+      "/api/projects/reviews": { body: { due: [], nextDueOn: null } },
+      "/api/rewards": { body: { stars: 3, starsThisWeek: 3, streak: 1, longestStreak: 1, freezes: 0,
+        thisWeekCounts: true, recentWeeks: [], milestonesReached: [], nextMilestone: 50 } },
+      "/api/plan": { body: { weekStart: "2026-10-05", onBreak: false, settings: null, plan: null } },
+      "/api/dashboard": { body: { weakAreas: [], whatChanged: null, coverage: [{ domainId: "dsa", name: "DSA",
+        done: 4, total: 40, stages: { notStarted: 36, learned: 2, reviewDue: 1, solid: 1 } }] } },
+    });
+    renderAt("/");
+    const thisWeek = await screen.findByRole("region", { name: "This week" });
+    const line = await screen.findByText(/^No reviews due\. The next one is on .*14/);
+    const stars = await screen.findByRole("region", { name: "Stars and streak" });
+    const coverage = await screen.findByText(/4 of 40 units started across 1 area, 1 due for review/);
+    const follows = (a: Element, b: Element) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(follows(thisWeek, line)).toBeTruthy();
+    expect(follows(line, stars)).toBeTruthy();
+    expect(follows(stars, coverage)).toBeTruthy();
+    // Nothing due is a quiet line, not a card with a heading.
+    expect(line.tagName).toBe("P");
+    expect(screen.queryByRole("heading", { name: /Reviews due/ })).not.toBeInTheDocument();
+    // Coverage by area lives on the progress page; home links there instead of repeating it.
+    expect(within(coverage).getByRole("link", { name: "See progress by area" })).toHaveAttribute("href", "/progress");
+    expect(screen.queryByRole("region", { name: "Coverage" })).not.toBeInTheDocument();
+  });
+
   it("shows an onboarded learner the curriculum, opening areas that have something in them", async () => {
     mockFetch({
       "/api/me": { body: me({ onboarded: true }) },

@@ -331,6 +331,7 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .breaks li > span:first-child { min-width: 11rem; }
 
 .dashboard { display: grid; gap: 1rem; margin: 1rem 0 1.5rem; }
+.dashboard > p { margin: 0; }
 .card { padding: 0.8rem 1rem; border-radius: 8px; background: color-mix(in srgb, var(--fg) 5%, transparent); }
 .card h3 { margin: 0 0 0.5rem; }
 .card > p { margin: 0.4rem 0; }

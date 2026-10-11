@@ -359,6 +359,9 @@ export const fetchProgressView = () => getJson<ProgressView>("/api/progress");
 export const fetchDashboard = () => getJson<Dashboard>("/api/dashboard");
 export const placeUnit = async (unitId: string, choice: Placement): Promise<Dashboard> =>
   (await send("PUT", "/api/placements", { unitId, choice })).json();
+/** Takes each listed unit's suggested placement, skipping any the learner already chose for. */
+export const acceptSuggestedPlacements = async (unitIds: string[]): Promise<Dashboard> =>
+  (await send("POST", "/api/placements/accept-suggested", { unitIds })).json();
 
 export type EvidenceSummary = {
   id: string;

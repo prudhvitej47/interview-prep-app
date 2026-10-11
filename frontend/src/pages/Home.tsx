@@ -42,9 +42,11 @@ export function Home({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         </span>
       </div>
       {!me.startGuideClosed && <StartHere onMe={onMe} />}
-      <RewardsStrip />
-      <ReviewsDue />
-      <Dashboard />
+      {/* This week first: it is what the learner came to do. Reviews and the stars follow it. */}
+      <Dashboard>
+        <ReviewsDue />
+        <RewardsStrip />
+      </Dashboard>
       <h3 className="browse">The curriculum</h3>
       {error && <p role="alert">{error}</p>}
       {!domains && !error && <p>Loading the curriculum…</p>}

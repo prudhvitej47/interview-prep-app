@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -138,6 +140,12 @@ class DashboardController {
   }
 
   /**
+   * The units a learner asks to accept the suggestion for: the ids of the rows the page showed, so a
+   * release that arrived in between cannot place units the learner never saw.
+   */
+  record AcceptRequest(List<String> unitIds) {}
+
+  /**
    * Places a unit from the latest release. "Now" also adds it to this week's plan if there is one
    * (on the least busy study day left); moving it away from "now" takes that item back out.
    */
@@ -152,9 +160,41 @@ class DashboardController {
     if (release == null || release.units().stream().noneMatch(u -> u.id().equals(request.unitId()))) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "not a unit of the latest release");
     }
+    record(me, release, request.unitId(), request.choice());
+    return dashboard(me);
+  }
+
+  /**
+   * Accepts the suggested placement, the one each row shows as "suggested", for every listed unit the
+   * learner has not chosen for yet, in one transaction. Each goes through the same step as a single
+   * choice, so a suggested "now" lands in this week's plan. Units already chosen keep the learner's
+   * choice, and ids that are not in the latest release are skipped, so sending it twice changes
+   * nothing the second time.
+   */
+  @PostMapping("/api/placements/accept-suggested")
+  @Transactional
+  Dashboard acceptSuggested(@AuthenticationPrincipal LearnerPrincipal me, @RequestBody AcceptRequest request) {
+    if (request == null || request.unitIds() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unitIds is required");
+    }
+    Release release = curriculum.latestRelease(me.slug());
+    if (release != null) {
+      Map<String, PlacementService.Choice> placed = placements.forLatestRelease(me);
+      for (String unitId : new LinkedHashSet<>(request.unitIds())) {
+        PlacementService.Choice c = placed.get(unitId);
+        if (c != null && !c.chosen()) {
+          record(me, release, unitId, c.suggested());
+        }
+      }
+    }
+    return dashboard(me);
+  }
+
+  /** Records one checked choice for a unit of {@code release}, and moves it into or out of this week. */
+  private void record(LearnerPrincipal me, Release release, String unitId, String choice) {
     MapSqlParameterSource p = new MapSqlParameterSource().addValue("learner", me.id())
-        .addValue("unit", request.unitId()).addValue("release", release.id())
-        .addValue("choice", request.choice()).addValue("week", PlanQueries.thisMonday());
+        .addValue("unit", unitId).addValue("release", release.id())
+        .addValue("choice", choice).addValue("week", PlanQueries.thisMonday());
     jdbc.update("insert into placement (learner_id, unit_id, release_id, choice, target_week)"
         + " values (:learner, :unit, :release, :choice, :week)"
         + " on conflict (learner_id, unit_id, release_id)"
@@ -164,14 +204,13 @@ class DashboardController {
         rs -> rs.next() ? rs.getLong(1) : null);
     if (plan != null) {
       p.addValue("plan", plan).addValue("reason", NOW_REASON).addValue("reasonPrefix", NOW_REASON + "%");
-      if (request.choice().equals(Placements.NOW)) {
-        addToThisWeek(me, p, plan, request.unitId());
+      if (choice.equals(Placements.NOW)) {
+        addToThisWeek(me, p, plan, unitId);
       } else {
         // Whether added here or put first when the plan was made, the item's reason starts the same way.
         jdbc.update("delete from plan_item where plan_id = :plan and unit_id = :unit and reason like :reasonPrefix", p);
       }
     }
-    return dashboard(me);
   }
 
   private void addToThisWeek(LearnerPrincipal me, MapSqlParameterSource p, long plan, String unitId) {
