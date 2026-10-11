@@ -70,7 +70,13 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           <li>The week's <strong>goal</strong> is 80% of the planned minutes.</li>
         </ul>
         <p className="hint">
-          Changing your hours, days or weights redraws the plan; everything you have done stays done.
+          Changing your hours, days or weights redraws the rest of the week; what you have already done stays in
+          the plan and still counts toward this week.
+        </p>
+        <p className="hint">
+          Finished every item early? The week page offers <strong>30, 60 or 90 more minutes</strong> for today,
+          picked the same way as the plan, by your weights. They count as done work once finished, but never raise
+          the week's planned minutes or goal, so finishing early can only help the week.
         </p>
       </section>
 
@@ -115,6 +121,10 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
             <strong> Reset data</strong> if you change it. Coding problems list test cases to check your own
             solution against.
           </li>
+          <li>
+            Units named in the text are links; a ✓ after one means you have done it. A diagram wider than your
+            screen scrolls sideways inside its frame, and says so underneath.
+          </li>
           <li>Your notes on a unit are private to you.</li>
         </ul>
       </section>
@@ -133,7 +143,7 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
             <tr><th>Easy</th><td>Straightforward. Two steps further out; a first Easy goes straight to 16 days.</td></tr>
           </tbody>
         </table>
-        <p>Reviews that are due show at the top of the home page.</p>
+        <p>Reviews that are due show on the home page, under This week.</p>
       </section>
 
       <section aria-labelledby="h-rewards">
@@ -143,8 +153,9 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
             <strong>Stars</strong>, never taken away: a unit earns them the first time it is done with anything but
             Again (3 for a design case, 2 for a project deep dive, 1 otherwise, and 1 more for a coding or SQL
             problem rated Easy). A question about your own project earns 1 the first time you rate it anything but
-            Again. A day with three or more reviews earns 1. A week that meets its goal earns 5, and 2 more if the
-            whole plan was done; a planned project question counts once you rate it that week.
+            Again. A day with three or more reviews earns 1. A week that meets its goal earns 5, and 2 more if
+            every planned item was done; a planned project question counts once you rate it that week. Minutes
+            added after finishing early count toward the goal but are not needed for the 2.
           </li>
           <li><strong>Streak</strong>: weeks in a row that met their goal.</li>
           <li>
@@ -162,7 +173,19 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
         <h3 id="h-changed">6. When the curriculum changes</h3>
         <p>
           New units arrive as releases. The <strong>What changed</strong> card on the home page lists them, with a
-          suggestion for each; choose Now, Next week or Later. Your progress is kept when a unit is updated.
+          suggestion for each, and you choose when each one joins your plan:
+        </p>
+        <table>
+          <tbody>
+            <tr><th>Now</th><td>Joins this week's plan straight away.</td></tr>
+            <tr><th>Next week</th><td>Goes into the pool when next week's plan is made.</td></tr>
+            <tr><th>Later</th><td>Never planned until you change your mind; you can still open it from the curriculum.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          A unit you leave alone behaves as its suggestion. <strong>Accept all suggested placements</strong> makes
+          every remaining suggestion your choice in one step, and keeps the ones you already picked. The card shows
+          the first 10 units; <strong>Show all</strong> lists the rest. Your progress is kept when a unit is updated.
         </p>
       </section>
 
@@ -233,6 +256,7 @@ export function HowItWorks({ me, onMe }: { me: Me; onMe: (me: Me) => void }) {
           so a solid unit you have forgotten goes back to learned. Units you marked "not for me" are left out of the
           counts, here and in the home page's coverage.
         </p>
+        <p>The unit list opens on the units you have started; choose All in the same list to see every unit.</p>
       </section>
 
       <section aria-labelledby="h-guide">

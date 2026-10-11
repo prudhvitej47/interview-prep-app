@@ -61,12 +61,13 @@ export function StartHere({ onMe }: { onMe: (me: Me) => void }) {
           how it went: Again, Hard, Good or Easy. That marks it done and schedules its reviews.
         </Step>
         <Step>
-          Come back on your study days. Reviews that are due show at the top of this page; the plan shows what
-          is next. Stars and the weekly streak count what you finish.
+          Come back on your study days. This week's plan shows what is next, and reviews that are due show
+          under it on this page. Finished early? The week page lets you add more for today. Stars and the
+          weekly streak count what you finish.
         </Step>
         <Step>
           When new units arrive, the <strong>What changed</strong> card below lets you choose when each one joins
-          your plan: now, next week or later.
+          your plan: now, next week or later. Or accept all the suggestions in one step.
         </Step>
       </ol>
       <p>
