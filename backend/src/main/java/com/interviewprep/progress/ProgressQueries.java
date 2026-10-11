@@ -1,16 +1,20 @@
 package com.interviewprep.progress;
 
+import com.interviewprep.curriculum.UnitsDone;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /** A learner's attempts, and what follows from them, for other modules and this one's controller. */
 @Component
-public class ProgressQueries {
+public class ProgressQueries implements UnitsDone {
 
   /** Days run in India time, the same days the planner and the streak use. */
   public static final ZoneId STUDY_ZONE = ZoneId.of("Asia/Kolkata");
@@ -35,6 +39,17 @@ public class ProgressQueries {
   List<Attempt> attempts(long learnerId, String unitId) {
     return query("learner_id = :learner and unit_id = :unit",
         new MapSqlParameterSource().addValue("learner", learnerId).addValue("unit", unitId));
+  }
+
+  @Override
+  public Set<String> doneAmong(Collection<String> unitIds, String slug) {
+    if (unitIds.isEmpty()) {
+      return Set.of();
+    }
+    return new HashSet<>(jdbc.queryForList(
+        "select distinct a.unit_id from attempt a join learner l on l.id = a.learner_id"
+            + " where l.slug = :slug and a.unit_id in (:ids)",
+        new MapSqlParameterSource("slug", slug).addValue("ids", unitIds), String.class));
   }
 
   /** When a unit is next due, from its attempts oldest first; null if it was never done. */

@@ -102,7 +102,11 @@ export type UnitDetail = {
   testCases: TestCase[];
   hiddenTestCases: number;
   sqlFixture: SqlFixture | null;
+  references: Reference[];
 };
+
+/** A unit or topic the unit's text names by id in inline code; the page shows its title instead. */
+export type Reference = { id: string; kind: "unit" | "topic"; title: string; domainName: string; done: boolean };
 
 export type TestCase = { name: string; input: string; expected: string };
 

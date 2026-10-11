@@ -1,4 +1,5 @@
-import { isValidElement, useRef, type ReactNode } from "react";
+import { isValidElement, useMemo, useRef, type ReactNode } from "react";
+import { Link } from "react-router";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createLowlight } from "lowlight";
@@ -10,6 +11,7 @@ import properties from "highlight.js/lib/languages/properties";
 import { Mermaid } from "./Mermaid";
 import { Sketch } from "./Sketch";
 import { useOverflow } from "./overflow";
+import type { Reference } from "../api";
 
 /**
  * Only the languages the curriculum actually fences, registered one by one on highlight.js's bare
@@ -24,14 +26,23 @@ const lowlight = createLowlight({ java, sql, yaml, properties });
  * sketch, a fence in a language we highlight
  * becomes marked-up code, and everything else is ordinary Markdown. Raw HTML in the source is not
  * rendered — react-markdown's default, and the right one.
+ *
+ * Units name other units and topics by id in inline code (`ds.transactions.idempotency-keys`), which
+ * keeps them checkable in the content repository. Given the unit's `references`, such a span
+ * becomes a link that reads as the title; anywhere without references (notes, project pages) and
+ * any code that is not a known id stays plain code.
  */
-export function Markdown({ children }: { children: string }) {
+export function Markdown({ children, references }: { children: string; references?: Reference[] }) {
+  const byId = useMemo(() => new Map(references?.map((r) => [r.id, r])), [references]);
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
         code({ className, children: code, ...rest }) {
           const language = languageOf(className);
+          // Only inline code: a fence's text ends in a newline, so it never equals an id anyway.
+          const reference = language === null ? byId.get(String(code)) : undefined;
+          if (reference) return <ReferenceLink reference={reference} />;
           if (language === "mermaid") return <Mermaid chart={String(code).trim()} />;
           if (language === "excalidraw") return <Sketch source={String(code).trim()} />;
           if (language && lowlight.registered(language)) {
@@ -54,6 +65,22 @@ export function Markdown({ children }: { children: string }) {
     >
       {children}
     </ReactMarkdown>
+  );
+}
+
+/**
+ * A unit or topic named in the text, shown by its title. The id and domain stay one hover away, and
+ * a unit already done carries the same muted tick as a finished step on Start here. The tick sits
+ * outside the link, so the link's name is the title alone, and a no-break space keeps it from
+ * wrapping onto a line by itself.
+ */
+function ReferenceLink({ reference: r }: { reference: Reference }) {
+  return (
+    <>
+      <Link to={r.kind === "unit" ? `/units/${r.id}` : `/topics/${r.id}`} className="reference"
+        title={`${r.id} · ${r.domainName}`}>{r.title}</Link>
+      {r.done && <span className="reference-done">{"\u00a0"}<span role="img" aria-label="done">✓</span></span>}
+    </>
   );
 }
 

@@ -67,5 +67,6 @@ export const unit = (overrides: object = {}) => ({
   testCases: [],
   hiddenTestCases: 0,
   sqlFixture: null,
+  references: [],
   ...overrides,
 });

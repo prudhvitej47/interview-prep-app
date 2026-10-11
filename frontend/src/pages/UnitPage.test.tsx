@@ -39,6 +39,16 @@ describe("UnitPage", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it("shows the units its text names by their titles, in folded blocks too", async () => {
+    show(unit({
+      type: "sql",
+      markdown: "## Why it matters\nSee `hld.method.estimation-drill`.\n\n## Solution\nAlso `hld.method.estimation-drill`.",
+      references: [{ id: "hld.method.estimation-drill", kind: "unit", title: "Estimation drill",
+        domainName: "High-level design", done: false }],
+    }));
+    expect(await screen.findAllByRole("link", { name: "Estimation drill" })).toHaveLength(2);
+  });
+
   it("shows the unit, where it sits and what kind it is", async () => {
     show(unit());
     expect(await screen.findByRole("heading", { name: "Idempotency keys for safe retries" })).toBeInTheDocument();
