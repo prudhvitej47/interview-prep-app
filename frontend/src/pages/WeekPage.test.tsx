@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WeekPage } from "./WeekPage";
-import { DOMAINS, mockFetch } from "../testing";
+import { DOMAINS, lastCallTo, mockFetch } from "../testing";
 
 const NO_SETTINGS = { hoursPerWeek: null, studyDays: [], weights: {} };
 const SETTINGS = { hoursPerWeek: 9, studyDays: [1, 3], weights: {} };
@@ -206,7 +206,7 @@ describe("WeekPage", () => {
     expect(within(card).getByRole("radio", { name: "1, Heard of it" })).toBeChecked();
     fireEvent.click(within(card).getByRole("button", { name: "Save ratings" }));
     expect(await screen.findByText(/Next week's plan will use these/)).toBeInTheDocument();
-    const [, init] = fetchMock.mock.calls.at(-1)!;
+    const [, init] = lastCallTo(fetchMock, "/api/me/ratings/topics");
     expect(JSON.parse(init!.body as string)).toEqual({ ratings: { "db.sql": 1 } });
   });
 
@@ -238,8 +238,7 @@ describe("WeekPage", () => {
 
     expect(await screen.findByRole("link", { name: "Group by" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Add more to today" })).not.toBeInTheDocument();
-    const [url, init] = fetchMock.mock.calls.at(-1)!;
-    expect(url).toBe("/api/plan/extra");
+    const [, init] = lastCallTo(fetchMock, "/api/plan/extra");
     expect(init?.method).toBe("POST");
     expect(JSON.parse(init!.body as string)).toEqual({ minutes: 60 });
     expect(screen.getByText(/60 of 389 goal minutes done/)).toBeInTheDocument();
@@ -261,7 +260,8 @@ describe("WeekPage", () => {
     fireEvent.click(within(offer).getByRole("button", { name: "30 min" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Nothing else to learn fits in 30 minutes.");
     // The week is reloaded after a refusal; this one is unchanged, so the offer stays.
-    await waitFor(() => expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/plan"));
+    const extra = fetchMock.mock.calls.findIndex(([u]) => u === "/api/plan/extra");
+    await waitFor(() => expect(fetchMock.mock.calls.slice(extra + 1).some(([u]) => u === "/api/plan")).toBe(true));
     expect(within(offer).getByRole("button", { name: "30 min" })).toBeEnabled();
   });
 
@@ -303,8 +303,7 @@ describe("WeekPage", () => {
       ...breaks, upcoming: [{ ...breaks.upcoming[0], taken: true }, breaks.upcoming[1]] }) }));
     fireEvent.click(within(section as HTMLElement).getByRole("button", { name: "Take it off" }));
     expect(await within(section as HTMLElement).findByRole("button", { name: "Give it back" })).toBeInTheDocument();
-    const [url, init] = fetchMock.mock.calls.at(-1)!;
-    expect(url).toBe("/api/breaks");
+    const [, init] = [...fetchMock.mock.calls].reverse().find(([u, i]) => u === "/api/breaks" && i?.method === "POST")!;
     expect(JSON.parse(init!.body as string)).toEqual({ weekStart: "2026-10-05" });
   });
 });

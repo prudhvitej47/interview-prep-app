@@ -16,6 +16,16 @@ export function mockFetch(routes: Record<string, Route>) {
   return fetchMock;
 }
 
+/**
+ * The latest recorded call to one URL. A page can fetch other things in the background (the week page
+ * loads planned breaks on its own), so "the last call" is not a safe way to find the one a test made.
+ */
+export function lastCallTo(fetchMock: ReturnType<typeof mockFetch>, url: string) {
+  const call = [...fetchMock.mock.calls].reverse().find(([u]) => u === url);
+  if (!call) throw new Error(`no fetch to ${url}`);
+  return call;
+}
+
 export const DOMAINS = [
   { id: "dsa", name: "DSA and coding", weight: 60, examples: ["Graphs", "Trees"] },
   { id: "databases", name: "Databases and SQL", weight: 40, examples: ["Indexes"] },
