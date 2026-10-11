@@ -196,7 +196,14 @@ describe("WeekPage", () => {
     show();
     const card = (await screen.findByRole("heading", { name: "How are you with these?" })).closest("section")!;
     expect(card).toHaveTextContent("guessed 3/5");
-    fireEvent.click(within(card).getByLabelText("1"));
+    // A radio group of choice pills, each named with its anchor, the ends of the scale spelled out.
+    const pills = within(card).getAllByRole("radio");
+    expect(pills.map((p) => p.getAttribute("aria-label"))).toEqual([
+      "0, New to me", "1, Heard of it", "2, Used it a little", "3, Comfortable", "4, Strong", "5, Could teach it"]);
+    expect(within(card).getByRole("group", { name: /SQL/ })).toContainElement(pills[0]);
+    expect(card).toHaveTextContent("0 = new to me … 5 = could teach it");
+    fireEvent.click(within(card).getByRole("radio", { name: "1, Heard of it" }));
+    expect(within(card).getByRole("radio", { name: "1, Heard of it" })).toBeChecked();
     fireEvent.click(within(card).getByRole("button", { name: "Save ratings" }));
     expect(await screen.findByText(/Next week's plan will use these/)).toBeInTheDocument();
     const [, init] = fetchMock.mock.calls.at(-1)!;

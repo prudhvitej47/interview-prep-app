@@ -7,6 +7,7 @@ import {
 import { formatDay } from "../unit/ProgressPanel";
 import { itemHref, itemKey, itemLabel } from "./planItem";
 import { moveFocusTo } from "../navigation";
+import { SCALE } from "../Onboarding";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -108,8 +109,8 @@ function Plan({ plan, weekStart, onAdded }: { plan: PlanView; weekStart: string;
           <ul>
             {plan.items.filter((i) => i.day === day).map((i) => (
               <li key={itemKey(i)} className={i.done ? "done" : ""}>
+                <span className="mark" role="img" aria-label={i.done ? "done" : "to do"}>{i.done ? "✓" : "○"}</span>
                 <div className="item-head">
-                  <span role="img" aria-label={i.done ? "done" : "to do"}>{i.done ? "✓" : "○"}</span>
                   <Link to={itemHref(i)}>{i.title}</Link>
                   <span className="count">{itemLabel(i)} · {i.minutes} min</span>
                 </div>
@@ -198,18 +199,23 @@ function TopicCard({ plan }: { plan: PlanView }) {
         This week teaches them, and so far their strength is a guess from your area rating. Optional; it sharpens next
         week's plan.
       </p>
+      <p className="hint scale-ends">0 = {SCALE[0].toLowerCase()} … 5 = {SCALE[SCALE.length - 1].toLowerCase()}</p>
       {plan.topicsToRate.map((t) => (
         <fieldset key={t.topicId}>
           <legend>
             {t.name} <span className="count">{t.domainName} · guessed {t.currentGuess}/5</span>
           </legend>
-          {[0, 1, 2, 3, 4, 5].map((v) => (
-            <label key={v}>
-              <input type="radio" name={t.topicId} checked={ratings[t.topicId] === v}
-                onChange={() => setRatings({ ...ratings, [t.topicId]: v })} />
-              {v}
-            </label>
-          ))}
+          {/* Native radios under the pills, so the group keeps the browser's arrow keys and is read
+              as "1 of 6"; each one is named with its anchor, which the pill has no room to show. */}
+          <div className="choices rating-pills">
+            {SCALE.map((anchor, v) => (
+              <label key={v}>
+                <input type="radio" className="visually-hidden" name={t.topicId} value={v} aria-label={`${v}, ${anchor}`}
+                  checked={ratings[t.topicId] === v} onChange={() => setRatings({ ...ratings, [t.topicId]: v })} />
+                <span aria-hidden="true">{v}</span>
+              </label>
+            ))}
+          </div>
         </fieldset>
       ))}
       <div className="note-actions">

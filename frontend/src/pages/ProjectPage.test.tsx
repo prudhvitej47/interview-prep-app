@@ -68,6 +68,15 @@ describe("ProjectPage", () => {
     expect(screen.getByRole("link", { name: "My projects" })).toHaveAttribute("href", "/projects");
   });
 
+  it("explains rating a rehearsal once, above the first question, not under every one", async () => {
+    show({ "/api/projects/1": { body: project([question(), question({ id: 12, prompt: "And when the broker is down?" })]) } });
+    const explainer = await screen.findByText(/say how your answer went under “Rehearsed it\?”/);
+    expect(screen.getAllByText(/how your answer went/)).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "Rehearsed it?" })).toHaveLength(2);
+    const first = screen.getByRole("heading", { level: 3, name: "What fails first at ten times the load?" });
+    expect(explainer.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("keeps the follow-ups and the strong answer out of reach until there is an answer or a rating", async () => {
     show({ "/api/projects/1": { body: project([question()]) } });
     await screen.findByRole("heading", { level: 2, name: "Example ledger" });
