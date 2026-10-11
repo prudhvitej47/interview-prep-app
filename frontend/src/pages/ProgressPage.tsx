@@ -6,6 +6,13 @@ import { formatDay } from "../unit/ProgressPanel";
 import { TYPE_LABEL } from "../unit/sections";
 import { describeCounts, STAGE_LABEL, StageBar, StageChip, StageLegend, STAGES, totalOf } from "./stages";
 
+const ALL = "all";
+/** Any stage but "not started": learned, review due or solid. */
+const STARTED = "started";
+type Filter = Stage | typeof ALL | typeof STARTED;
+const isFilter = (value: string): value is Filter =>
+  value === ALL || value === STARTED || (STAGES as string[]).includes(value);
+
 /** When a unit or question is next reviewed, or since when it has been due. */
 function when(stage: Stage, dueOn: string | null, today: string) {
   if (!dueOn) return null;
@@ -23,13 +30,14 @@ export function ProgressPage() {
   const [error, setError] = useState<string | null>(null);
   // In the address, so Back from a unit returns to the same filtered list.
   const [params, setParams] = useSearchParams();
-  const stage = (STAGES as string[]).includes(params.get("stage") ?? "") ? (params.get("stage") as Stage) : "";
+  const asked = params.get("stage") ?? "";
   const area = params.get("area") ?? "";
 
   useEffect(() => {
     fetchProgressView().then(setData).catch((e: Error) => setError(e.message));
   }, []);
 
+  // "All" is a choice of its own in the address: no stage there means the default below.
   const setFilter = (key: "stage" | "area", value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -41,8 +49,12 @@ export function ProgressPage() {
   if (!data) return <p>Loading your progress…</p>;
 
   const units = data.units.filter((u) => !u.notForMe);
+  // Every unit is hundreds of rows, most not started; the ones begun are what this list is for. A
+  // learner who has begun none sees them all, rather than an empty list.
+  const begun = (u: { stage: Stage }) => u.stage !== "not-started";
+  const stage: Filter = isFilter(asked) ? asked : units.some(begun) ? STARTED : ALL;
   const inArea = units.filter((u) => !area || u.domainId === area);
-  const shown = inArea.filter((u) => !stage || u.stage === stage);
+  const shown = inArea.filter((u) => stage === ALL || (stage === STARTED ? begun(u) : u.stage === stage));
   const areaName = new Map(data.areas.map((a) => [a.domainId, a.name]));
 
   return (
@@ -124,7 +136,8 @@ export function ProgressPage() {
           <label className="filter">
             Stage{" "}
             <select value={stage} onChange={(e) => setFilter("stage", e.target.value)}>
-              <option value="">All ({inArea.length})</option>
+              <option value={ALL}>All ({inArea.length})</option>
+              <option value={STARTED}>Started ({inArea.filter(begun).length})</option>
               {STAGES.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABEL[s]} ({inArea.filter((u) => u.stage === s).length})
