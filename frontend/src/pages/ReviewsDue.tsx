@@ -27,23 +27,23 @@ function UnitReviews() {
   }, []);
 
   if (!queue || (queue.due.length === 0 && !queue.nextDueOn)) return null;
+  // Nothing to do is not worth a card: one quiet line says when there will be.
+  if (queue.due.length === 0) {
+    return <p className="hint">No reviews due. The next one is on {formatDay(queue.nextDueOn!)}.</p>;
+  }
   return (
     <section className="reviews-due">
-      <h3>Reviews due{queue.due.length > 0 && <span className="count"> {queue.due.length}</span>}</h3>
-      {queue.due.length === 0 ? (
-        <p className="hint">Nothing due. The next review is on {formatDay(queue.nextDueOn!)}.</p>
-      ) : (
-        <ul className="units">
-          {queue.due.map((d) => (
-            <li key={d.unitId}>
-              <Link to={`/units/${d.unitId}`}>{d.title}</Link>
-              <span className="count">
-                {TYPE_LABEL[d.type] ?? d.type} · due {formatDay(d.dueOn)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <h3>Reviews due <span className="count">{queue.due.length}</span></h3>
+      <ul className="units">
+        {queue.due.map((d) => (
+          <li key={d.unitId}>
+            <Link to={`/units/${d.unitId}`}>{d.title}</Link>
+            <span className="count">
+              {TYPE_LABEL[d.type] ?? d.type} · due {formatDay(d.dueOn)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -56,23 +56,22 @@ function ProjectReviews() {
   }, []);
 
   if (!queue || (queue.due.length === 0 && !queue.nextDueOn)) return null;
+  if (queue.due.length === 0) {
+    return <p className="hint">No project questions due. The next one is on {formatDay(queue.nextDueOn!)}.</p>;
+  }
   return (
     <section className="reviews-due">
-      <h3>Project questions due{queue.due.length > 0 && <span className="count"> {queue.due.length}</span>}</h3>
-      {queue.due.length === 0 ? (
-        <p className="hint">Nothing due. The next one is on {formatDay(queue.nextDueOn!)}.</p>
-      ) : (
-        <ul className="units">
-          {queue.due.map((d) => (
-            <li key={d.questionId}>
-              <Link to={`/projects/${d.projectId}#q-${d.questionId}`}>{d.prompt}</Link>
-              <span className="count">
-                {d.projectName} · {RUNG_LABEL[d.rung] ?? d.rung} · due {formatDay(d.dueOn)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <h3>Project questions due <span className="count">{queue.due.length}</span></h3>
+      <ul className="units">
+        {queue.due.map((d) => (
+          <li key={d.questionId}>
+            <Link to={`/projects/${d.projectId}#q-${d.questionId}`}>{d.prompt}</Link>
+            <span className="count">
+              {d.projectName} · {RUNG_LABEL[d.rung] ?? d.rung} · due {formatDay(d.dueOn)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

@@ -368,6 +368,58 @@ class PlanApiTest extends PostgresTestBase {
   }
 
   @Test
+  void acceptingTheSuggestionsPlacesEachUnchosenUnitOnceAndKeepsTheLearnersOwnChoices() throws Exception {
+    // This week's plan is made while the joins unit is suggested for later, so it is not in it...
+    jdbc.update("update curriculum_release set changelog = ?", CHANGELOG);
+    send(put("/api/me/week"), TESTER, SETTINGS);
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')]").isEmpty());
+    // ...then the table says "now" for it; the rest have no row, so their suggestion is next week.
+    jdbc.update("update curriculum_release set changelog = ?", CHANGELOG.replace("end of track | now", "now | now"));
+    // The learner already chose "later" for one unit: accepting must not overrule it.
+    send(put("/api/placements"), TESTER, "{\"unitId\": \"dsa.window.p1\", \"choice\": \"end-of-track\"}");
+    String body = "{\"unitIds\": [\"db.sql.joins\", \"dsa.window.concept\", \"dsa.window.p1\", \"no.such.unit\","
+        + " \"db.sql.joins\"]}";
+
+    send(post("/api/placements/accept-suggested"), TESTER, body)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].placement").value("now"))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].chosen").value(true))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'dsa.window.concept')].placement").value("next-week"))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'dsa.window.concept')].chosen").value(true))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'dsa.window.p1')].placement").value("end-of-track"))
+        // Not sent, so not accepted.
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.tester-only')].chosen").value(false));
+    // A suggested "now" goes through the same step as choosing it by hand: it is in this week's plan.
+    mvc.perform(as(get("/api/plan"), TESTER))
+        .andExpect(jsonPath("$.plan.items[?(@.unitId == 'db.sql.joins')].reason").value("You chose to start it now"));
+    String placements = "select string_agg(unit_id || '=' || choice || '@' || decided_at, ',' order by unit_id)"
+        + " from placement";
+    String before = jdbc.queryForObject(placements, String.class);
+    int items = jdbc.queryForObject("select count(*) from plan_item", Integer.class);
+
+    // Sending it again changes nothing: every listed unit is now chosen.
+    send(post("/api/placements/accept-suggested"), TESTER, body).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject(placements, String.class)).isEqualTo(before);
+    assertThat(jdbc.queryForObject("select count(*) from plan_item", Integer.class)).isEqualTo(items);
+    assertThat(jdbc.queryForObject("select count(*) from placement", Integer.class)).isEqualTo(3);
+    // The other learner's placements are their own.
+    mvc.perform(as(get("/api/dashboard"), OTHER))
+        .andExpect(jsonPath("$.whatChanged.units[?(@.unitId == 'db.sql.joins')].chosen").value(false));
+  }
+
+  @Test
+  void acceptingTheSuggestionsIsChecked() throws Exception {
+    send(post("/api/placements/accept-suggested"), TESTER, "{}").andExpect(status().isBadRequest());
+    // Another learner's private unit is not theirs to place: skipped, not an error.
+    send(post("/api/placements/accept-suggested"), OTHER, "{\"unitIds\": [\"db.sql.tester-only\"]}")
+        .andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("select count(*) from placement", Integer.class)).isZero();
+    mvc.perform(as(post("/api/placements/accept-suggested"), TESTER).contentType(MediaType.APPLICATION_JSON)
+        .content("{\"unitIds\": []}")).andExpect(status().isForbidden());
+  }
+
+  @Test
   void placementsAreChecked() throws Exception {
     send(put("/api/placements"), TESTER, "{\"unitId\": \"db.sql.joins\", \"choice\": \"someday\"}")
         .andExpect(status().isBadRequest());

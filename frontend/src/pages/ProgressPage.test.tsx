@@ -64,8 +64,32 @@ it("shows each area as a stage bar with its counts in words, and says what it le
   expect(areas).toHaveTextContent("DSA3/4");
   expect(areas).toHaveTextContent("1 unit you kept out of your plans (\"not for me\") is left out here.");
   // The "not for me" unit is not listed, whatever the filter.
+  fireEvent.change(screen.getByRole("combobox", { name: "Stage" }), { target: { value: "all" } });
   expect(titles()).not.toContain("Title of db.hidden");
   expect(titles()).toHaveLength(5);
+});
+
+it("lists the units already started by default, with every unit one choice away", async () => {
+  renderPage();
+  await screen.findByRole("region", { name: "Units" });
+  const stage = screen.getByRole("combobox", { name: "Stage" });
+  expect(stage).toHaveDisplayValue("Started (4)");
+  // Learned, review due and solid; not the unit not started yet.
+  expect(titles()).toEqual(["Title of dsa.a", "Title of dsa.b", "Title of dsa.c", "Title of db.a"]);
+  expect(screen.getByLabelText("search")).toHaveTextContent(/^$/);
+
+  fireEvent.change(stage, { target: { value: "all" } });
+  expect(titles()).toHaveLength(5);
+  // "All" stays in the address, so Back from a unit returns to the whole list.
+  expect(screen.getByLabelText("search")).toHaveTextContent("?stage=all");
+});
+
+it("lists every unit for a learner who has started none", async () => {
+  mockFetch({ "/api/progress": { body: { ...view, units: [unit("dsa.d", "dsa", "not-started", 0, null)] } } });
+  render(<MemoryRouter initialEntries={["/progress"]}><ProgressPage /></MemoryRouter>);
+  await screen.findByRole("region", { name: "Units" });
+  expect(screen.getByRole("combobox", { name: "Stage" })).toHaveDisplayValue("All (1)");
+  expect(titles()).toEqual(["Title of dsa.d"]);
 });
 
 it("filters the units by stage and by area, and keeps the filter in the address", async () => {
