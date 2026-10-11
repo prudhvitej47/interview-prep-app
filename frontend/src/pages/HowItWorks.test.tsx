@@ -21,6 +21,15 @@ it("explains the plan, reviews and rewards", () => {
   expect(screen.getByRole("row", { name: /^Solid/ })).toHaveTextContent("16 or more days away");
 });
 
+it("explains finishing early, rebuilding and the release choices", () => {
+  render(<MemoryRouter><HowItWorks me={me({ onboarded: true })} onMe={vi.fn()} /></MemoryRouter>);
+  expect(screen.getByText(/Finished every item early\?/)).toHaveTextContent("never raise the week's planned minutes or goal");
+  expect(screen.getByText(/redraws the rest of the week/)).toHaveTextContent("still counts toward this week");
+  expect(screen.getByRole("row", { name: /^Now/ })).toHaveTextContent("this week's plan straight away");
+  expect(screen.getByRole("row", { name: /^Later/ })).toHaveTextContent("Never planned until you change your mind");
+  expect(screen.getByText(/A unit you leave alone/)).toHaveTextContent("Accept all suggested placements");
+});
+
 it("brings a closed start guide back", async () => {
   const fetchMock = mockFetch({ "/api/me/start-guide": { body: me({ onboarded: true, startGuideClosed: false }) } });
   const onMe = vi.fn();
