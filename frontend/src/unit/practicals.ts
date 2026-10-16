@@ -73,8 +73,11 @@ export function readNumber(raw: string): number | null {
   return Number(cleaned);
 }
 
+// The epsilon absorbs floating-point error at the edge: |2.6 - 2.5| is 0.10000000000000009, not 0.1.
+const EDGE = 1e-9;
+
 export function isRightNumber(spec: Extract<PredictSpec, { kind: "number" }>, value: number): boolean {
-  return Math.abs(value - spec.number) <= spec.tolerance;
+  return Math.abs(value - spec.number) <= spec.tolerance + EDGE;
 }
 
 export function parseEvidence(source: string): EvidenceSpec {

@@ -54,6 +54,13 @@ describe("isRightNumber", () => {
     expect(isRightNumber(spec, 11)).toBe(true);
     expect(isRightNumber(spec, 11.5)).toBe(false);
   });
+
+  it("accepts a decimal answer exactly at the tolerance edge, despite floating point", () => {
+    const decimal = { kind: "number" as const, question: "q", number: 2.5, tolerance: 0.1, reveal: "r" };
+    expect(isRightNumber(decimal, 2.6)).toBe(true);
+    expect(isRightNumber(decimal, 2.4)).toBe(true);
+    expect(isRightNumber(decimal, 2.61)).toBe(false);
+  });
 });
 
 describe("parseEvidence", () => {

@@ -43,3 +43,13 @@ it("puts each mark before its line, so a long line cannot scroll it out of view"
   const mark = screen.getByText("not a cause", { selector: ".evidence-mark" });
   expect(mark.nextElementSibling?.tagName).toBe("CODE");
 });
+
+it("moves focus to the result after Check", () => {
+  render(<Evidence source={source} render={md} />);
+  const status = screen.getByRole("status");
+  expect(status).toBeEmptyDOMElement();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Line 2: postFee(fee);" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  expect(status).toHaveTextContent("Right.");
+  expect(document.activeElement).toBe(status);
+});

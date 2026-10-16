@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { isRightNumber, parsePredict, readNumber, type PredictSpec } from "./practicals";
 
 /**
@@ -18,6 +18,9 @@ function PredictExercise({ spec, render }: { spec: PredictSpec; render: (markdow
   const [choice, setChoice] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState(false);
+  const status = useRef<HTMLParagraphElement>(null);
+  // Check disappears once used, so focus moves to the result instead of falling to the page.
+  useEffect(() => { if (checked) status.current?.focus(); }, [checked]);
   const value = spec.kind === "number" ? readNumber(typed) : null;
   const ready = spec.kind === "choice" ? choice !== null : value !== null;
   const right = spec.kind === "choice" ? choice === spec.answer : value !== null && isRightNumber(spec, value);
@@ -49,11 +52,12 @@ function PredictExercise({ spec, render }: { spec: PredictSpec; render: (markdow
       {!checked && (
         <button type="button" className="secondary" disabled={!ready} onClick={() => setChecked(true)}>Check</button>
       )}
+      {/* The live region exists from the start, so screen readers announce the result when it appears. */}
+      <p role="status" tabIndex={-1} ref={status} className={checked ? `verdict ${right ? "right" : "wrong"}` : "practical-status"}>
+        {checked ? (right ? "Right." : `Not quite. The answer is: ${answer}`) : ""}
+      </p>
       {checked && (
         <>
-          <p role="status" className={`verdict ${right ? "right" : "wrong"}`}>
-            {right ? "Right." : `Not quite. The answer is: ${answer}`}
-          </p>
           {render(spec.reveal)}
           {spec.output && <pre className="practical-output"><code>{spec.output}</code></pre>}
         </>

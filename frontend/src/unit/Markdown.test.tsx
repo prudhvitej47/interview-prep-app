@@ -151,3 +151,13 @@ it("keeps the rest of the unit when an exercise fence is broken", () => {
   expect(screen.getByText(/This exercise could not be read/)).toBeInTheDocument();
   expect(screen.getByText("Outro.")).toBeInTheDocument();
 });
+
+it("keeps an exercise's answer when the page re-renders", () => {
+  const body = JSON.stringify({ question: "How many?", number: 5, reveal: "Five." });
+  const source = "```predict\n" + body + "\n```";
+  const { rerender } = render(<div className="unit"><Markdown>{source}</Markdown></div>);
+  fireEvent.change(screen.getByRole("textbox", { name: "Your answer" }), { target: { value: "5" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  rerender(<div className="unit"><Markdown>{source}</Markdown></div>);
+  expect(screen.getByRole("status")).toHaveTextContent("Right.");
+});

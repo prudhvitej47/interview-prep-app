@@ -47,10 +47,23 @@ it("keeps two exercises on one page independent", () => {
   expect(firstHangs.name).not.toBe(secondHangs.name);
   fireEvent.click(firstHangs);
   fireEvent.click(screen.getAllByRole("button", { name: "Check" })[0]);
-  expect(screen.getAllByRole("status")).toHaveLength(1);
+  const [firstStatus, secondStatus] = screen.getAllByRole("status");
+  expect(firstStatus).toHaveTextContent("Right.");
+  expect(secondStatus).toBeEmptyDOMElement();
+  expect(screen.getAllByRole("button", { name: "Check" })).toHaveLength(1);
 });
 
 it("shows a readable line instead of breaking the page when the fence is bad", () => {
   render(<Predict source="{" render={md} />);
   expect(screen.getByText(/This exercise could not be read: the fence is not valid JSON/)).toBeInTheDocument();
+});
+
+it("moves focus to the result after Check, so keyboard and screen-reader users keep their place", () => {
+  render(<Predict source={choice} render={md} />);
+  const status = screen.getByRole("status");
+  expect(status).toBeEmptyDOMElement();
+  fireEvent.click(screen.getByRole("radio", { name: "It hangs" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  expect(status).toHaveTextContent("Right.");
+  expect(document.activeElement).toBe(status);
 });

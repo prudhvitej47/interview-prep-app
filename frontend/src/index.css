@@ -486,3 +486,5 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .evidence-lines code { background: none; padding: 0; }
 .evidence-n { color: var(--muted); min-width: 1.6rem; text-align: right; }
 .evidence-mark, .evidence-gap { flex: none; width: 11ch; color: var(--muted); font-style: italic; white-space: nowrap; }
+.practical-status:empty { margin: 0; }
+.practical [role="status"]:focus { outline: none; }

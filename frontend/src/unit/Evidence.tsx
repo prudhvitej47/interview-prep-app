@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { markLines, parseEvidence, type EvidenceSpec } from "./practicals";
 
 /**
@@ -18,6 +18,9 @@ export function Evidence({ source, render }: { source: string; render: (markdown
 function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markdown: string) => ReactNode }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [checked, setChecked] = useState(false);
+  const status = useRef<HTMLParagraphElement>(null);
+  // Check disappears once used, so focus moves to the result instead of falling to the page.
+  useEffect(() => { if (checked) status.current?.focus(); }, [checked]);
   const result = markLines(spec, [...selected]);
   const cause = new Set(spec.cause);
 
@@ -59,12 +62,11 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
       {!checked && (
         <button type="button" className="secondary" disabled={selected.size === 0} onClick={() => setChecked(true)}>Check</button>
       )}
-      {checked && (
-        <>
-          <p role="status" className={`verdict ${result.right ? "right" : "wrong"}`}>{verdict}</p>
-          {render(spec.explain)}
-        </>
-      )}
+      {/* The live region exists from the start, so screen readers announce the result when it appears. */}
+      <p role="status" tabIndex={-1} ref={status} className={checked ? `verdict ${result.right ? "right" : "wrong"}` : "practical-status"}>
+        {checked ? verdict : ""}
+      </p>
+      {checked && render(spec.explain)}
     </section>
   );
 }
