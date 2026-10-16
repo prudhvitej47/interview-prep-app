@@ -455,3 +455,24 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .filters select:focus-visible { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
 .stage-units li { margin: 0; padding: 0.4rem 0; border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent); }
 .stage-project { margin: 1rem 0 1.6rem; }
+
+/* Exercises inside a unit (Predict, Evidence): a panel like the dashboard's cards (DESIGN.md "Cards and
+   panels"). Check is a ghost button, because the unit page keeps its one solid button for the rating. */
+.practical { border-radius: 8px; background: color-mix(in srgb, var(--fg) 5%, transparent); padding: 0.8rem 1rem; margin: 1rem 0; }
+.practical > :first-child { margin-top: 0; }
+.practical-kind { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 0.3rem; }
+.practical button.secondary { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; cursor: pointer; margin-top: 0.6rem;
+  background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
+.practical button.secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+.practical button.secondary:active:not(:disabled) { background: color-mix(in srgb, var(--fg) 14%, transparent); }
+.practical button:disabled { opacity: 0.45; cursor: default; }
+.practical-choices { display: flex; flex-direction: column; gap: 0.35rem; }
+.practical-choices label { display: flex; gap: 0.5rem; align-items: baseline; cursor: pointer; }
+.practical-number { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.practical-number input { font: inherit; width: 8rem; padding: 0.35rem 0.5rem; border-radius: 6px; background: var(--bg); color: var(--fg);
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); }
+.practical-number input:focus-visible { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+.practical .verdict { margin: 0.6rem 0; }
+.practical-output { margin: 0.5rem 0 0; }
+.practical-error { color: var(--muted); font-size: 0.875rem; }
