@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { expect, it } from "vitest";
 import { Markdown } from "./Markdown";
@@ -125,4 +125,29 @@ it("shows ids as plain code where there are no references, as in a note or a pro
   const container = linked("See `ds.transactions.idempotency-keys`.");
   expect(screen.queryByRole("link")).toBeNull();
   expect(container.querySelector("code")).toHaveTextContent("ds.transactions.idempotency-keys");
+});
+
+it("turns a predict fence into an exercise, not a code block", () => {
+  const body = JSON.stringify({ question: "How many?", number: 5, reveal: "Five, **every** time." });
+  const container = show("Before.\n\n```predict\n" + body + "\n```\n\nAfter.");
+  expect(container.querySelector("pre")).toBeNull();
+  expect(screen.getByRole("region", { name: "Predict" })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox", { name: "Your answer" }), { target: { value: "5" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  // The reveal is Markdown, rendered by the unit's own renderer.
+  expect(container.querySelector(".predict strong")).toHaveTextContent("every");
+  expect(screen.getByText("After.")).toBeInTheDocument();
+});
+
+it("turns an evidence fence into an exercise", () => {
+  const body = JSON.stringify({ prompt: "Which?", lines: ["a", "b"], cause: [1], explain: "Because." });
+  const container = show("```evidence\n" + body + "\n```");
+  expect(container.querySelector("pre")).toBeNull();
+  expect(screen.getByRole("region", { name: "Read the evidence" })).toBeInTheDocument();
+});
+
+it("keeps the rest of the unit when an exercise fence is broken", () => {
+  show("Intro.\n\n```predict\n{ not json\n```\n\nOutro.");
+  expect(screen.getByText(/This exercise could not be read/)).toBeInTheDocument();
+  expect(screen.getByText("Outro.")).toBeInTheDocument();
 });

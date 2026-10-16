@@ -10,6 +10,8 @@ import yaml from "highlight.js/lib/languages/yaml";
 import properties from "highlight.js/lib/languages/properties";
 import { Mermaid } from "./Mermaid";
 import { Sketch } from "./Sketch";
+import { Predict } from "./Predict";
+import { Evidence } from "./Evidence";
 import { useOverflow } from "./overflow";
 import type { Reference } from "../api";
 
@@ -23,7 +25,7 @@ const lowlight = createLowlight({ java, sql, yaml, properties });
 
 /**
  * Renders unit Markdown. A ```mermaid fence becomes a diagram, an ```excalidraw fence a hand-drawn
- * sketch, a fence in a language we highlight
+ * sketch, a ```predict or ```evidence fence an exercise (practicals.ts), a fence in a language we highlight
  * becomes marked-up code, and everything else is ordinary Markdown. Raw HTML in the source is not
  * rendered — react-markdown's default, and the right one.
  *
@@ -45,6 +47,8 @@ export function Markdown({ children, references }: { children: string; reference
           if (reference) return <ReferenceLink reference={reference} />;
           if (language === "mermaid") return <Mermaid chart={String(code).trim()} />;
           if (language === "excalidraw") return <Sketch source={String(code).trim()} />;
+          if (language === "predict") return <Predict source={String(code).trim()} render={renderNested} />;
+          if (language === "evidence") return <Evidence source={String(code).trim()} render={renderNested} />;
           if (language && lowlight.registered(language)) {
             // Rendered as elements rather than a string of HTML: nothing here ever sets innerHTML.
             const tree = lowlight.highlight(language, String(code).replace(/\n$/, ""));
@@ -57,15 +61,20 @@ export function Markdown({ children, references }: { children: string; reference
         table({ children: rows, node: _node, ...rest }) {
           return <ScrollBox as="div" className="table-scroll" label="Table"><table {...rest}>{rows}</table></ScrollBox>;
         },
-        // A diagram replaces its code block entirely instead of sitting inside a <pre>.
+        // A diagram, sketch or exercise replaces its code block entirely instead of sitting inside a <pre>.
         pre({ children: inner }) {
-          return isDiagram(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
+          return isBlock(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
         },
       }}
     >
       {children}
     </ReactMarkdown>
   );
+}
+
+/** Markdown inside an exercise (its question, reveal or explanation): same renderer, no id links. */
+function renderNested(markdown: string): ReactNode {
+  return <Markdown>{markdown}</Markdown>;
 }
 
 /**
@@ -111,10 +120,11 @@ function languageOf(className: string | undefined): string | null {
 
 // react-markdown hands <pre> the element for its <code> child. That element's type is the code
 // override above, not Mermaid — Mermaid is only what the override returns once rendered — so the
-// fence is recognised by its language instead.
-function isDiagram(node: ReactNode): boolean {
+// fence is recognised by its language instead. Diagrams, sketches and exercises replace the <pre>.
+const BLOCK_FENCES = new Set(["language-mermaid", "language-excalidraw", "language-predict", "language-evidence"]);
+function isBlock(node: ReactNode): boolean {
   if (!isValidElement<{ className?: string }>(node)) return false;
-  return node.props.className === "language-mermaid" || node.props.className === "language-excalidraw";
+  return BLOCK_FENCES.has(node.props.className ?? "");
 }
 
 /** lowlight returns a hast tree of nested spans; this turns it into React elements. */

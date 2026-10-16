@@ -35,3 +35,11 @@ it("shows a readable line instead of breaking the page when the fence is bad", (
   render(<Evidence source={JSON.stringify({ prompt: "p", lines: ["a"], cause: [2], explain: "e" })} render={md} />);
   expect(screen.getByText(/This exercise could not be read: cause names line 2/)).toBeInTheDocument();
 });
+
+it("puts each mark before its line, so a long line cannot scroll it out of view", () => {
+  render(<Evidence source={source} render={md} />);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Line 1: first.lock.lock();" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  const mark = screen.getByText("not a cause", { selector: ".evidence-mark" });
+  expect(mark.nextElementSibling?.tagName).toBe("CODE");
+});

@@ -334,6 +334,16 @@ correct but dull.
 - **Focus:** the house ring (below), plus the field's own border strengthening to 45% ink — the
   control answers in its own vocabulary as well as wearing the ring.
 
+### Exercises (Predict, Read the evidence)
+
+- **Panel:** a card (8px, ink at 5%), with a small muted uppercase label naming the kind.
+- **Check:** a ghost button; the page's one solid button stays the rating. Disabled until there is an
+  answer. After Check the answer locks, so the reveal cannot be gamed by changing it.
+- **Result:** the existing `.verdict` line (`right` / `wrong`), announced as a status. Evidence lines are
+  labelled "cause" / "not a cause" in words, never by colour alone.
+- **Broken fence:** one muted line, "This exercise could not be read: …"; the rest of the unit renders.
+- Nothing is saved and nothing counts as progress.
+
 ### Navigation
 
 - A row of pills under the title: muted by default, underline on hover, and the current section in

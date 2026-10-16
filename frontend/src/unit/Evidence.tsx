@@ -4,7 +4,8 @@ import { markLines, parseEvidence, type EvidenceSpec } from "./practicals";
 /**
  * "Read the evidence": a dump, a log or some code, and the learner selects the lines that cause the
  * problem. Each line is a native checkbox, so the keyboard and screen readers work without extra code.
- * After Check, every line that matters is labelled in words ("cause", "not a cause"), not by colour alone.
+ * After Check, every line that matters is labelled in words ("cause", "not a cause"), not by colour alone,
+ * in a column before the code, so a long line cannot scroll the label out of view.
  */
 export function Evidence({ source, render }: { source: string; render: (markdown: string) => ReactNode }) {
   const parsed = useMemo(() => {
@@ -48,8 +49,8 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
                 <input type="checkbox" checked={selected.has(n)} disabled={checked} onChange={() => toggle(n)}
                   aria-label={`Line ${n}: ${line.trim() || "(blank)"}`} />
                 <span className="evidence-n" aria-hidden="true">{n}</span>
+                {checked && (mark ? <span className="evidence-mark">{mark}</span> : <span className="evidence-gap" aria-hidden="true" />)}
                 <code>{line || " "}</code>
-                {mark && <span className="evidence-mark">{mark}</span>}
               </label>
             </li>
           );
