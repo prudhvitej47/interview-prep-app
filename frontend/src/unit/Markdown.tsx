@@ -1,6 +1,6 @@
 import { isValidElement, useMemo, useRef, type ReactNode } from "react";
 import { Link } from "react-router";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createLowlight } from "lowlight";
 import type { Element, Root, RootContent } from "hast";
@@ -10,6 +10,8 @@ import yaml from "highlight.js/lib/languages/yaml";
 import properties from "highlight.js/lib/languages/properties";
 import { Mermaid } from "./Mermaid";
 import { Sketch } from "./Sketch";
+import { Predict } from "./Predict";
+import { Evidence } from "./Evidence";
 import { useOverflow } from "./overflow";
 import type { Reference } from "../api";
 
@@ -23,7 +25,7 @@ const lowlight = createLowlight({ java, sql, yaml, properties });
 
 /**
  * Renders unit Markdown. A ```mermaid fence becomes a diagram, an ```excalidraw fence a hand-drawn
- * sketch, a fence in a language we highlight
+ * sketch, a ```predict or ```evidence fence an exercise (practicals.ts), a fence in a language we highlight
  * becomes marked-up code, and everything else is ordinary Markdown. Raw HTML in the source is not
  * rendered — react-markdown's default, and the right one.
  *
@@ -34,38 +36,45 @@ const lowlight = createLowlight({ java, sql, yaml, properties });
  */
 export function Markdown({ children, references }: { children: string; references?: Reference[] }) {
   const byId = useMemo(() => new Map(references?.map((r) => [r.id, r])), [references]);
+  // Built once per set of references, not on every render: a new `code` function each time would be a new
+  // component type to React, which would remount every exercise and wipe the learner's answer.
+  const components = useMemo<Components>(() => ({
+    code({ className, children: code, ...rest }) {
+      const language = languageOf(className);
+      // Only inline code: a fence's text ends in a newline, so it never equals an id anyway.
+      const reference = language === null ? byId.get(String(code)) : undefined;
+      if (reference) return <ReferenceLink reference={reference} />;
+      if (language === "mermaid") return <Mermaid chart={String(code).trim()} />;
+      if (language === "excalidraw") return <Sketch source={String(code).trim()} />;
+      if (language === "predict") return <Predict source={String(code).trim()} render={renderNested} />;
+      if (language === "evidence") return <Evidence source={String(code).trim()} render={renderNested} />;
+      if (language && lowlight.registered(language)) {
+        // Rendered as elements rather than a string of HTML: nothing here ever sets innerHTML.
+        const tree = lowlight.highlight(language, String(code).replace(/\n$/, ""));
+        return <code className={className} {...rest}>{toReact(tree)}</code>;
+      }
+      return <code className={className} {...rest}>{code}</code>;
+    },
+    // A wide table (a SQL result with seven snake_case columns) scrolls in its own box, like a
+    // diagram, instead of pushing the whole page sideways.
+    table({ children: rows, node: _node, ...rest }) {
+      return <ScrollBox as="div" className="table-scroll" label="Table"><table {...rest}>{rows}</table></ScrollBox>;
+    },
+    // A diagram, sketch or exercise replaces its code block entirely instead of sitting inside a <pre>.
+    pre({ children: inner }) {
+      return isBlock(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
+    },
+  }), [byId]);
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        code({ className, children: code, ...rest }) {
-          const language = languageOf(className);
-          // Only inline code: a fence's text ends in a newline, so it never equals an id anyway.
-          const reference = language === null ? byId.get(String(code)) : undefined;
-          if (reference) return <ReferenceLink reference={reference} />;
-          if (language === "mermaid") return <Mermaid chart={String(code).trim()} />;
-          if (language === "excalidraw") return <Sketch source={String(code).trim()} />;
-          if (language && lowlight.registered(language)) {
-            // Rendered as elements rather than a string of HTML: nothing here ever sets innerHTML.
-            const tree = lowlight.highlight(language, String(code).replace(/\n$/, ""));
-            return <code className={className} {...rest}>{toReact(tree)}</code>;
-          }
-          return <code className={className} {...rest}>{code}</code>;
-        },
-        // A wide table (a SQL result with seven snake_case columns) scrolls in its own box, like a
-        // diagram, instead of pushing the whole page sideways.
-        table({ children: rows, node: _node, ...rest }) {
-          return <ScrollBox as="div" className="table-scroll" label="Table"><table {...rest}>{rows}</table></ScrollBox>;
-        },
-        // A diagram replaces its code block entirely instead of sitting inside a <pre>.
-        pre({ children: inner }) {
-          return isDiagram(inner) ? <>{inner}</> : <ScrollBox as="pre" label="Code">{inner}</ScrollBox>;
-        },
-      }}
-    >
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
       {children}
     </ReactMarkdown>
   );
+}
+
+/** Markdown inside an exercise (its question, reveal or explanation): same renderer, no id links. */
+function renderNested(markdown: string): ReactNode {
+  return <Markdown>{markdown}</Markdown>;
 }
 
 /**
@@ -111,10 +120,11 @@ function languageOf(className: string | undefined): string | null {
 
 // react-markdown hands <pre> the element for its <code> child. That element's type is the code
 // override above, not Mermaid — Mermaid is only what the override returns once rendered — so the
-// fence is recognised by its language instead.
-function isDiagram(node: ReactNode): boolean {
+// fence is recognised by its language instead. Diagrams, sketches and exercises replace the <pre>.
+const BLOCK_FENCES = new Set(["language-mermaid", "language-excalidraw", "language-predict", "language-evidence"]);
+function isBlock(node: ReactNode): boolean {
   if (!isValidElement<{ className?: string }>(node)) return false;
-  return node.props.className === "language-mermaid" || node.props.className === "language-excalidraw";
+  return BLOCK_FENCES.has(node.props.className ?? "");
 }
 
 /** lowlight returns a hast tree of nested spans; this turns it into React elements. */
