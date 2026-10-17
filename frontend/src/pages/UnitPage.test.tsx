@@ -303,4 +303,28 @@ describe("UnitPage", () => {
     expect(init?.headers).toMatchObject({ "X-XSRF-TOKEN": "token-from-the-server" });
     expect(JSON.parse(init?.body as string)).toEqual({ body: "Keys live beside the payment row." });
   });
+  it("shows a unit's laptop lab after its sections, and says so beside its minutes", async () => {
+    const fetchMock = mockFetch({
+      [URL]: { body: unit({ lab: { title: "Count the queries", minutes: 20, needs: ["jdk"], readme: "Run it." } }) },
+      [`${URL}/note`]: { body: { body: "", updatedAt: null } },
+      [`${URL}/progress`]: { body: NOT_DONE },
+      [`${URL}/lab`]: { body: { doneAt: null } },
+      "/api/me/not-for-me": { body: { topics: [], units: [] } },
+    });
+    render(
+      <MemoryRouter initialEntries={["/units/ds.transactions.idempotency-keys"]}>
+        <Routes><Route path="/units/:unitId" element={<UnitPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "Lab: Count the queries" })).toBeInTheDocument();
+    expect(screen.getByText(/30 min · lab on your laptop/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(`${URL}/lab`);
+  });
+
+  it("shows no lab, and asks for none, on a retired unit or a unit without one", async () => {
+    const fetchMock = show(unit({ state: "retired", lab: { title: "Old lab", minutes: 20, needs: ["jdk"], readme: "x" } }));
+    expect(await screen.findByText(/has been retired/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Lab:/ })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalledWith(`${URL}/lab`);
+  });
 });

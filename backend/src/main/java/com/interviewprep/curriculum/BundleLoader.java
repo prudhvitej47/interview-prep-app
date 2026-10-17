@@ -246,6 +246,7 @@ class BundleLoader {
       replacePrerequisites(u);
       replaceSources(u);
       replaceTests(u);
+      replaceLab(u);
     }
 
     // Gone from the bundle: retired, not deleted, so history that points at it stays valid.
@@ -349,6 +350,28 @@ class BundleLoader {
               .addValue("hidden", c.path("hidden").asBoolean(false))
               .addValue("order", order++));
     }
+  }
+
+  /** A laptop lab rides inside its unit (like test cases), so it changes only when the unit does. */
+  private void replaceLab(JsonNode u) {
+    MapSqlParameterSource p = new MapSqlParameterSource("id", u.path("id").asString());
+    jdbc.update("delete from lab where unit_id = :id", p);
+    JsonNode lab = u.path("lab");
+    if (!lab.isObject()) {
+      return;
+    }
+    jdbc.update(
+        "insert into lab (unit_id, title, minutes, needs, readme, files, salt, token_hash)"
+            + " values (:id, :title, :minutes,"
+            + " array(select jsonb_array_elements_text(cast(:needs as jsonb))),"
+            + " :readme, cast(:files as jsonb), :salt, :hash)",
+        p.addValue("title", lab.path("title").asString())
+            .addValue("minutes", lab.path("minutes").asInt())
+            .addValue("needs", arrayJson(lab.path("needs")))
+            .addValue("readme", lab.path("readme").asString())
+            .addValue("files", lab.path("files").toString())
+            .addValue("salt", lab.path("salt").asString())
+            .addValue("hash", lab.path("token_hash").asString()));
   }
 
   /** Tracks carry no learner data, so they are simply replaced with each release. */

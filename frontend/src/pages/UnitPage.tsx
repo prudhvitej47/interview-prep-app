@@ -6,6 +6,7 @@ import { NoteEditor } from "../unit/NoteEditor";
 import { NotForMe } from "../unit/NotForMe";
 import { PlanNav } from "./PlanNav";
 import { ProgressPanel } from "../unit/ProgressPanel";
+import { LabPanel } from "../unit/LabPanel";
 import { splitFolds, splitSections, TYPE_LABEL } from "../unit/sections";
 import { CodingPractice } from "../practice/CodingPractice";
 import { SqlPractice } from "../practice/SqlPractice";
@@ -43,6 +44,7 @@ export function UnitPage() {
       <h2>{unit.title}</h2>
       <p className="meta">
         {TYPE_LABEL[unit.type] ?? unit.type} · difficulty {unit.difficulty}/5 · {unit.estMinutes} min
+        {unit.lab && <> · lab on your laptop</>}
         {unit.rounds.length > 0 && <> · asked in {unit.rounds.join(", ")} rounds</>}
       </p>
       {unit.state === "retired" && (
@@ -68,6 +70,7 @@ export function UnitPage() {
         ),
       ])}
       {practiceAt === sections.length && practice}
+      {unit.lab && unit.state !== "retired" && <LabPanel unitId={unit.id} lab={unit.lab} />}
 
       {unit.prerequisites.length > 0 && (
         <section>

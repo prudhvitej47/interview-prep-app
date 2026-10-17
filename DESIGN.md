@@ -343,6 +343,9 @@ correct but dull.
   labelled "cause" / "not a cause" in words, never by colour alone.
 - **Broken fence:** one muted line, "This exercise could not be read: …"; the rest of the unit renders.
 - Nothing is saved and nothing counts as progress.
+- **Laptop lab:** the same panel, titled "Lab: …", with what it needs, a download link, the steps folded,
+  and a one-line token form. "✓ Lab done <date>" appears once the server accepts the token. A lab is never a
+  rating.
 
 ### Navigation
 

@@ -1,7 +1,11 @@
 package com.interviewprep.curriculum;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +48,8 @@ public class CurriculumQueries {
     this.unitsDone = unitsDone;
   }
 
-  public record UnitSummary(String id, String title, String type, int difficulty, int estMinutes) {}
+  public record UnitSummary(String id, String title, String type, int difficulty, int estMinutes,
+      boolean hasLab) {}
 
   public record TopicDetail(
       String id, String name, String domainId, String domainName, String parentId, String parentName,
@@ -66,6 +71,14 @@ public class CurriculumQueries {
   /** Everything the browser needs to run a SQL problem in PGlite and work out the right answer. */
   public record SqlFixture(String schema, String seed, String reference, boolean orderMatters) {}
 
+  /** A unit's laptop lab as its page shows it. The salt and token hash stay on the server. */
+  public record Lab(String title, int minutes, List<String> needs, String readme) {}
+
+  /** One file of a lab's starter download: the fixed files and the learner's starter files. */
+  public record LabFile(String name, String content) {}
+
+  public record LabDownload(String title, String readme, List<LabFile> files) {}
+
   /**
    * Hidden test cases are counted, never sent: they are kept for the code runner planned for
    * phase 2, and sending them would make them visible to anyone who opens the network tab.
@@ -75,7 +88,7 @@ public class CurriculumQueries {
       List<String> technologies, String origin, String state, int version, String markdown,
       String topicId, String topicName, String domainId, String domainName,
       List<Source> sources, List<Link> prerequisites, List<TestCase> testCases,
-      int hiddenTestCases, SqlFixture sqlFixture, List<Reference> references) {}
+      int hiddenTestCases, SqlFixture sqlFixture, List<Reference> references, Lab lab) {}
 
   private static MapSqlParameterSource forLearner(String slug) {
     return new MapSqlParameterSource("private", "learner:" + slug);
@@ -113,12 +126,14 @@ public class CurriculumQueries {
                 (rs2, j) -> new TopicSummary(rs2.getString("id"), rs2.getString("domain_id"),
                     rs2.getString("parent_id"), rs2.getString("name"), rs2.getInt("unit_count"))),
             jdbc.query(
-                "select u.id, u.title, u.type, u.difficulty, u.est_minutes from unit u"
+                "select u.id, u.title, u.type, u.difficulty, u.est_minutes,"
+                    + " exists(select 1 from lab l where l.unit_id = u.id) as has_lab from unit u"
                     + " where u.topic_id = :id and u.state <> 'retired' and " + VISIBLE
                     + " order by u.difficulty, u.title",
                 p,
                 (rs2, j) -> new UnitSummary(rs2.getString("id"), rs2.getString("title"),
-                    rs2.getString("type"), rs2.getInt("difficulty"), rs2.getInt("est_minutes")))));
+                    rs2.getString("type"), rs2.getInt("difficulty"), rs2.getInt("est_minutes"),
+                    rs2.getBoolean("has_lab")))));
     return found.stream().findFirst();
   }
 
@@ -169,7 +184,11 @@ public class CurriculumQueries {
                 (rs2, j) -> new SqlFixture(rs2.getString("schema_ddl"), rs2.getString("seed_sql"),
                     rs2.getString("reference_query"), rs2.getBoolean("order_matters")))
                 .stream().findFirst().orElse(null),
-            references(rs.getString("markdown"), slug)));
+            references(rs.getString("markdown"), slug),
+            jdbc.query("select title, minutes, needs, readme from lab where unit_id = :id", p,
+                (rs2, j) -> new Lab(rs2.getString("title"), rs2.getInt("minutes"),
+                    List.of((String[]) rs2.getArray("needs").getArray()), rs2.getString("readme")))
+                .stream().findFirst().orElse(null)));
     return found.stream().findFirst();
   }
 
@@ -307,11 +326,52 @@ public class CurriculumQueries {
       return List.of();
     }
     return jdbc.query(
-        "select u.id, u.title, u.type, u.difficulty, u.est_minutes from unit u"
+        "select u.id, u.title, u.type, u.difficulty, u.est_minutes,"
+            + " exists(select 1 from lab l where l.unit_id = u.id) as has_lab from unit u"
             + " where u.id in (:ids) and u.state <> 'retired' and " + VISIBLE,
         forLearner(slug).addValue("ids", ids),
         (rs, i) -> new UnitSummary(rs.getString("id"), rs.getString("title"), rs.getString("type"),
-            rs.getInt("difficulty"), rs.getInt("est_minutes")));
+            rs.getInt("difficulty"), rs.getInt("est_minutes"), rs.getBoolean("has_lab")));
+  }
+
+  public boolean hasLab(String unitId) {
+    return Boolean.TRUE.equals(jdbc.queryForObject(
+        "select exists(select 1 from lab where unit_id = :id)", new MapSqlParameterSource("id", unitId),
+        Boolean.class));
+  }
+
+  /**
+   * Whether {@code token} is the proof token of this unit's lab: sha256(salt + token) equals the stored
+   * hash. The caller normalises the token first. Compared in constant time out of habit; the token is
+   * not a credential.
+   */
+  public boolean labTokenMatches(String unitId, String token) {
+    List<String[]> rows = jdbc.query("select salt, token_hash from lab where unit_id = :id",
+        new MapSqlParameterSource("id", unitId), (rs, i) -> new String[] {rs.getString(1), rs.getString(2)});
+    if (rows.isEmpty()) {
+      return false;
+    }
+    try {
+      byte[] digest = MessageDigest.getInstance("SHA-256")
+          .digest((rows.get(0)[0] + token).getBytes(StandardCharsets.UTF_8));
+      String actual = "sha256:" + HexFormat.of().formatHex(digest);
+      return MessageDigest.isEqual(actual.getBytes(StandardCharsets.UTF_8),
+          rows.get(0)[1].getBytes(StandardCharsets.UTF_8));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /** What the starter download holds, or empty if the unit has no lab. Visibility is the caller's check. */
+  public Optional<LabDownload> labDownload(String unitId) {
+    MapSqlParameterSource p = new MapSqlParameterSource("id", unitId);
+    return jdbc.query("select title, readme from lab where unit_id = :id", p,
+        (rs, i) -> new LabDownload(rs.getString("title"), rs.getString("readme"),
+            jdbc.query("select f.name, f.content from lab l"
+                    + " cross join jsonb_to_recordset(l.files) as f(name text, content text)"
+                    + " where l.unit_id = :id order by f.name", p,
+                (rs2, j) -> new LabFile(rs2.getString("name"), rs2.getString("content")))))
+        .stream().findFirst();
   }
 
   /** Whether this learner may see this unit. Other modules use it before attaching data to one. */

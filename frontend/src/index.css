@@ -488,3 +488,22 @@ button.link { font: inherit; font-size: 0.875rem; background: none; border: 0; p
 .evidence-mark, .evidence-gap { flex: none; width: 11ch; color: var(--muted); font-style: italic; white-space: nowrap; }
 .practical-status:empty { margin: 0; }
 .practical [role="status"]:focus { outline: none; }
+
+/* A laptop lab on its unit: the same panel as an exercise (DESIGN.md "Exercises"), with the token
+   form on one line where it fits. Check is a ghost button; the page keeps its one solid button. */
+.lab { border-radius: 8px; background: color-mix(in srgb, var(--fg) 5%, transparent); padding: 0.8rem 1rem; margin: 1.5rem 0; }
+.lab h3 { margin: 0 0 0.3rem; }
+.lab-done { margin: 0.3rem 0; }
+.lab-token { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-top: 0.8rem; }
+.lab-token input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; width: 12rem;
+  padding: 0.35rem 0.5rem; border-radius: 6px; background: var(--bg); color: var(--fg);
+  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); }
+.lab-token input:focus-visible { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+.lab-token button.secondary { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
+.lab-token button.secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+.lab-token button:disabled { opacity: 0.45; cursor: default; }
+.lab [role="status"]:focus { outline: none; }
+/* The lab's steps come from its README, whose headings would outrank the panel's own title. */
+.lab .folded h1, .lab .folded h2, .lab .folded h3 { font-size: 1rem; margin: 1.1rem 0 0.4rem; }

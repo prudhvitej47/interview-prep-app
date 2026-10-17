@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.interviewprep.PostgresTestBase;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -207,6 +208,48 @@ class BundleLoaderTest extends PostgresTestBase {
     load(content);
     assertThat(jdbc.queryForObject("select count(*) from test_case", Integer.class)).isEqualTo(2);
     assertThat(queries.unit("dsa.window", "t").orElseThrow().hiddenTestCases()).isZero();
+  }
+
+  @Test
+  void aLabLoadsWithItsUnitAndItsSecretStaysOnTheServer() {
+    ObjectNode content = base();
+    unitNode(content, "ds.transactions.idempotency").set("lab", json.readTree("""
+        {"title": "Count the queries", "minutes": 20, "needs": ["jdk", "jbang"],
+         "readme": "Steps.", "salt": "0123456789abcdef",
+         "token_hash": "sha256:471b61a050e0644c068f523480278c9b076a427e378bfb5952cccd784d63bb38",
+         "files": [{"name": "LabCheck.java", "content": "class LabCheck {}"},
+                   {"name": "PaymentQueries.java", "content": "interface Payments {}"}]}
+        """));
+    load(content);
+
+    assertThat(queries.unit("ds.transactions.idempotency", "t").orElseThrow().lab())
+        .isEqualTo(new CurriculumQueries.Lab("Count the queries", 20, List.of("jdk", "jbang"), "Steps."));
+    assertThat(queries.unit("ds.transactions.sagas.intro", "t").orElseThrow().lab()).isNull();
+    // "0000002a" is the token whose salted hash is stored above.
+    assertThat(queries.labTokenMatches("ds.transactions.idempotency", "0000002a")).isTrue();
+    assertThat(queries.labTokenMatches("ds.transactions.idempotency", "0000002b")).isFalse();
+    assertThat(queries.labDownload("ds.transactions.idempotency").orElseThrow().files())
+        .extracting(CurriculumQueries.LabFile::name).containsExactly("LabCheck.java", "PaymentQueries.java");
+    assertThat(queries.summaries(List.of("ds.transactions.idempotency", "ds.transactions.sagas.intro"), "t"))
+        .filteredOn(CurriculumQueries.UnitSummary::hasLab)
+        .extracting(CurriculumQueries.UnitSummary::id).containsExactly("ds.transactions.idempotency");
+
+    // The lab goes when its unit no longer carries one.
+    ObjectNode unit = unitNode(content, "ds.transactions.idempotency");
+    unit.remove("lab");
+    unit.put("content_hash", "sha256:a2");
+    load(content);
+    assertThat(queries.hasLab("ds.transactions.idempotency")).isFalse();
+    assertThat(queries.unit("ds.transactions.idempotency", "t").orElseThrow().lab()).isNull();
+  }
+
+  private ObjectNode unitNode(ObjectNode content, String id) {
+    for (JsonNode u : content.path("units")) {
+      if (u.path("id").asString().equals(id)) {
+        return (ObjectNode) u;
+      }
+    }
+    throw new IllegalArgumentException(id);
   }
 
   @Test
