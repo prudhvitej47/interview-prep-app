@@ -15,5 +15,7 @@ export const itemLabel = (i: PlanItem): string => {
   if (i.kind === "project") {
     return `Your project: ${i.projectName ?? ""}${i.rung ? ` · ${RUNG_LABEL[i.rung]}` : ""}`;
   }
-  return i.kind === "review" ? "Review" : TYPE_LABEL[i.type] ?? i.type;
+  const base = i.kind === "review" ? "Review" : TYPE_LABEL[i.type] ?? i.type;
+  // Said where the plan is read, so a learner on a phone can pick a laptop day for it.
+  return i.kind === "learn" && i.hasLab ? `${base} · lab on your laptop` : base;
 };

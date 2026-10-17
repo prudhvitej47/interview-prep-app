@@ -68,6 +68,7 @@ export type UnitSummary = {
   type: string;
   difficulty: number;
   estMinutes: number;
+  hasLab?: boolean;
 };
 
 export type TopicDetail = {
@@ -187,6 +188,7 @@ export type PlanItem = {
   minutes: number;
   reason: string;
   done: boolean;
+  hasLab?: boolean;
   projectQuestionId?: number | null;
   projectId?: number | null;
   projectName?: string | null;
