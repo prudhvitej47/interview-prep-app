@@ -253,6 +253,65 @@ class BundleLoaderTest extends PostgresTestBase {
   }
 
   @Test
+  void aCodingUnitKeepsItsSignatureAndTypedCasesForTheRunnerOnly() {
+    ObjectNode content = withPracticeUnits(base());
+    load(content);
+
+    CurriculumQueries.CodingFixture fixture = queries.codingFixture("dsa.window").orElseThrow();
+    assertThat(json.readTree(fixture.signatureJson()).path("method").asString()).isEqualTo("maxSum");
+    // No compare in the bundle means exact.
+    assertThat(fixture.compare()).isEqualTo("exact");
+    assertThat(fixture.cases()).extracting(CurriculumQueries.RunnerCase::name)
+        .containsExactly("example", "negatives", "at the end");
+    CurriculumQueries.RunnerCase hidden = fixture.cases().get(2);
+    assertThat(hidden.hidden()).isTrue();
+    assertThat(json.readTree(hidden.argsJson()).path("nums").get(1).asInt()).isEqualTo(5);
+    assertThat(json.readTree(hidden.expectedJson()).asInt()).isEqualTo(5);
+    assertThat(queries.codingFixture("db.unsettled")).isEmpty();
+
+    // The page's view is unchanged: visible display strings and a hidden count, nothing typed.
+    CurriculumQueries.UnitDetail page = queries.unit("dsa.window", "t").orElseThrow();
+    assertThat(json.writeValueAsString(page)).doesNotContain("expected_value").doesNotContain("[1, 5]")
+        .doesNotContain("argsJson").doesNotContain("maxSum");
+    assertThat(page.hiddenTestCases()).isEqualTo(1);
+
+    // any-order is kept; and a unit that stops being a coding problem loses its fixture.
+    ObjectNode window = unitNode(content, "dsa.window");
+    ((ObjectNode) window.path("tests")).put("compare", "any-order");
+    window.put("content_hash", "sha256:w2");
+    load(content);
+    assertThat(queries.codingFixture("dsa.window").orElseThrow().compare()).isEqualTo("any-order");
+    window.put("type", "concept");
+    window.putNull("tests");
+    window.put("content_hash", "sha256:w3");
+    load(content);
+    assertThat(queries.codingFixture("dsa.window")).isEmpty();
+    assertThat(count("test_case")).isZero();
+  }
+
+  @Test
+  void codingUnitsLoadedBeforeTheRunnerAreFilledInAtTheNextReleaseWithoutANewVersion() {
+    ObjectNode content = withPracticeUnits(base());
+    load(content);
+    // As a database migrated to V17 looks before any new release: no fixture, no typed cases.
+    jdbc.update("delete from coding_fixture");
+    jdbc.update("update test_case set args = null, expected_value = null");
+    int versionBefore = version("dsa.window");
+
+    // The next real release changes some other unit; the coding unit's hash is unchanged.
+    BundleLoader.Result result = load(withUnitEdited(content, "ds.transactions.idempotency"));
+
+    assertThat(result.changed()).isEqualTo(1);
+    assertThat(version("dsa.window")).isEqualTo(versionBefore);
+    CurriculumQueries.CodingFixture fixture = queries.codingFixture("dsa.window").orElseThrow();
+    assertThat(fixture.cases()).hasSize(3).allSatisfy(c -> assertThat(c.argsJson()).isNotNull());
+
+    // Loading the same bundle again does nothing more.
+    assertThat(load(content).outcome()).isEqualTo(BundleLoader.Outcome.UNCHANGED);
+    assertThat(count("test_case")).isEqualTo(3);
+  }
+
+  @Test
   void noBundleIsNotAnError() {
     assertThat(loader.load(dir.resolve("missing")).outcome())
         .isEqualTo(BundleLoader.Outcome.NO_BUNDLE);
@@ -310,10 +369,16 @@ class BundleLoaderTest extends PostgresTestBase {
          "difficulty": 2, "est_minutes": 25, "rounds": [], "technologies": ["java"],
          "origin": "original-practice", "state": "draft", "version": 1, "prerequisites": [],
          "sources": [], "body": {"markdown": "## Problem\\nSum."}, "content_hash": "sha256:w",
-         "tests": {"cases": [
-           {"name": "example", "input": "nums = [2, 1], k = 1", "expected": "2"},
-           {"name": "negatives", "input": "nums = [-3, -1], k = 1", "expected": "-1"},
-           {"name": "at the end", "input": "nums = [1, 5], k = 1", "expected": "5", "hidden": true}]}}
+         "tests": {
+           "signature": {"method": "maxSum", "params": [{"name": "nums", "type": "int[]"},
+                         {"name": "k", "type": "int"}], "returns": "int"},
+           "cases": [
+             {"name": "example", "args": {"nums": [2, 1], "k": 1}, "input": "nums = [2, 1], k = 1",
+              "expected": "2", "expected_value": 2},
+             {"name": "negatives", "args": {"nums": [-3, -1], "k": 1}, "input": "nums = [-3, -1], k = 1",
+              "expected": "-1", "expected_value": -1},
+             {"name": "at the end", "args": {"nums": [1, 5], "k": 1}, "input": "nums = [1, 5], k = 1",
+              "expected": "5", "expected_value": 5, "hidden": true}]}}
         """));
     units.add(json.readTree("""
         {"id": "db.unsettled", "topic": "hld.payments", "type": "sql", "title": "Unsettled",
