@@ -290,6 +290,28 @@ class BundleLoaderTest extends PostgresTestBase {
   }
 
   @Test
+  void codingUnitsLoadedBeforeTheRunnerAreFilledInAtTheNextReleaseWithoutANewVersion() {
+    ObjectNode content = withPracticeUnits(base());
+    load(content);
+    // As a database migrated to V17 looks before any new release: no fixture, no typed cases.
+    jdbc.update("delete from coding_fixture");
+    jdbc.update("update test_case set args = null, expected_value = null");
+    int versionBefore = version("dsa.window");
+
+    // The next real release changes some other unit; the coding unit's hash is unchanged.
+    BundleLoader.Result result = load(withUnitEdited(content, "ds.transactions.idempotency"));
+
+    assertThat(result.changed()).isEqualTo(1);
+    assertThat(version("dsa.window")).isEqualTo(versionBefore);
+    CurriculumQueries.CodingFixture fixture = queries.codingFixture("dsa.window").orElseThrow();
+    assertThat(fixture.cases()).hasSize(3).allSatisfy(c -> assertThat(c.argsJson()).isNotNull());
+
+    // Loading the same bundle again does nothing more.
+    assertThat(load(content).outcome()).isEqualTo(BundleLoader.Outcome.UNCHANGED);
+    assertThat(count("test_case")).isEqualTo(3);
+  }
+
+  @Test
   void noBundleIsNotAnError() {
     assertThat(loader.load(dir.resolve("missing")).outcome())
         .isEqualTo(BundleLoader.Outcome.NO_BUNDLE);

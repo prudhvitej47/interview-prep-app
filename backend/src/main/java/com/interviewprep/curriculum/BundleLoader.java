@@ -213,7 +213,12 @@ class BundleLoader {
       // A retired unit coming back has the hash it had before retiring, so it counts as changed:
       // otherwise a reverted removal would stay retired for good.
       if (hash.equals(existing.get(id)) && !alreadyRetired.contains(id)) {
-        continue; // unchanged: keeps its version and the release it last changed in
+        // Unchanged: keeps its version and the release it last changed in. A coding unit loaded before
+        // the runner's fixture was kept (V17) gets it here, quietly, instead of a version bump.
+        if (u.path("tests").has("signature") && !hasCodingFixture(id)) {
+          replaceTests(u);
+        }
+        continue;
       }
       MapSqlParameterSource p = unitParams(u, releaseId);
       if (existing.containsKey(id)) {
@@ -261,6 +266,12 @@ class BundleLoader {
       }
     }
     return new int[] {added, changed, retired};
+  }
+
+  private boolean hasCodingFixture(String unitId) {
+    return Boolean.TRUE.equals(jdbc.queryForObject(
+        "select exists(select 1 from coding_fixture where unit_id = :id)",
+        new MapSqlParameterSource("id", unitId), Boolean.class));
   }
 
   private MapSqlParameterSource unitParams(JsonNode u, long releaseId) {
