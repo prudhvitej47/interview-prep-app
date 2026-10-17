@@ -27,7 +27,8 @@ export function LabPanel({ unitId, lab }: { unitId: string; lab: Lab }) {
   const ready = /^[0-9a-f]{8}$/.test(cleaned);
 
   useEffect(() => {
-    fetchLabStatus(unitId).then((s) => setDoneAt(s.doneAt)).catch(() => setDoneAt(null));
+    // A check that already answered wins over a status that arrives after it.
+    fetchLabStatus(unitId).then((s) => setDoneAt((current) => current ?? s.doneAt)).catch(() => {});
   }, [unitId]);
 
   async function check() {

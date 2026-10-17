@@ -56,3 +56,20 @@ it("shows a lab already done on a revisit", async () => {
   render(<LabPanel unitId={UNIT} lab={LAB} />);
   expect(await screen.findByText(`✓ Lab done ${shownDate}`)).toBeInTheDocument();
 });
+
+it("keeps a fresh Lab done when the first status answer arrives late", async () => {
+  let answerStatus: (v: unknown) => void = () => {};
+  vi.stubGlobal("fetch", vi.fn((url: string) => {
+    if (url === BASE) {
+      return new Promise((resolve) => { answerStatus = resolve; });
+    }
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({ right: true, doneAt: DONE }) });
+  }));
+  render(<LabPanel unitId={UNIT} lab={LAB} />);
+  fireEvent.change(screen.getByLabelText("Token from LabCheck"), { target: { value: "70e1ab80" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  expect(await screen.findByText(`✓ Lab done ${shownDate}`)).toBeInTheDocument();
+  answerStatus({ ok: true, status: 200, json: async () => ({ doneAt: null }) });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.getByText(`✓ Lab done ${shownDate}`)).toBeInTheDocument();
+});
