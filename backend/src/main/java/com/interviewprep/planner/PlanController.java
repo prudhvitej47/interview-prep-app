@@ -108,15 +108,17 @@ class PlanController {
    * lives.
    */
   record ItemView(String unitId, String title, String type, int day, String kind, int minutes,
-      String reason, boolean done, Long projectQuestionId, Long projectId, String projectName, String rung) {
+      String reason, boolean done, Long projectQuestionId, Long projectId, String projectName, String rung,
+      boolean hasLab) {
 
     static ItemView unit(UnitSummary u, int day, String kind, int minutes, String reason, boolean done) {
-      return new ItemView(u.id(), u.title(), u.type(), day, kind, minutes, reason, done, null, null, null, null);
+      return new ItemView(u.id(), u.title(), u.type(), day, kind, minutes, reason, done, null, null, null, null,
+          u.hasLab());
     }
 
     static ItemView project(QuestionRef q, int day, int minutes, String reason, boolean done) {
       return new ItemView(null, q.prompt(), "project-question", day, "project", minutes, reason, done,
-          q.questionId(), q.projectId(), q.projectName(), q.rung());
+          q.questionId(), q.projectId(), q.projectName(), q.rung(), false);
     }
   }
 
