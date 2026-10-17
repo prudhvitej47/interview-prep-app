@@ -104,6 +104,7 @@ export type UnitDetail = {
   hiddenTestCases: number;
   sqlFixture: SqlFixture | null;
   references: Reference[];
+  lab: Lab | null;
 };
 
 /** A unit or topic the unit's text names by id in inline code; the page shows its title instead. */
@@ -127,6 +128,24 @@ async function getOrNotFound<T>(url: string): Promise<T> {
 export const fetchTopic = (id: string) => getOrNotFound<TopicDetail>(`/api/topics/${encodeURIComponent(id)}`);
 export const fetchUnit = (id: string) => getOrNotFound<UnitDetail>(`/api/units/${encodeURIComponent(id)}`);
 export const fetchNote = (unitId: string) => getJson<Note>(`/api/units/${encodeURIComponent(unitId)}/note`);
+
+/** A unit's laptop lab as its page shows it; the token is checked on the server. */
+export type Lab = { title: string; minutes: number; needs: string[]; readme: string };
+export type LabStatus = { doneAt: string | null };
+export type LabCheckResult = { right: boolean; doneAt: string | null };
+
+export const labStarterUrl = (unitId: string) => `/api/units/${encodeURIComponent(unitId)}/lab/starter.zip`;
+export const fetchLabStatus = (unitId: string) => getJson<LabStatus>(`/api/units/${encodeURIComponent(unitId)}/lab`);
+
+export async function checkLabToken(unitId: string, token: string): Promise<LabCheckResult> {
+  const response = await fetch(`/api/units/${encodeURIComponent(unitId)}/lab/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) throw new Error(`Could not check the token (${response.status})`);
+  return response.json();
+}
 
 export async function saveNote(unitId: string, body: string): Promise<Note> {
   const response = await fetch(`/api/units/${encodeURIComponent(unitId)}/note`, {
