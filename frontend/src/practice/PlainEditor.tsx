@@ -42,6 +42,7 @@ export function PlainEditor({ value, onChange, label, disabled }: EditorProps) {
       aria-label={label}
       value={value}
       rows={16}
+      wrap="off"
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"

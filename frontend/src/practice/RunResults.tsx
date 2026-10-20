@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { CaseResult, Refusal, RunAnswer } from "../api";
 
 const REFUSALS: Record<Refusal, string> = {
@@ -41,17 +42,24 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
         <div className="result">
           <table aria-label="Results">
             <thead>
-              <tr><th>Case</th><th>Input</th><th>Expected</th><th>Got</th><th>Result</th></tr>
+              <tr><th>Result</th><th>Case</th><th>Input</th><th>Expected</th><th>Got</th></tr>
             </thead>
             <tbody>
               {r.cases.map((c) => (
-                <tr key={c.name}>
-                  <td>{c.name}</td>
-                  <td><code>{c.input}</code></td>
-                  <td><code>{c.expected}</code></td>
-                  <td><code>{c.error ? `throws ${c.error}` : c.got ?? ""}</code></td>
-                  <td>{MARK[c.verdict]}</td>
-                </tr>
+                <Fragment key={c.name}>
+                  <tr>
+                    <td className="mark">{MARK[c.verdict]}</td>
+                    <td>{c.name}</td>
+                    <td><code>{c.input}</code></td>
+                    <td><code>{c.expected}</code></td>
+                    <td><code>{c.got ?? ""}</code></td>
+                  </tr>
+                  {c.error && (
+                    <tr className="case-error">
+                      <td colSpan={5}><code>throws {c.error}</code></td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

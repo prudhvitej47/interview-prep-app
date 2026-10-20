@@ -23,6 +23,11 @@ describe("PlainEditor", () => {
     expect(box.value).toBe("    if (a) {\n            ");
   });
 
+  it("keeps long lines on one line, as code editors do", () => {
+    render(<Harness initial="x" />);
+    expect(editor()).toHaveAttribute("wrap", "off");
+  });
+
   it("never traps the keyboard: Shift+Tab and Esc then Tab are left to the browser", () => {
     render(<Harness initial="x" />);
     const box = editor();

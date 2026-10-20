@@ -81,6 +81,25 @@ describe("CodeRunner", () => {
     expect(within(screen.getByRole("table", { name: "Results" })).getAllByRole("row")).toHaveLength(3);
   });
 
+  it("puts each case's result first, and an exception on its own row under the case", async () => {
+    mockFetch({
+      [CODE]: { body: draft() },
+      [RUN]: { body: finished({ cases: [
+        { ...CASES[0], verdict: "pass", got: "2", error: null, ms: 3 },
+        { ...CASES[1], verdict: "error", got: null, error: "java.lang.ArithmeticException: / by zero", ms: 2 },
+      ] }) },
+    });
+    show();
+    await waitFor(() => expect(editor().value).toBe(STARTER));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    const table = await screen.findByRole("table", { name: "Results" });
+    const rows = within(table).getAllByRole("row");
+    expect(within(rows[0]).getAllByRole("columnheader")[0]).toHaveTextContent("Result");
+    expect(within(rows[1]).getAllByRole("cell")[0]).toHaveTextContent("✓");
+    expect(within(rows[2]).getAllByRole("cell")[0]).toHaveTextContent("✗ error");
+    expect(rows[3]).toHaveTextContent("throws java.lang.ArithmeticException: / by zero");
+  });
+
   it("shows compiler text on a red line, and an exception in place of a value", async () => {
     mockFetch({
       [CODE]: { body: draft() },
