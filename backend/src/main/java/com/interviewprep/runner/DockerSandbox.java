@@ -93,13 +93,22 @@ final class DockerSandbox implements Sandbox {
     }
   }
 
-  /** Kills the container (the docker client dying is not enough: the container would keep running). */
+  /**
+   * Kills the container. The client goes first: once we stop reading its output it blocks on a full pipe,
+   * and while it is attached, docker kill and docker rm hang until their timeouts. Then the container,
+   * because the client dying is not enough: the container would keep running.
+   */
   private void stop(String name, Process client) {
-    quietly(docker, "kill", name);
-    quietly(docker, "rm", "-f", name);
     if (client != null) {
       client.destroyForcibly();
+      try {
+        client.getInputStream().close();
+      } catch (IOException e) {
+        // Already gone.
+      }
     }
+    quietly(docker, "kill", name);
+    quietly(docker, "rm", "-f", name);
   }
 
   private static void quietly(String... command) {
