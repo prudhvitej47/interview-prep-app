@@ -64,6 +64,36 @@ Two containers: `app` (768 MB) and `postgres` (512 MB), on a machine with 1.9 GB
 of swap. PostgreSQL publishes no ports and is reachable only on the Compose network; the app is
 bound to `127.0.0.1:8080` and reached only through `tailscale serve`.
 
+## The code runner
+
+A second Compose service, `interview-prep-runner`, built from the same image as the app and started as
+`com.interviewprep.runner.RunnerMain` (runner design: `claude-tools/runner-design-2026-10-11.md`, not in this repo).
+It runs learners' Java in throwaway sandbox containers. Nothing calls it until the practice module lands.
+
+- **It alone holds the Docker socket.** Anything that can start containers is root on this host, so the
+  socket is mounted only here, the service publishes no port (the app reaches it as `http://runner:8090` on
+  the Compose network), its root filesystem is read-only, and it drops every capability. It starts
+  containers only with the fixed sandbox flags pinned by `backend/src/test/java/com/interviewprep/runner/DockerSandboxArgsTest.java`:
+  no network, read-only, the `nobody` user, 256 MB, one CPU, 64 processes.
+- **It joins the host's docker group** through `DOCKER_GID`, which `vm-setup.sh` writes to `app.env`. Without
+  it the runner simply cannot reach Docker (health fails); Compose and the app are unaffected.
+- **The sandbox image** is named in `deploy/sandbox-image` (a test keeps it equal to the runner's pinned
+  digest). `update.sh` pulls it only when it is missing: pulling by digest every two minutes would spend
+  Docker Hub's anonymous rate limit.
+- **It never holds up the app.** `update.sh` brings it up after the app, separately; a failed pull or start
+  only logs.
+- **Leftovers:** a sweeper inside the runner removes sandbox containers (label `interview-prep.run=1`) older
+  than a minute, at start and every minute.
+
+Checking it:
+
+```bash
+sudo docker ps --format '{{.Names}} {{.Status}}'                     # interview-prep-runner ... (healthy)
+sudo docker exec interview-prep-runner java -cp '/app/BOOT-INF/classes:/app/BOOT-INF/lib/*' \
+  com.interviewprep.runner.RunnerMain smoke                         # finished pass
+sudo docker ps -aq --filter label=interview-prep.run=1              # empty
+```
+
 ## Sending to the curriculum
 
 "Send to the curriculum" (debriefs) and "Add an article" put files on new `proposals/…` and `inbox/…`

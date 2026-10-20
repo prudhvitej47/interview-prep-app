@@ -98,10 +98,12 @@ else
   DB_PASSWORD="$(openssl rand -hex 24)"
   echo "generated a database password"
 fi
+# DOCKER_GID: the code runner joins the host's docker group to reach the socket; see docker-compose.yml.
 umask 077
 cat > "${APP_ENV}" <<ENV
 APP_IMAGE=${ECR_REGISTRY}/interview-prep-app:main
 CONTENT_IMAGE=${ECR_REGISTRY}/interview-prep-content:main
+DOCKER_GID=$(getent group docker | cut -d: -f3)
 DB_PASSWORD=${DB_PASSWORD}
 APP_LEARNERS="${LEARNERS}"
 ENV
