@@ -2,9 +2,8 @@ import { useState } from "react";
 import type { TestCase } from "../api";
 
 /**
- * Self-check for a coding problem: the learner runs their own solution and ticks the cases it gets
- * right. Running Java in the app arrives with the code runner in phase 2; until then the hidden
- * cases stay on the server for it, and nothing here is saved.
+ * Self-check for a coding problem: the learner ticks the cases their solution gets right. Shown by
+ * CodeRunner when code cannot run here (no fixture loaded yet, or the runner is down); nothing here is saved.
  */
 export function CodingPractice({ cases, hidden }: { cases: TestCase[]; hidden: number }) {
   const [passed, setPassed] = useState<Set<number>>(new Set());

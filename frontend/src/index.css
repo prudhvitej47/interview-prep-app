@@ -291,6 +291,14 @@ summary:hover { text-decoration: underline; }
 .practice .code-mirror .cm-selectionBackground, .practice .code-mirror .cm-focused .cm-selectionBackground {
   background: color-mix(in srgb, var(--fg) 18%, transparent) !important; }
 .practice .code-mirror .cm-matchingBracket { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.code-practice .editor-choice { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.875rem; margin: 0.2rem 0 0.5rem; }
+.code-practice .note-actions { flex-wrap: wrap; }
+.code-practice .run-results { margin-top: 0.75rem; }
+.code-practice .compile-errors, .code-practice .printed { background: color-mix(in srgb, var(--fg) 6%, transparent);
+  padding: 0.6rem 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; white-space: pre; }
+.code-practice .hidden-count { margin: 0.5rem 0; }
+.code-practice h4 { margin: 0.9rem 0 0.3rem; font-size: 0.9rem; }
+.code-practice .practice { margin-top: 1.2rem; }
 .practice .result { overflow-x: auto; margin-top: 0.75rem; }
 .note-actions button.secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
 /* Ink, not the muted paragraph grey: on the tinted banners grey falls below 4.5:1 in light mode. */
