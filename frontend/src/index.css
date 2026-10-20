@@ -277,6 +277,20 @@ summary:hover { text-decoration: underline; }
   font-size: 0.9rem; padding: 0.6rem; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
   background: var(--bg); color: var(--fg); }
 .practice .hint { color: var(--muted); font-size: 0.875rem; }
+/* The code editor: the plain field (default) and CodeMirror (optional) look the same (runner design §2). */
+.practice .code-input { tab-size: 4; min-height: 16rem; }
+.practice .code-mirror { border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); border-radius: 6px;
+  background: var(--bg); overflow: hidden; }
+.practice .code-mirror .cm-editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem;
+  min-height: 16rem; background: var(--bg); color: var(--fg); }
+.practice .code-mirror .cm-editor.cm-focused { outline: none; }
+.practice .code-mirror:focus-within { outline: 2px solid color-mix(in srgb, var(--fg) 55%, transparent); outline-offset: 2px; }
+.practice .code-mirror .cm-gutters { background: color-mix(in srgb, var(--fg) 4%, var(--bg)); color: var(--muted);
+  border-right: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.practice .code-mirror .cm-cursor { border-left-color: var(--fg); }
+.practice .code-mirror .cm-selectionBackground, .practice .code-mirror .cm-focused .cm-selectionBackground {
+  background: color-mix(in srgb, var(--fg) 18%, transparent) !important; }
+.practice .code-mirror .cm-matchingBracket { background: color-mix(in srgb, var(--fg) 12%, transparent); }
 .practice .result { overflow-x: auto; margin-top: 0.75rem; }
 .note-actions button.secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
 /* Ink, not the muted paragraph grey: on the tinted banners grey falls below 4.5:1 in light mode. */
