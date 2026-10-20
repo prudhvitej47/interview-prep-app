@@ -79,8 +79,9 @@ public class CurriculumQueries {
 
   public record LabDownload(String title, String readme, List<LabFile> files) {}
 
-  /** One case as the runner needs it: typed JSON exactly as the bundle has it. Server-only. */
-  public record RunnerCase(String name, String argsJson, String expectedJson, boolean hidden) {}
+  /** One case as the runner needs it (typed JSON exactly as the bundle has it), with the text the page shows. Server-only. */
+  public record RunnerCase(String name, String argsJson, String expectedJson, boolean hidden, String input,
+      String expected) {}
 
   /** Everything the runner needs for one coding problem. Server-only: never part of UnitDetail. */
   public record CodingFixture(String signatureJson, String compare, List<RunnerCase> cases) {}
@@ -389,10 +390,11 @@ public class CurriculumQueries {
     MapSqlParameterSource p = new MapSqlParameterSource("id", unitId);
     return jdbc.query("select signature::text as signature, compare from coding_fixture where unit_id = :id", p,
         (rs, i) -> new CodingFixture(rs.getString("signature"), rs.getString("compare"),
-            jdbc.query("select name, args::text as args, expected_value::text as expected_value, hidden"
+            jdbc.query("select name, args::text as args, expected_value::text as expected_value, hidden, input, expected"
                     + " from test_case where unit_id = :id order by sort_order", p,
                 (rs2, j) -> new RunnerCase(rs2.getString("name"), rs2.getString("args"),
-                    rs2.getString("expected_value"), rs2.getBoolean("hidden")))))
+                    rs2.getString("expected_value"), rs2.getBoolean("hidden"), rs2.getString("input"),
+                    rs2.getString("expected")))))
         .stream().findFirst();
   }
 

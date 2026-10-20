@@ -267,6 +267,8 @@ class BundleLoaderTest extends PostgresTestBase {
     assertThat(hidden.hidden()).isTrue();
     assertThat(json.readTree(hidden.argsJson()).path("nums").get(1).asInt()).isEqualTo(5);
     assertThat(json.readTree(hidden.expectedJson()).asInt()).isEqualTo(5);
+    assertThat(hidden.input()).isEqualTo("nums = [1, 5], k = 1");
+    assertThat(hidden.expected()).isEqualTo("5");
     assertThat(queries.codingFixture("db.unsettled")).isEmpty();
 
     // The page's view is unchanged: visible display strings and a hidden count, nothing typed.
