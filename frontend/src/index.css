@@ -277,6 +277,36 @@ summary:hover { text-decoration: underline; }
   font-size: 0.9rem; padding: 0.6rem; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
   background: var(--bg); color: var(--fg); }
 .practice .hint { color: var(--muted); font-size: 0.875rem; }
+/* The code editor: the plain field (default) and CodeMirror (optional) look the same (runner design §2). */
+.practice .code-input { tab-size: 4; min-height: 16rem; }
+.practice .code-mirror { border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); border-radius: 6px;
+  background: var(--bg); overflow: hidden; }
+.practice .code-mirror { margin-bottom: 0.4rem; }
+/* A fixed height, like the plain field's 16 rows: the gutter then runs the full height, and long code
+   scrolls inside the editor rather than growing the page. */
+.practice .code-mirror .cm-editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem;
+  height: 18rem; background: var(--bg); color: var(--fg); }
+.practice .code-mirror .cm-editor.cm-focused { outline: none; }
+.practice .code-mirror:focus-within { outline: 2px solid color-mix(in srgb, var(--fg) 55%, transparent); outline-offset: 2px; }
+.practice .code-mirror .cm-gutters { background: color-mix(in srgb, var(--fg) 4%, var(--bg)); color: var(--muted);
+  border-right: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.practice .code-mirror .cm-cursor { border-left-color: var(--fg); }
+.practice .code-mirror .cm-selectionBackground, .practice .code-mirror .cm-focused .cm-selectionBackground {
+  background: color-mix(in srgb, var(--fg) 18%, transparent) !important; }
+.practice .code-mirror .cm-matchingBracket { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.code-practice .editor-choice { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.875rem; margin: 0.2rem 0 0.5rem; }
+.code-practice .note-actions { flex-wrap: wrap; }
+.code-practice .run-results { margin-top: 0.75rem; }
+/* The result comes first so a phone sees it without scrolling; values stay on one line and the table
+   scrolls inside its box; an exception gets its own full-width row, wrapping anywhere. */
+.code-practice .run-results td code { white-space: nowrap; }
+.code-practice .run-results td.mark { white-space: nowrap; }
+.code-practice .run-results tr.case-error td code { white-space: normal; overflow-wrap: anywhere; }
+.code-practice .compile-errors, .code-practice .printed { background: color-mix(in srgb, var(--fg) 6%, transparent);
+  padding: 0.6rem 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; white-space: pre; }
+.code-practice .hidden-count { margin: 0.5rem 0; }
+.code-practice h4 { margin: 0.9rem 0 0.3rem; font-size: 0.9rem; }
+.code-practice .practice { margin-top: 1.2rem; }
 .practice .result { overflow-x: auto; margin-top: 0.75rem; }
 .note-actions button.secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent); }
 /* Ink, not the muted paragraph grey: on the tinted banners grey falls below 4.5:1 in light mode. */

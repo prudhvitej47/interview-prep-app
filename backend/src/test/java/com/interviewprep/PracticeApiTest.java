@@ -255,4 +255,14 @@ class PracticeApiTest extends PostgresTestBase {
         .contains("mode=run status=not-ready")
         .doesNotContain("secret-code").doesNotContain("9090");
   }
+
+  @Test
+  void theDraftCarriesAStarterOnlyWhenTheProblemCanRun() throws Exception {
+    mvc.perform(as(get("/api/units/" + CODING + "/code"), TESTER))
+        .andExpect(jsonPath("$.starter").value(org.hamcrest.Matchers.containsString("public int maxSum(int[] nums, int k)")));
+    saveCode(CODING, "class Solution {}", TESTER).andExpect(jsonPath("$.starter").isNotEmpty());
+    mvc.perform(as(get("/api/units/" + CONCEPT + "/code"), TESTER)).andExpect(jsonPath("$.starter").isEmpty());
+    jdbc.update("delete from coding_fixture where unit_id = ?", CODING);
+    mvc.perform(as(get("/api/units/" + CODING + "/code"), TESTER)).andExpect(jsonPath("$.starter").isEmpty());
+  }
 }

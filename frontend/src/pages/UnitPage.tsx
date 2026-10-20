@@ -8,7 +8,7 @@ import { PlanNav } from "./PlanNav";
 import { ProgressPanel } from "../unit/ProgressPanel";
 import { LabPanel } from "../unit/LabPanel";
 import { splitFolds, splitSections, TYPE_LABEL } from "../unit/sections";
-import { CodingPractice } from "../practice/CodingPractice";
+import { CodeRunner } from "../practice/CodeRunner";
 import { SqlPractice } from "../practice/SqlPractice";
 
 export function UnitPage() {
@@ -30,7 +30,7 @@ export function UnitPage() {
   const practice = unit.sqlFixture ? (
     <SqlPractice key="practice" fixture={unit.sqlFixture} />
   ) : unit.testCases.length > 0 ? (
-    <CodingPractice key="practice" cases={unit.testCases} hidden={unit.hiddenTestCases} />
+    <CodeRunner key="practice" unitId={unit.id} cases={unit.testCases} hidden={unit.hiddenTestCases} />
   ) : null;
   // Practice goes just before the first spoiler (hints, solution), so the attempt comes first.
   const firstFolded = sections.findIndex((s) => s.folded);

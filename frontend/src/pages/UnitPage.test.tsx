@@ -21,6 +21,7 @@ function show(unitBody: object, note = { body: "", updatedAt: null }, progress: 
     [URL]: { body: unitBody },
     [`${URL}/note`]: { body: note },
     [`${URL}/progress`]: { body: progress },
+    [`${URL}/code`]: { body: { code: "", savedAt: null, lastSubmit: null, starter: null } },
     "/api/me/not-for-me": { body: { topics: [], units: [] } },
   });
   render(
@@ -121,6 +122,7 @@ describe("UnitPage", () => {
     const hints = screen.getByText("Show hints");
     expect(practice.compareDocumentPosition(hints) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(practice).toHaveTextContent("1 more case is kept back");
+    expect(screen.getByRole("heading", { name: "Write and run your solution" })).toBeInTheDocument();
 
     expect(within(practice).getByRole("status")).toHaveTextContent("0 of 2 pass");
     fireEvent.click(screen.getByLabelText("Passes: the example"));
