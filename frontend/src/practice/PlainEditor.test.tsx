@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlainEditor } from "./PlainEditor";
 
 function Harness({ initial }: { initial: string }) {
@@ -13,6 +13,10 @@ function editor() {
 }
 
 describe("PlainEditor", () => {
+  afterEach(() => {
+    delete (document as { execCommand?: unknown }).execCommand;
+  });
+
   it("indents with Tab and keeps the indent on Enter", () => {
     render(<Harness initial={"    if (a) {"} />);
     const box = editor();
@@ -21,6 +25,24 @@ describe("PlainEditor", () => {
     expect(box.value).toBe("    if (a) {\n        ");
     fireEvent.keyDown(box, { key: "Tab" });
     expect(box.value).toBe("    if (a) {\n            ");
+  });
+
+  it("types its indents through the browser's own edit, so Cmd+Z can undo them", () => {
+    // jsdom has no editing commands; a browser inserts the text and fires input itself.
+    const exec = vi.fn((_cmd: string, _ui?: boolean, text?: string) => {
+      const box = editor();
+      const start = box.selectionStart;
+      box.setRangeText(text ?? "", start, box.selectionEnd, "end");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    });
+    Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
+    render(<Harness initial={"    if (a) {"} />);
+    const box = editor();
+    box.setSelectionRange(12, 12);
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(exec).toHaveBeenCalledWith("insertText", false, "\n        ");
+    expect(box.value).toBe("    if (a) {\n        ");
   });
 
   it("keeps long lines on one line, as code editors do", () => {

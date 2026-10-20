@@ -31,6 +31,10 @@ export function PlainEditor({ value, onChange, label, disabled }: EditorProps) {
     e.preventDefault();
     const t = e.currentTarget;
     const edit = keyEdit(t.value, t.selectionStart, t.selectionEnd, indenting ? "Tab" : "Enter");
+    // The browser's own insert keeps Cmd+Z working (setting the value from code wipes undo) and fires
+    // the input event that reaches onChange. Where editing commands are missing, set it directly.
+    const inserted = edit.value.slice(t.selectionStart, edit.caret);
+    if (typeof document.execCommand === "function" && document.execCommand("insertText", false, inserted)) return;
     caret.current = edit.caret;
     onChange(edit.value);
   }

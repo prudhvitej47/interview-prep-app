@@ -117,6 +117,7 @@ describe("CodeRunner", () => {
     mockFetch({ [CODE]: { body: draft({ starter: null }) } });
     show();
     await screen.findByText(/can't run here yet/);
+    expect(screen.queryByText(/Run tries the cases/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(editor()).not.toBeDisabled();

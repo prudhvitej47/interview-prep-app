@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Annotation, Compartment, EditorState } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, Transaction } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, HighlightStyle, indentUnit, syntaxHighlighting } from "@codemirror/language";
@@ -15,6 +15,7 @@ const highlight = HighlightStyle.define([
 ]);
 
 // Marks a change made from outside (new code from the page), so it is not reported back as an edit.
+// It also stays out of undo history: Cmd+Z must never take away the code the page loaded.
 const fromOutside = Annotation.define<boolean>();
 
 /**
@@ -64,7 +65,7 @@ export default function CodeMirrorEditor({ value, onChange, label, disabled }: E
   useEffect(() => {
     const v = view.current;
     if (v && v.state.doc.toString() !== value) {
-      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value }, annotations: fromOutside.of(true) });
+      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value }, annotations: [fromOutside.of(true), Transaction.addToHistory.of(false)] });
     }
   }, [value]);
 

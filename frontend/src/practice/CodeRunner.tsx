@@ -115,8 +115,15 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
     <section className="practice code-practice">
       <h3>Write and run your solution</h3>
       <p className="hint">
-        Java 25. Run tries the cases below; Submit also tries {hidden} hidden case{hidden === 1 ? "" : "s"}.
-        Neither marks the unit done. Tab indents; press Esc, then Tab, to move on.
+        Java 25.{" "}
+        {canRun && (
+          <>
+            Run tries the cases below
+            {hidden > 0 ? `; Submit also tries ${hidden} hidden case${hidden === 1 ? "" : "s"}` : "; Submit tries them too"}.
+            Neither marks the unit done.{" "}
+          </>
+        )}
+        Tab indents; press Esc, then Tab, to move on.
       </p>
       {load === "ready" && !canRun && (
         <p className="hint">This problem can't run here yet: it arrives with the next curriculum update. Save your code now, and check it by hand below.</p>

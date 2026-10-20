@@ -1,5 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { EditorView } from "@codemirror/view";
+import { undo } from "@codemirror/commands";
 import { describe, expect, it, vi } from "vitest";
 import CodeMirrorEditor from "./CodeMirrorEditor";
 
@@ -23,5 +24,14 @@ describe("CodeMirrorEditor", () => {
   it("is read-only while disabled", () => {
     const { container } = render(<CodeMirrorEditor value="x" onChange={() => {}} label="Your solution" disabled />);
     expect(container.querySelector(".cm-content")).toHaveAttribute("contenteditable", "false");
+  });
+
+  it("does not let undo take away code that arrived from outside", async () => {
+    const { container, rerender } = render(<CodeMirrorEditor value="" onChange={() => {}} label="Your solution" />);
+    rerender(<CodeMirrorEditor value="class Solution {}" onChange={() => {}} label="Your solution" />);
+    const view = EditorView.findFromDOM(container.querySelector(".cm-editor") as HTMLElement)!;
+    await waitFor(() => expect(view.state.doc.toString()).toBe("class Solution {}"));
+    undo(view);
+    expect(view.state.doc.toString()).toBe("class Solution {}");
   });
 });
