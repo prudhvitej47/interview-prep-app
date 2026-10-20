@@ -15,6 +15,8 @@ final class HarnessSource {
 
   static final int CASE_LIMIT_MS = 2000;
   static final int OUTPUT_CAP_BYTES = 16 * 1024;
+  /** A case's shown result is cut here, so large results cannot push a run past the sandbox's read limit. */
+  static final int GOT_CAP_CHARS = 2048;
 
   private static final Pattern DECLARES_TREE = Pattern.compile("\\bclass\\s+TreeNode\\b");
 
@@ -54,6 +56,7 @@ final class HarnessSource {
     }
     return MAIN.replace("%LIMIT%", Integer.toString(CASE_LIMIT_MS))
         .replace("%CAP%", Integer.toString(OUTPUT_CAP_BYTES))
+        .replace("%GOTCAP%", Integer.toString(GOT_CAP_CHARS))
         .replace("%RUNS%", runs)
         .replace("%METHODS%", methods);
   }
@@ -92,6 +95,7 @@ final class HarnessSource {
         static final PrintStream OUT = System.out;
         static final CappedStream CAPTURED = new CappedStream(%CAP%);
         static final int LIMIT_MS = %LIMIT%;
+        static final int GOT_CAP = %GOTCAP%;
 
         public static void main(String[] args) {
           PrintStream learner = new PrintStream(CAPTURED, true, StandardCharsets.UTF_8);
@@ -127,6 +131,8 @@ final class HarnessSource {
           }
           if (t.isAlive()) {
             OUT.println("@@CASE " + Harness.line(id, "timeout", null, null, LIMIT_MS));
+            // What the learner printed matters most here: it is how they debug a loop that never ends.
+            OUT.println("@@OUTPUT " + Harness.json(CAPTURED.text()));
             OUT.println("@@TIMEOUT " + Harness.json(id));
             OUT.flush();
             Runtime.getRuntime().halt(3);
@@ -143,7 +149,7 @@ final class HarnessSource {
             throw new IllegalStateException(e);
           }
           boolean pass = Objects.equals(want, result[0]);
-          OUT.println("@@CASE " + Harness.line(id, pass ? "pass" : "fail", Harness.show(result[0]), null, took[0]));
+          OUT.println("@@CASE " + Harness.line(id, pass ? "pass" : "fail", Harness.cap(Harness.show(result[0])), null, took[0]));
           OUT.flush();
         }
 
@@ -220,6 +226,10 @@ final class HarnessSource {
             return j.toString();
           }
           return String.valueOf(c);
+        }
+
+        static String cap(String s) {
+          return s.length() <= Main.GOT_CAP ? s : s.substring(0, Main.GOT_CAP) + "…";
         }
 
         static String json(String s) {

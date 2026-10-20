@@ -151,4 +151,20 @@ class HarnessLocalTest {
         new Wire.Signature("echo", List.of(new Wire.Param("x", "int")), "int"), "exact", List.of());
     assertThat(HarnessSource.files(plain)).containsOnlyKeys("Solution.java", "Main.java", "TreeNode.java");
   }
+
+  @Test
+  void aHugeResultIsCutSoTheRunStaysSmall() throws Exception {
+    String source = "class Solution { String f(int x) { return \"a\".repeat(x); } }";
+    HarnessOutput.CaseLine line = run(source, "f", "int", "String", "exact", "10000", "\"b\"").parsed().cases().get(0);
+    assertThat(line.verdict()).isEqualTo("fail");
+    assertThat(line.got()).hasSizeLessThanOrEqualTo(HarnessSource.GOT_CAP_CHARS + 1).endsWith("…");
+  }
+
+  @Test
+  void printedOutputSurvivesATimeout() throws Exception {
+    String source = "class Solution { int f(int x) { System.out.println(\"debug before the loop\"); while (true) { } } }";
+    Ran ran = run(source, "f", "int", "int", "exact", "1", "1");
+    assertThat(ran.parsed().timedOut()).isEqualTo("c0");
+    assertThat(ran.parsed().output()).contains("debug before the loop");
+  }
 }
