@@ -57,3 +57,7 @@ app:
     # /etc/interview-prep/github.env on the VM. Unset, the page says sending is not set up.
     github-token: ${APP_GITHUB_TOKEN:}
     repo: ${APP_CONTENT_REPO:prudhvitej47/interview-prep-content}
+  runner:
+    # The code runner on the Compose network (http://runner:8090 on the VM). Empty means code runs are
+    # off: the page says the runner is unavailable and keeps the learner's code.
+    url: ${RUNNER_URL:}
