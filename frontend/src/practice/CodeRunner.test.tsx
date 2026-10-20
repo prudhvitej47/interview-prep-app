@@ -44,7 +44,9 @@ describe("CodeRunner", () => {
     mockFetch({ [CODE]: { body: draft({ code: "class Solution { /* mine */ }", lastSubmit: { passed: 2, total: 3, at: "2026-10-11T06:00:00Z" } }) } });
     show();
     await waitFor(() => expect(screen.getAllByLabelText("Your solution").at(-1)).toHaveValue("class Solution { /* mine */ }"));
-    expect(screen.getByText(/Last submit: 2 of 3 pass, 11 Oct/)).toBeInTheDocument();
+    // The date is in the reader's own locale ("11 Oct" or "Oct 11"), so compare with the same formatter.
+    const day = new Date("2026-10-11T06:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    expect(screen.getByText(`Last submit: 2 of 3 pass, ${day}`)).toBeInTheDocument();
   });
 
   it("runs the visible cases and shows each with what the code returned", async () => {
