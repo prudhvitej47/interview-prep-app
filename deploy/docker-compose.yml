@@ -92,3 +92,48 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     mem_limit: 768m
+
+  # The code runner: the same image as the app, started as RunnerMain. It alone holds the Docker
+  # socket, which is root on this host, so it is the only service that gets it, it exposes no port,
+  # and it runs nothing but the sandbox flags of runner design §4. If it fails, code runs are off and
+  # nothing else changes (update.sh starts it separately).
+  runner:
+    image: ${APP_IMAGE:?APP_IMAGE must be set}
+    container_name: interview-prep-runner
+    restart: unless-stopped
+    entrypoint:
+      - java
+      - -Xmx48m
+      - -XX:+ExitOnOutOfMemoryError
+      # A request has 30 s to arrive and 30 s to be answered, so a slow client cannot hold a thread.
+      - -Dsun.net.httpserver.maxReqTime=30
+      - -Dsun.net.httpserver.maxRspTime=30
+      - -cp
+      - /app/BOOT-INF/classes:/app/BOOT-INF/lib/*
+      - com.interviewprep.runner.RunnerMain
+    environment:
+      RUNNER_PORT: "8090"
+      # The Docker CLI wants somewhere to keep its config; the root filesystem is read-only.
+      DOCKER_CONFIG: /tmp/docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The host's docker group, written to app.env by vm-setup.sh. The default 0 grants nothing (the
+    # socket is root:docker 660), so a missing value disables code runs instead of breaking Compose.
+    group_add:
+      - "${DOCKER_GID:-0}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # No ports section on purpose: the app reaches it as http://runner:8090 on the Compose network.
+    # Measured 2026-10-20 with these flags: 46 MB idle, 107 MB peak while a smoke check ran a second JVM
+    # and the Docker CLI beside it. Every docker CLI call (runs, sweeps, health) counts here too.
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8090 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"healthy\":true' <&3"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 20s

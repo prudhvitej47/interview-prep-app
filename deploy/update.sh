@@ -19,6 +19,23 @@ compose pull --quiet app
 # --no-deps so a new app image never restarts PostgreSQL underneath it.
 compose up --detach --no-deps app
 
+# --- the code runner ------------------------------------------------------------
+# Same image as the app, already pulled above. Its sandbox image (deploy/sandbox-image) is pulled only
+# when missing: pulling by digest every two minutes would spend Docker Hub's anonymous rate limit for
+# nothing. Neither step may stop the app's updates: without the runner, code runs are off and that is all.
+update_runner() {
+  local sandbox
+  # A plain assignment would end the script under set -e if the file were missing; this one cannot.
+  sandbox="$(cat "$(dirname "${BASH_SOURCE[0]}")/sandbox-image" 2>/dev/null)" || sandbox=""
+  if [[ -z "${sandbox}" ]]; then
+    echo "deploy/sandbox-image is missing; skipping the sandbox pull" >&2
+  elif ! docker image inspect "${sandbox}" > /dev/null 2>&1; then
+    docker pull --quiet "${sandbox}" > /dev/null || echo "could not pull the sandbox image; retrying next time" >&2
+  fi
+  compose up --detach --no-deps runner || echo "the code runner did not start; the app is unaffected" >&2
+}
+update_runner
+
 # --- the curriculum -----------------------------------------------------------
 # The bundle is not a running container, so Compose cannot decide this one. The content image is
 # built deterministically, so an unchanged curriculum has an unchanged image id and nothing happens.

@@ -31,6 +31,11 @@ COPY --from=layers --chown=app:app /layers/extracted/spring-boot-loader/ ./
 COPY --from=layers --chown=app:app /layers/extracted/snapshot-dependencies/ ./
 COPY --from=layers --chown=app:app /layers/extracted/application/ ./
 
+# The code runner (a second Compose service from this same image) starts sandbox containers with the
+# Docker CLI. Copied from the official image, pinned by digest; the app itself never uses it, and only
+# the runner service gets the socket.
+COPY --from=docker:28-cli@sha256:625d9431a9f54c5a2bc90f24f0e1c3d55b1349fd857dd85035f98c2c9acbdd4d /usr/local/bin/docker /usr/local/bin/docker
+
 USER app
 EXPOSE 8080
 
