@@ -25,8 +25,11 @@ compose up --detach --no-deps app
 # nothing. Neither step may stop the app's updates: without the runner, code runs are off and that is all.
 update_runner() {
   local sandbox
-  sandbox="$(cat "$(dirname "${BASH_SOURCE[0]}")/sandbox-image")"
-  if ! docker image inspect "${sandbox}" > /dev/null 2>&1; then
+  # A plain assignment would end the script under set -e if the file were missing; this one cannot.
+  sandbox="$(cat "$(dirname "${BASH_SOURCE[0]}")/sandbox-image" 2>/dev/null)" || sandbox=""
+  if [[ -z "${sandbox}" ]]; then
+    echo "deploy/sandbox-image is missing; skipping the sandbox pull" >&2
+  elif ! docker image inspect "${sandbox}" > /dev/null 2>&1; then
     docker pull --quiet "${sandbox}" > /dev/null || echo "could not pull the sandbox image; retrying next time" >&2
   fi
   compose up --detach --no-deps runner || echo "the code runner did not start; the app is unaffected" >&2

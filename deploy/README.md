@@ -89,8 +89,9 @@ Checking it:
 
 ```bash
 sudo docker ps --format '{{.Names}} {{.Status}}'                     # interview-prep-runner ... (healthy)
-sudo docker exec interview-prep-runner java -cp '/app/BOOT-INF/classes:/app/BOOT-INF/lib/*' \
-  com.interviewprep.runner.RunnerMain smoke                         # finished pass
+sudo docker exec interview-prep-runner java -Xmx24m -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=16m \
+  -cp '/app/BOOT-INF/classes:/app/BOOT-INF/lib/*' com.interviewprep.runner.RunnerMain smoke   # finished pass
+sudo docker exec interview-prep-runner docker version --format '{{.Client.APIVersion}} / {{.Server.APIVersion}}'
 sudo docker ps -aq --filter label=interview-prep.run=1              # empty
 ```
 

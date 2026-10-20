@@ -128,7 +128,9 @@ services:
     security_opt:
       - no-new-privileges:true
     # No ports section on purpose: the app reaches it as http://runner:8090 on the Compose network.
-    mem_limit: 128m
+    # Measured 2026-10-20 with these flags: 46 MB idle, 107 MB peak while a smoke check ran a second JVM
+    # and the Docker CLI beside it. Every docker CLI call (runs, sweeps, health) counts here too.
+    mem_limit: 192m
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8090 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"healthy\":true' <&3"]
       interval: 60s

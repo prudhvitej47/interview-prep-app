@@ -101,4 +101,12 @@ check "a sandbox pull that fails does not fail the update" 0 "$?"
 check "and the curriculum still updates" "$((before + 2))" "$(restarts)"
 unset FAKE_SANDBOX_PULL_FAILS
 
+# A missing sandbox-image file (a partial sync) must not stop the curriculum either.
+cp -R "${HERE}" "${WORK}/deploy-copy" && rm "${WORK}/deploy-copy/sandbox-image"
+export FAKE_IMAGE_ID="sha256:seven"
+before="$(restarts)"
+bash "${WORK}/deploy-copy/update.sh" > /dev/null 2>&1
+check "no sandbox-image file does not fail the update" 0 "$?"
+check "and the curriculum still updates" "$((before + 1))" "$(restarts)"
+
 exit $fail
