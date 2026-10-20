@@ -16,7 +16,7 @@ class DockerSandboxArgsTest {
         "--tmpfs", "/work:size=8m,mode=1777,noexec,nosuid", "--tmpfs", "/tmp:size=8m,noexec,nosuid",
         "--memory", "256m", "--memory-swap", "256m", "--cpus", "1", "--pids-limit", "64",
         "--ulimit", "nofile=64:64", "--ulimit", "nproc=64:64", "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges", "--ipc", "none", "--log-driver", "none",
+        "--security-opt", "no-new-privileges", "--ipc", "none", "--log-driver", "none", "--pull", "never",
         "img@sha256:abc", "sh", "-c",
         "tar -xf - -C /work && exec java -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:-UsePerfData"
             + " -Xmx160m -XX:ActiveProcessorCount=1 /work/Main.java");
@@ -33,5 +33,19 @@ class DockerSandboxArgsTest {
   void theDefaultImageIsTheTrialsPinnedDigest() {
     assertThat(DockerSandbox.DEFAULT_IMAGE).isEqualTo(
         "eclipse-temurin:25-jdk-noble@sha256:a75cd2f1bd3e1e45da898bf658f1f1039ab7392b34844862514d230fd6a516d4");
+  }
+
+  @Test
+  void aStalledDockerCannotWedgeTheRunnerEvenWithInputLargerThanAPipe(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)
+      throws Exception {
+    // A docker that never reads its input: the code must still come back after the wall clock.
+    java.nio.file.Path fake = dir.resolve("docker");
+    java.nio.file.Files.writeString(fake, "#!/bin/sh\nif [ \"$1\" = run ]; then exec sleep 60; fi\nexit 0\n");
+    fake.toFile().setExecutable(true);
+    DockerSandbox sandbox = new DockerSandbox(fake.toString(), "img", null);
+    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(25), () -> {
+      Sandbox.Result r = sandbox.run(java.util.Map.of("Main.java", "x".repeat(512 * 1024)));
+      assertThat(r.timedOut()).isTrue();
+    });
   }
 }

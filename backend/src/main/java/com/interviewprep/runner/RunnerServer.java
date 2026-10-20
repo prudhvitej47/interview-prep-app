@@ -84,6 +84,11 @@ final class RunnerServer {
         send(exchange, 200, service.run(request));
       } catch (IllegalArgumentException e) {
         send(exchange, 400, Map.of("error", e.getMessage()));
+      } catch (RuntimeException e) {
+        // Never the message or trace: it can hold learner code or case data.
+        System.getLogger(RunnerServer.class.getName()).log(System.Logger.Level.WARNING,
+            "run failed: {0}", e.getClass().getName());
+        send(exchange, 500, Map.of("error", "runner failed"));
       } finally {
         permit.release();
       }

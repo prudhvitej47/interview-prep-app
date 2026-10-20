@@ -102,4 +102,16 @@ class RunnerServerTest {
     assertThat(r.statusCode()).isEqualTo(200);
     assertThat(r.body()).isEqualTo("{\"healthy\":true}");
   }
+
+  @Test
+  void anUnexpectedFailureIsA500WithoutDetail() throws Exception {
+    Sandbox broken = new Sandbox() {
+      @Override public Result run(Map<String, String> files) { throw new IllegalStateException("secret detail"); }
+      @Override public boolean healthy() { return true; }
+    };
+    server = new RunnerServer(new RunService(broken), broken, 1000);
+    HttpResponse<String> r = post(server.start(0), BODY);
+    assertThat(r.statusCode()).isEqualTo(500);
+    assertThat(r.body()).isEqualTo("{\"error\":\"runner failed\"}");
+  }
 }

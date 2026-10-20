@@ -44,7 +44,9 @@ final class DockerSandbox implements Sandbox {
         "--tmpfs", "/work:size=8m,mode=1777,noexec,nosuid", "--tmpfs", "/tmp:size=8m,noexec,nosuid",
         "--memory", "256m", "--memory-swap", "256m", "--cpus", "1", "--pids-limit", "64",
         "--ulimit", "nofile=64:64", "--ulimit", "nproc=64:64", "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges", "--ipc", "none", "--log-driver", "none"));
+        "--security-opt", "no-new-privileges", "--ipc", "none", "--log-driver", "none",
+        // The image is pre-pulled (plan 5d); a missing one fails fast instead of pulling inside a run.
+        "--pull", "never"));
     if (runtime != null && !runtime.isBlank()) {
       args.add("--runtime");
       args.add(runtime);
@@ -60,11 +62,20 @@ final class DockerSandbox implements Sandbox {
     command.add(docker);
     command.addAll(runArgs(name));
     long start = System.nanoTime();
+    Process p = null;
     try {
-      Process p = new ProcessBuilder(command).redirectErrorStream(true).start();
-      try (OutputStream in = p.getOutputStream()) {
-        in.write(Tar.of(files));
-      }
+      p = new ProcessBuilder(command).redirectErrorStream(true).start();
+      // Written on its own thread, inside the wall-clock window: a docker that never reads its input
+      // (stalled daemon, a missing image) must not hold the runner's one permit forever.
+      OutputStream stdin = p.getOutputStream();
+      byte[] tar = Tar.of(files);
+      Thread.ofVirtual().start(() -> {
+        try (stdin) {
+          stdin.write(tar);
+        } catch (IOException e) {
+          // The process was killed or exited early: its result says what happened.
+        }
+      });
       Reader reader = new Reader(p.getInputStream());
       Thread readThread = Thread.ofVirtual().start(reader);
       // Poll, so a run that floods its output is killed as soon as it passes the limit.
@@ -88,7 +99,7 @@ final class DockerSandbox implements Sandbox {
       throw new UncheckedIOException(e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      stop(name, null);
+      stop(name, p);
       throw new IllegalStateException("interrupted", e);
     }
   }
@@ -101,11 +112,6 @@ final class DockerSandbox implements Sandbox {
   private void stop(String name, Process client) {
     if (client != null) {
       client.destroyForcibly();
-      try {
-        client.getInputStream().close();
-      } catch (IOException e) {
-        // Already gone.
-      }
     }
     quietly(docker, "kill", name);
     quietly(docker, "rm", "-f", name);

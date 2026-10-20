@@ -112,4 +112,39 @@ class RunServiceTest {
     assertThatThrownBy(() -> service.run(new Wire.RunRequest(ok.source(), ok.signature(), "sorted", ok.cases())))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void compileDiagnosticsNeverShowTheGeneratedFileWhereHiddenCasesLive() {
+    String mixed = "/work/Main.java:3: error: cannot find symbol\n"
+        + "  static Object actual1() { return new Solution().f(4242); }\n"
+        + "                                                  ^\n"
+        + "  symbol:   method f(int)\n"
+        + "/work/Solution.java:2: error: cannot find symbol\n"
+        + "  int g(int x) { return y; }\n"
+        + "                        ^\n"
+        + "  symbol:   variable y\n"
+        + "/work/Main.java:9: error: incompatible types\n"
+        + "  static Object expected1() { return 777; }\n"
+        + "2 errors\nerror: compilation failed\n";
+    Wire.RunResponse r = serviceReturning(1, mixed, false, false).run(request(true));
+    assertThat(r.status()).isEqualTo("compile-error");
+    assertThat(r.compileErrors()).contains("Solution.java:2: error: cannot find symbol").contains("variable y")
+        .doesNotContain("4242").doesNotContain("777").doesNotContain("Main.java").doesNotContain("errors");
+  }
+
+  @Test
+  void requestsWithMissingPartsAreRefusedNotCrashed() {
+    Wire.RunRequest ok = request(false);
+    assertThatThrownBy(() -> serviceReturning(0, BOTH_PASS, false, false).run(new Wire.RunRequest(ok.source(),
+        new Wire.Signature("f", null, "int"), "exact", ok.cases()))).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> serviceReturning(0, BOTH_PASS, false, false).run(new Wire.RunRequest(ok.source(),
+        new Wire.Signature("f", List.of(new Wire.Param("x", "int")), null), "exact", ok.cases())))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> serviceReturning(0, BOTH_PASS, false, false).run(new Wire.RunRequest(ok.source(),
+        ok.signature(), "exact", List.of(new Wire.CaseIn("a", null, JSON.readTree("1"), true)))))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> serviceReturning(0, BOTH_PASS, false, false).run(new Wire.RunRequest(ok.source(),
+        new Wire.Signature("f; System.exit(0); //", List.of(new Wire.Param("x", "int")), "int"), "exact", ok.cases())))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

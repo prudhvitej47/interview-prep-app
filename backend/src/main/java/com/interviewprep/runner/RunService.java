@@ -24,6 +24,9 @@ final class RunService {
 
   private static final Logger LOG = System.getLogger(RunService.class.getName());
   private static final Pattern LEARNER_DIAGNOSTIC = Pattern.compile("^(/work/)?(Solution|TreeNode)\\.java:\\d+: error", Pattern.MULTILINE);
+  private static final Pattern BLOCK_HEADER = Pattern.compile("^(/work/)?(\\w+)\\.java:\\d+: (error|warning)");
+  private static final Pattern SUMMARY = Pattern.compile("^(\\d+ (errors?|warnings?)|error: compilation failed)$");
+  private static final Pattern NAME = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
   private static final Pattern HARNESS_DIAGNOSTIC = Pattern.compile("^(/work/)?Main\\.java:\\d+: error", Pattern.MULTILINE);
 
   private final Sandbox sandbox;
@@ -50,6 +53,16 @@ final class RunService {
     if (r.source().getBytes(StandardCharsets.UTF_8).length > SOURCE_LIMIT_BYTES) {
       throw new IllegalArgumentException("code is limited to 32 KB");
     }
+    Wire.Signature sig = r.signature();
+    if (sig.method() == null || !NAME.matcher(sig.method()).matches() || sig.params() == null
+        || sig.returns() == null) {
+      throw new IllegalArgumentException("a signature needs a method name, params and a return type");
+    }
+    for (Wire.Param p : sig.params()) {
+      if (p == null || p.name() == null || !NAME.matcher(p.name()).matches() || p.type() == null) {
+        throw new IllegalArgumentException("every parameter needs a name and a type");
+      }
+    }
     if (r.compare() != null && !r.compare().equals("exact") && !r.compare().equals("any-order")) {
       throw new IllegalArgumentException("unknown compare " + r.compare());
     }
@@ -66,8 +79,11 @@ final class RunService {
     }
     Set<String> ids = new HashSet<>();
     for (Wire.CaseIn c : r.cases()) {
-      if (c.id() == null || !ids.add(c.id())) {
-        throw new IllegalArgumentException("case id " + c.id() + " is missing or used twice");
+      if (c == null || c.id() == null || !ids.add(c.id())) {
+        throw new IllegalArgumentException("case id " + (c == null ? null : c.id()) + " is missing or used twice");
+      }
+      if (c.args() == null || !c.args().isObject() || c.expected() == null) {
+        throw new IllegalArgumentException("case " + c.id() + " needs args and an expected value");
       }
     }
   }
@@ -121,13 +137,25 @@ final class RunService {
     return List.copyOf(out);
   }
 
+  /**
+   * Only the learner's own diagnostic blocks. javac echoes the source line of every error, and in the
+   * generated Main.java those lines hold the cases' literals, hidden ones included: a block from Main.java
+   * is never shown. A block runs from its "File.java:N: error" header to the next header.
+   */
   private static String diagnostics(String output) {
     StringBuilder out = new StringBuilder();
+    boolean keep = false;
     for (String line : output.split("\n")) {
-      if (line.startsWith("@@") || line.startsWith("error: compilation failed")) {
+      java.util.regex.Matcher header = BLOCK_HEADER.matcher(line);
+      if (header.find()) {
+        keep = header.group(2).equals("Solution") || header.group(2).equals("TreeNode");
+      } else if (SUMMARY.matcher(line).matches() || line.startsWith("@@")) {
+        keep = false;
         continue;
       }
-      out.append(line.replace("/work/", "")).append('\n');
+      if (keep) {
+        out.append(line.replace("/work/", "")).append('\n');
+      }
     }
     String text = out.toString().strip();
     return text.length() <= DIAGNOSTICS_LIMIT ? text : text.substring(0, DIAGNOSTICS_LIMIT) + "\n…";

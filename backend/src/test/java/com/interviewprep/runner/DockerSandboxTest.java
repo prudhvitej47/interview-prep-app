@@ -119,4 +119,16 @@ class DockerSandboxTest {
     assertThat(JSON.writeValueAsString(r)).doesNotContain("7").doesNotContain("secret").doesNotContain("4242");
     assertThat(leftoverContainers()).isZero();
   }
+
+  @Test
+  void aCompileErrorNeverEchoesAHiddenCase() {
+    // A typo plus a renamed method: javac also reports Main.java, whose lines hold the case literals.
+    Wire.RunRequest request = new Wire.RunRequest("class Solution {\n  int g(int x) { return y; }\n}\n",
+        new Wire.Signature("f", List.of(new Wire.Param("x", "int")), "int"), "exact",
+        List.of(new Wire.CaseIn("hidden", JSON.readTree("{\"x\": 424242}"), JSON.readTree("777777"), false)));
+    Wire.RunResponse r = SERVICE.run(request);
+    assertThat(r.status()).isEqualTo("compile-error");
+    assertThat(r.compileErrors()).contains("Solution.java:2").doesNotContain("424242").doesNotContain("777777")
+        .doesNotContain("Main.java");
+  }
 }
