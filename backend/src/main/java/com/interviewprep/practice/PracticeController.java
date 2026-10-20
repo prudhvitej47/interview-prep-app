@@ -65,16 +65,16 @@ class PracticeController {
     boolean submit = request != null && request.submit();
     String code = request == null ? null : request.code();
     drafts.save(me.id(), unitId, code); // 400 for code over 32 KB, before anything runs
+    long start = System.nanoTime();
     Optional<CurriculumQueries.CodingFixture> fixture = curriculum.codingFixture(unitId);
     if (fixture.isEmpty()) {
-      return status(HttpStatus.CONFLICT, "not-ready");
+      return logged(me, unitId, submit, start, 0, 0, status(HttpStatus.CONFLICT, "not-ready"), "");
     }
     String refused = limiter.acquire(me.id());
     if (refused != null) {
-      return status(HttpStatus.TOO_MANY_REQUESTS, refused);
+      return logged(me, unitId, submit, start, 0, 0, status(HttpStatus.TOO_MANY_REQUESTS, refused), "");
     }
     // A refusal returns before the try, so its finally never frees another request's slot.
-    long start = System.nanoTime();
     try {
       List<CurriculumQueries.RunnerCase> cases = new ArrayList<>();
       Map<String, CurriculumQueries.RunnerCase> byId = new LinkedHashMap<>(); // wire order = curriculum order
@@ -99,20 +99,23 @@ class PracticeController {
         w.put("reveal", !c.hidden());
       });
       RunnerClient.Outcome outcome = runner.run(body);
+      int sent = cases.size();
       return switch (outcome) {
-        case RunnerClient.Busy b -> status(HttpStatus.SERVICE_UNAVAILABLE, "busy");
-        case RunnerClient.Unavailable u -> status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable");
-        case RunnerClient.Answered a when a.status() != 200 -> status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable");
+        case RunnerClient.Busy b -> logged(me, unitId, submit, start, sent, 0,
+            status(HttpStatus.SERVICE_UNAVAILABLE, "busy"), "");
+        case RunnerClient.Unavailable u -> logged(me, unitId, submit, start, sent, 0,
+            status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable"), "");
+        // A 400 is a request the runner refused: in practice a content bug in the signature or cases.
+        case RunnerClient.Answered a when a.status() != 200 -> logged(me, unitId, submit, start, sent, 0,
+            status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable"), "runner answered " + a.status());
         case RunnerClient.Answered a -> {
           RunView view = view(a.body(), byId, all, submit);
+          int passed = (int) view.cases().stream().filter(c -> c.verdict().equals("pass")).count()
+              + (view.hidden() == null ? 0 : view.hidden().passed());
           if (submit) {
-            int passed = view.cases().stream().filter(c -> c.verdict().equals("pass")).mapToInt(c -> 1).sum()
-                + (view.hidden() == null ? 0 : view.hidden().passed());
-            drafts.recordSubmit(me.id(), unitId, passed, cases.size());
+            drafts.recordSubmit(me.id(), unitId, passed, sent);
           }
-          LOG.log(Level.INFO, "practice run learner={0} unit={1} mode={2} status={3} cases={4} ms={5}",
-              String.valueOf(me.id()), unitId, submit ? "submit" : "run", view.status(),
-              String.valueOf(cases.size()), String.valueOf((System.nanoTime() - start) / 1_000_000));
+          log(me, unitId, submit, start, view.status(), sent, passed, "");
           yield ResponseEntity.ok(view);
         }
       };
@@ -160,6 +163,21 @@ class PracticeController {
     }
     JsonNode v = node.path(field);
     return v.isNull() || v.isMissingNode() ? null : v.asString();
+  }
+
+  /** One line per run, whatever its outcome (runner design §6): counts and timing, never code or case data. */
+  private static ResponseEntity<?> logged(LearnerPrincipal me, String unitId, boolean submit, long start, int cases,
+      int passed, ResponseEntity<Map<String, String>> answer, String note) {
+    log(me, unitId, submit, start, answer.getBody().get("status"), cases, passed, note);
+    return answer;
+  }
+
+  private static void log(LearnerPrincipal me, String unitId, boolean submit, long start, String status, int cases,
+      int passed, String note) {
+    LOG.log(Level.INFO, "practice run learner={0} unit={1} mode={2} status={3} cases={4} passed={5} ms={6}{7}",
+        String.valueOf(me.id()), unitId, submit ? "submit" : "run", status, String.valueOf(cases),
+        String.valueOf(passed), String.valueOf((System.nanoTime() - start) / 1_000_000),
+        note.isEmpty() ? "" : " (" + note + ")");
   }
 
   private static ResponseEntity<Map<String, String>> status(HttpStatus status, String value) {

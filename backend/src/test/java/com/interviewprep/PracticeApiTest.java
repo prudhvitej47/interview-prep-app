@@ -17,6 +17,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -36,6 +39,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class PracticeApiTest extends PostgresTestBase {
 
   static final String TESTER = "tester@example.com";
@@ -236,5 +240,19 @@ class PracticeApiTest extends PostgresTestBase {
         .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.status").value("too-many"));
     runCode(PRIVATE, "class Solution {}", false, TESTER).andExpect(status().isTooManyRequests());
     runCode(CODING, "class Solution {}", false, OTHER).andExpect(status().isOk());
+  }
+
+  @Test
+  void everyOutcomeIsLoggedWithCountsButNeverCode(CapturedOutput log) throws Exception {
+    ANSWER.set(RUNNER_FINISHED);
+    runCode(CODING, "class Solution { /* secret-code */ }", true, TESTER).andExpect(status().isOk());
+    ANSWER_STATUS.set(502);
+    runCode(CODING, "class Solution {}", false, TESTER).andExpect(status().isServiceUnavailable());
+    jdbc.update("delete from coding_fixture where unit_id = ?", CODING);
+    runCode(CODING, "class Solution {}", false, TESTER).andExpect(status().isConflict());
+    assertThat(log.getOut()).contains("mode=submit status=finished cases=3 passed=2")
+        .contains("mode=run status=unavailable")
+        .contains("mode=run status=not-ready")
+        .doesNotContain("secret-code").doesNotContain("9090");
   }
 }
