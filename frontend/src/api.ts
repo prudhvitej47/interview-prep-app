@@ -157,6 +157,58 @@ export async function saveNote(unitId: string, body: string): Promise<Note> {
   return response.json();
 }
 
+/** A learner's code for a coding problem; starter is null until the problem can run here. */
+export type LastSubmit = { passed: number; total: number; at: string };
+export type CodeDraft = { code: string; savedAt: string | null; lastSubmit: LastSubmit | null; starter: string | null };
+export type CaseResult = {
+  name: string;
+  input: string;
+  expected: string;
+  verdict: "pass" | "fail" | "error" | "timeout" | "not-run";
+  got: string | null;
+  error: string | null;
+  ms: number | null;
+};
+export type RunResult = {
+  status: "finished" | "compile-error" | "signature-mismatch" | "timeout" | "oom" | "crashed";
+  compileErrors: string | null;
+  cases: CaseResult[];
+  hidden: { passed: number; total: number } | null;
+  output: string | null;
+};
+export type Refusal = "busy" | "unavailable" | "not-ready" | "one-at-a-time" | "too-many" | "too-big";
+export type RunAnswer = { kind: "result"; result: RunResult } | { kind: "refused"; reason: Refusal };
+
+const codeUrl = (unitId: string) => `/api/units/${encodeURIComponent(unitId)}/code`;
+
+export const fetchCode = (unitId: string) => getJson<CodeDraft>(codeUrl(unitId));
+
+export async function saveCode(unitId: string, code: string): Promise<CodeDraft> {
+  const response = await fetch(codeUrl(unitId), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw new Error(`Could not save your code (${response.status})`);
+  return response.json();
+}
+
+/** Run (visible cases) or Submit (all). The server saves the code first, except when it is over 32 KB. */
+export async function runCode(unitId: string, code: string, submit: boolean): Promise<RunAnswer> {
+  const response = await fetch(`/api/units/${encodeURIComponent(unitId)}/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
+    body: JSON.stringify({ code, submit }),
+  });
+  if (response.ok) return { kind: "result", result: await response.json() };
+  if (response.status === 400) return { kind: "refused", reason: "too-big" };
+  if ([409, 429, 503].includes(response.status)) {
+    const body = (await response.json()) as { status: Refusal };
+    return { kind: "refused", reason: body.status };
+  }
+  throw new Error(`Could not run your code (${response.status})`);
+}
+
 export type Rating = "again" | "hard" | "good" | "easy";
 
 export type Progress = {
