@@ -79,6 +79,12 @@ public class CurriculumQueries {
 
   public record LabDownload(String title, String readme, List<LabFile> files) {}
 
+  /** One case as the runner needs it: typed JSON exactly as the bundle has it. Server-only. */
+  public record RunnerCase(String name, String argsJson, String expectedJson, boolean hidden) {}
+
+  /** Everything the runner needs for one coding problem. Server-only: never part of UnitDetail. */
+  public record CodingFixture(String signatureJson, String compare, List<RunnerCase> cases) {}
+
   /**
    * Hidden test cases are counted, never sent: they are kept for the code runner planned for
    * phase 2, and sending them would make them visible to anyone who opens the network tab.
@@ -371,6 +377,22 @@ public class CurriculumQueries {
                     + " cross join jsonb_to_recordset(l.files) as f(name text, content text)"
                     + " where l.unit_id = :id order by f.name", p,
                 (rs2, j) -> new LabFile(rs2.getString("name"), rs2.getString("content")))))
+        .stream().findFirst();
+  }
+
+  /**
+   * Everything the code runner needs for one coding problem, hidden cases included. Server-only: the
+   * runner client is its one caller, and none of it is ever part of {@link UnitDetail}. Empty for a
+   * unit that is not a coding problem or was loaded before its fixture was kept (see BundleLoader).
+   */
+  public Optional<CodingFixture> codingFixture(String unitId) {
+    MapSqlParameterSource p = new MapSqlParameterSource("id", unitId);
+    return jdbc.query("select signature::text as signature, compare from coding_fixture where unit_id = :id", p,
+        (rs, i) -> new CodingFixture(rs.getString("signature"), rs.getString("compare"),
+            jdbc.query("select name, args::text as args, expected_value::text as expected_value, hidden"
+                    + " from test_case where unit_id = :id order by sort_order", p,
+                (rs2, j) -> new RunnerCase(rs2.getString("name"), rs2.getString("args"),
+                    rs2.getString("expected_value"), rs2.getBoolean("hidden")))))
         .stream().findFirst();
   }
 

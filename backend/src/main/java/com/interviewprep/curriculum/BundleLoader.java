@@ -213,7 +213,12 @@ class BundleLoader {
       // A retired unit coming back has the hash it had before retiring, so it counts as changed:
       // otherwise a reverted removal would stay retired for good.
       if (hash.equals(existing.get(id)) && !alreadyRetired.contains(id)) {
-        continue; // unchanged: keeps its version and the release it last changed in
+        // Unchanged: keeps its version and the release it last changed in. A coding unit loaded before
+        // the runner's fixture was kept (V17) gets it here, quietly, instead of a version bump.
+        if (u.path("tests").has("signature") && !hasCodingFixture(id)) {
+          replaceTests(u);
+        }
+        continue;
       }
       MapSqlParameterSource p = unitParams(u, releaseId);
       if (existing.containsKey(id)) {
@@ -261,6 +266,12 @@ class BundleLoader {
       }
     }
     return new int[] {added, changed, retired};
+  }
+
+  private boolean hasCodingFixture(String unitId) {
+    return Boolean.TRUE.equals(jdbc.queryForObject(
+        "select exists(select 1 from coding_fixture where unit_id = :id)",
+        new MapSqlParameterSource("id", unitId), Boolean.class));
   }
 
   private MapSqlParameterSource unitParams(JsonNode u, long releaseId) {
@@ -326,6 +337,7 @@ class BundleLoader {
     MapSqlParameterSource id = new MapSqlParameterSource("id", u.path("id").asString());
     jdbc.update("delete from test_case where unit_id = :id", id);
     jdbc.update("delete from sql_fixture where unit_id = :id", id);
+    jdbc.update("delete from coding_fixture where unit_id = :id", id);
     JsonNode tests = u.path("tests");
     if (tests.has("reference")) {
       // The bundle has already put the shared dataset in front of the problem's own schema and seed.
@@ -337,18 +349,30 @@ class BundleLoader {
               .addValue("reference", tests.path("reference").asString())
               .addValue("ordered", tests.path("order_matters").asBoolean(false)));
     }
+    if (tests.has("signature")) {
+      // For the code runner only: never sent to the browser (CurriculumQueries.codingFixture).
+      jdbc.update(
+          "insert into coding_fixture (unit_id, signature, compare)"
+              + " values (:id, cast(:signature as jsonb), :compare)",
+          new MapSqlParameterSource("id", u.path("id").asString())
+              .addValue("signature", tests.path("signature").toString())
+              .addValue("compare", tests.path("compare").asString("exact")));
+    }
     int order = 0;
     for (JsonNode c : tests.path("cases")) {
       jdbc.update(
-          "insert into test_case (unit_id, name, input, expected, hidden, sort_order)"
-              + " values (:id, :name, :input, :expected, :hidden, :order)",
+          "insert into test_case (unit_id, name, input, expected, hidden, sort_order, args, expected_value)"
+              + " values (:id, :name, :input, :expected, :hidden, :order,"
+              + " cast(:args as jsonb), cast(:expectedValue as jsonb))",
           new MapSqlParameterSource()
               .addValue("id", u.path("id").asString())
               .addValue("name", c.path("name").asString())
               .addValue("input", c.path("input").asString())
               .addValue("expected", c.path("expected").asString())
               .addValue("hidden", c.path("hidden").asBoolean(false))
-              .addValue("order", order++));
+              .addValue("order", order++)
+              .addValue("args", c.has("args") ? c.path("args").toString() : null)
+              .addValue("expectedValue", c.has("expected_value") ? c.path("expected_value").toString() : null));
     }
   }
 
