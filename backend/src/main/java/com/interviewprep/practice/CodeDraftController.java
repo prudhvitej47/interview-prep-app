@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
 
 /** A learner's code for a coding unit, saved like a note (runner design §2). */
 @RestController
@@ -24,25 +25,36 @@ class CodeDraftController {
 
   private final CodeDrafts drafts;
   private final CurriculumQueries curriculum;
+  private final JsonMapper json;
 
-  CodeDraftController(CodeDrafts drafts, CurriculumQueries curriculum) {
+  CodeDraftController(CodeDrafts drafts, CurriculumQueries curriculum, JsonMapper json) {
     this.drafts = drafts;
     this.curriculum = curriculum;
+    this.json = json;
   }
 
   record CodeBody(String code) {}
 
+  /** The draft plus the stub to start from: null when this problem cannot run yet (no fixture loaded). */
+  record CodeView(String code, OffsetDateTime savedAt, CodeDrafts.LastSubmit lastSubmit, String starter) {}
+
   @GetMapping
-  CodeDrafts.Draft read(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me) {
+  CodeView read(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me) {
     requireVisible(unitId, me);
-    return drafts.read(me.id(), unitId);
+    return view(unitId, drafts.read(me.id(), unitId));
   }
 
   @PutMapping
-  CodeDrafts.Draft save(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me,
+  CodeView save(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me,
       @RequestBody CodeBody request) {
     requireVisible(unitId, me);
-    return drafts.save(me.id(), unitId, request == null ? null : request.code());
+    return view(unitId, drafts.save(me.id(), unitId, request == null ? null : request.code()));
+  }
+
+  private CodeView view(String unitId, CodeDrafts.Draft draft) {
+    String starter = curriculum.codingFixture(unitId)
+        .map(f -> Starter.of(json.readTree(f.signatureJson()))).orElse(null);
+    return new CodeView(draft.code(), draft.savedAt(), draft.lastSubmit(), starter);
   }
 
   private void requireVisible(String unitId, LearnerPrincipal me) {
