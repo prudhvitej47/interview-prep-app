@@ -83,6 +83,8 @@ services:
       # "Send to the curriculum": a GitHub token for the content repository only, from
       # /etc/interview-prep/github.env. Optional: without it the page says sending is not set up.
       APP_GITHUB_TOKEN: ${APP_GITHUB_TOKEN:-}
+      # The code runner on the Compose network. Unset means code runs are off (the page says so).
+      RUNNER_URL: http://runner:8090
     volumes:
       # The curriculum bundle, copied out of the content image by update.sh. Read-only: the app
       # loads it at startup and never writes it.

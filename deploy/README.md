@@ -68,7 +68,11 @@ bound to `127.0.0.1:8080` and reached only through `tailscale serve`.
 
 A second Compose service, `interview-prep-runner`, built from the same image as the app and started as
 `com.interviewprep.runner.RunnerMain` (runner design: `claude-tools/runner-design-2026-10-11.md`, not in this repo).
-It runs learners' Java in throwaway sandbox containers. Nothing calls it until the practice module lands.
+It runs learners' Java in throwaway sandbox containers. The app calls it for Run and Submit through
+`RUNNER_URL` (`http://runner:8090` in Compose). Without `RUNNER_URL`, as on a laptop by default, runs answer
+"unavailable" and the learner's code is still saved; to try runs locally, start the runner from the built jar
+(`java -Dloader.main=com.interviewprep.runner.RunnerMain -cp backend/target/interview-prep-backend-0.1.0-SNAPSHOT.jar org.springframework.boot.loader.launch.PropertiesLauncher`)
+and start the app with `RUNNER_URL=http://localhost:8090`.
 
 - **It alone holds the Docker socket.** Anything that can start containers is root on this host, so the
   socket is mounted only here, the service publishes no port (the app reaches it as `http://runner:8090` on
