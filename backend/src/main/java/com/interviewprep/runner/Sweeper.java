@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,9 @@ import java.util.concurrent.TimeUnit;
 final class Sweeper {
 
   static final long MAX_AGE_SECONDS = 60;
+
+  // Reads each docker command's output, so a command that never exits can be killed at the limit.
+  private static final ExecutorService READERS = Executors.newVirtualThreadPerTaskExecutor();
 
   private final String docker;
   private final Clock clock;
@@ -105,7 +109,7 @@ final class Sweeper {
         } catch (IOException e) {
           return new byte[0];
         }
-      }, Executors.newVirtualThreadPerTaskExecutor());
+      }, READERS);
       if (!p.waitFor(limit.toMillis(), TimeUnit.MILLISECONDS)) {
         p.destroyForcibly();
         return new Ran("", false);

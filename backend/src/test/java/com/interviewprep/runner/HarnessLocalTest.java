@@ -195,4 +195,15 @@ class HarnessLocalTest {
     assertThat(ran.exit()).isEqualTo(137);
     assertThat(ran.raw()).contains("@@EXIT");
   }
+
+  @Test
+  void aVeryLongStringLiteralDoesNotBreakTheTreeNodeCheck() {
+    String longString = "class Solution { String f(int x) { return \"" + "a".repeat(20_000) + "\"; } }";
+    String escapes = "class Solution { String f(int x) { return \"" + "\\\"".repeat(10_000) + "\"; } }";
+    for (String source : List.of(longString, escapes)) {
+      Wire.RunRequest request = new Wire.RunRequest(source,
+          new Wire.Signature("f", List.of(new Wire.Param("x", "int")), "String"), "exact", List.of());
+      assertThat(HarnessSource.files(request)).containsKey("TreeNode.java");
+    }
+  }
 }

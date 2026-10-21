@@ -150,6 +150,7 @@ describe("CodeRunner", () => {
       [400, "too-big", /limited to 32 KB/],
       [400, "something-else", /went wrong on the server/],
       [502, "runner-refused", /could not use this problem's cases/],
+      [503, "a-status-this-page-does-not-know", /went wrong on the server/],
       [403, "", /Reload the page/],
       [404, "", /no longer available/],
       [500, "", /went wrong on the server/],

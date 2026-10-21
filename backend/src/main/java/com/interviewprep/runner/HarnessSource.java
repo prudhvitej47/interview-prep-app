@@ -23,12 +23,19 @@ final class HarnessSource {
   private HarnessSource() {}
 
   // Text blocks, string and char literals, then comments: what is left is code, so a comment or a string
-  // that mentions "class TreeNode" does not count as the learner declaring their own.
+  // that mentions "class TreeNode" does not count as the learner declaring their own. The literal loops
+  // are unrolled and possessive: an alternation inside a * recurses once per character in Java's regex
+  // engine, and a 20 KB string literal overflowed the stack.
   private static final Pattern NOT_CODE = Pattern.compile(
-      "\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'|//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+      "\"\"\"[\\s\\S]*?\"\"\"|\"[^\"\\\\\\n]*+(?:\\\\.[^\"\\\\\\n]*+)*+\"|'[^'\\\\\\n]*+(?:\\\\.[^'\\\\\\n]*+)*+'"
+      + "|//[^\\n]*|/\\*[\\s\\S]*?\\*/");
 
   static String codeOnly(String source) {
-    return NOT_CODE.matcher(source).replaceAll(" ");
+    try {
+      return NOT_CODE.matcher(source).replaceAll(" ");
+    } catch (StackOverflowError e) {
+      return source; // never fail a run over this check: at worst a comment hides our TreeNode
+    }
   }
 
   static Map<String, String> files(Wire.RunRequest request) {

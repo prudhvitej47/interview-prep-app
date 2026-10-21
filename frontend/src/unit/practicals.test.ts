@@ -46,6 +46,8 @@ describe("readNumber", () => {
     ["1,5", 1.5], ["-0,25", -0.25], ["12,345,678", 12345678], ["1,500.5", 1500.5],
     // Half-written decimals are what people type.
     ["5.", 5], [".5", 0.5], ["-.5", -0.5],
+    // A leading zero before the comma is a decimal, never thousands.
+    ["0,123", 0.123],
   ])("reads %j as %d", (raw, value) => expect(readNumber(raw)).toBe(value));
 
   it.each(["", "  ", "five", "5x", "1e"])("returns null for %j", (raw) => expect(readNumber(raw)).toBeNull());
@@ -99,5 +101,5 @@ describe("markLines", () => {
 });
 
 describe("readNumber refuses", () => {
-  it.each(["abc", ".", "-", "1,2,3", "1,5.2", "1.2.3", ""])("%j", (raw) => expect(readNumber(raw)).toBeNull());
+  it.each(["abc", ".", "-", "1,2,3", "1,5.2", "1.2.3", "", "9".repeat(400)])("%j", (raw) => expect(readNumber(raw)).toBeNull());
 });

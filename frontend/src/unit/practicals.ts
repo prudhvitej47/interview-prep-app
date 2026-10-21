@@ -69,14 +69,15 @@ export function parsePredict(source: string): PredictSpec {
 /** What a learner typed, read leniently: spaces and thousands commas are ignored. */
 /**
  * A typed number as people write it: commas in groups of three are thousands ("12,345"), a lone comma
- * before one or two digits is a decimal comma ("1,5"), and "5." or ".5" are fine. Anything else is null.
+ * is otherwise a decimal comma ("1,5", "0,123"), and "5." or ".5" are fine. Anything else is null.
  */
 export function readNumber(raw: string): number | null {
   let t = raw.trim();
-  if (/^-?\d{1,3}(,\d{3})+(\.\d*)?$/.test(t)) t = t.replaceAll(",", "");
-  else if (/^-?\d*,\d{1,2}$/.test(t)) t = t.replace(",", ".");
+  if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d*)?$/.test(t)) t = t.replaceAll(",", "");
+  else if (/^-?\d*,\d+$/.test(t) && !/^-?[1-9]\d{0,2},\d{3}$/.test(t)) t = t.replace(",", ".");
   if (!/^-?(\d+\.?\d*|\.\d+)$/.test(t)) return null;
-  return Number(t);
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }
 
 // The epsilon absorbs floating-point error at the edge: |2.6 - 2.5| is 0.10000000000000009, not 0.1.

@@ -43,7 +43,8 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
     <section className="practical evidence" aria-label="Read the evidence">
       <p className="practical-kind">Read the evidence</p>
       <div id={`${base}-prompt`}>{render(spec.prompt)}</div>
-      <ol className="evidence-lines" role="group" aria-labelledby={`${base}-prompt`}>
+      <div role="group" aria-labelledby={`${base}-prompt`}>
+      <ol className="evidence-lines">
         {spec.lines.map((line, i) => {
           const n = i + 1;
           const mark = !checked ? null : cause.has(n) ? "cause" : selected.has(n) ? "not a cause" : null;
@@ -61,6 +62,7 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
           );
         })}
       </ol>
+      </div>
       {!checked && (
         <button type="button" className="secondary" disabled={selected.size === 0} onClick={() => setChecked(true)}>Check</button>
       )}
