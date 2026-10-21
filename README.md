@@ -22,6 +22,19 @@ docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on 127.0.0.1:5432
 cd backend && ./mvnw spring-boot:run             # API and the built UI on :8080
 ```
 
+Run and Submit on coding problems need the code runner too. Compose builds it from your packaged
+jar and pulls the sandbox JDK, so package first (again after changing the runner), then start the
+app with the runner's address:
+
+```bash
+( cd backend && ./mvnw -q package -DskipTests )
+docker compose -f docker-compose.dev.yml up -d --build    # adds the runner on 127.0.0.1:8090
+cd backend && RUNNER_URL=http://localhost:8090 ./mvnw spring-boot:run
+```
+
+Without the runner the page still works: Run and Submit say the runner isn't answering, and code is
+still saved.
+
 On the VM, Tailscale tells the app who each request is from. There is no Tailscale in front of it
 on a laptop, so name yourself:
 
