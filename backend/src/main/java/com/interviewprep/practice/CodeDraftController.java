@@ -26,8 +26,10 @@ class CodeDraftController {
   private final CodeDrafts drafts;
   private final CurriculumQueries curriculum;
   private final JsonMapper json;
+  private final CodingUnits codingUnits;
 
-  CodeDraftController(CodeDrafts drafts, CurriculumQueries curriculum, JsonMapper json) {
+  CodeDraftController(CodeDrafts drafts, CurriculumQueries curriculum, JsonMapper json, CodingUnits codingUnits) {
+    this.codingUnits = codingUnits;
     this.drafts = drafts;
     this.curriculum = curriculum;
     this.json = json;
@@ -58,16 +60,24 @@ class CodeDraftController {
   }
 
   private void requireVisible(String unitId, LearnerPrincipal me) {
-    if (!curriculum.isVisible(unitId, me.slug())) {
+    if (!codingUnits.visible(unitId, me.slug())) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
   }
+
 
   /** The code_draft table. Shared with PracticeController, which saves before every run. */
   @Component
   static class CodeDrafts {
 
     static final int MAX_BYTES = 32 * 1024;
+
+    /** Code over MAX_BYTES: a 400 the page names ({"status": "too-big"}), not any other bad request. */
+    static final class CodeTooBig extends RuntimeException {
+      CodeTooBig() {
+        super("code is limited to 32 KB", null, false, false);
+      }
+    }
 
     record LastSubmit(int passed, int total, OffsetDateTime at) {}
 
@@ -92,7 +102,7 @@ class CodeDraftController {
     Draft save(long learnerId, String unitId, String code) {
       String text = code == null ? "" : code;
       if (text.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "code is limited to 32 KB");
+        throw new CodeTooBig();
       }
       jdbc.update("insert into code_draft (learner_id, unit_id, code) values (:learner, :unit, :code)"
               + " on conflict (learner_id, unit_id) do update set code = excluded.code, saved_at = now()",

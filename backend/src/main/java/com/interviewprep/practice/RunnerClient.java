@@ -28,6 +28,10 @@ class RunnerClient {
 
   record Unavailable() implements Outcome {}
 
+  // Longer than the runner's worst case: 20 s in its queue, a 12 s run, then up to 10 s each for docker
+  // kill and rm and 2 s to read what was left, about 54 s. Shorter, and a run still going reads as down.
+  static final Duration ANSWER_TIMEOUT = Duration.ofSeconds(60);
+
   private final String url;
   private final JsonMapper json;
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
@@ -47,7 +51,7 @@ class RunnerClient {
     }
     try {
       HttpResponse<byte[]> response = http.send(HttpRequest.newBuilder(URI.create(url + "/runs"))
-              .timeout(Duration.ofSeconds(45))
+              .timeout(ANSWER_TIMEOUT)
               .header("Content-Type", "application/json")
               .POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(request)))
               .build(),

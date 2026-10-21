@@ -446,4 +446,15 @@ class BundleLoaderTest extends PostgresTestBase {
         }
         """);
   }
+
+  @Test
+  void aCompareTheAppDoesNotKnowSkipsThatFixtureButNotTheRelease() {
+    ObjectNode content = withPracticeUnits(base());
+    ((ObjectNode) unitNode(content, "dsa.window").path("tests")).put("compare", "tolerance");
+    load(content);
+    assertThat(queries.codingFixture("dsa.window")).isEmpty();
+    assertThat(queries.unit("dsa.window", "t")).isPresent();
+    assertThat(queries.codingFixture("db.unsettled")).isEmpty();
+    assertThat(count("sql_fixture")).isEqualTo(1);
+  }
 }
