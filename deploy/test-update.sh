@@ -116,4 +116,10 @@ check "the stack unit starts only postgres and app" 1 "$(grep -c '^ExecStart=.* 
 check "the runner starts after them, its failure ignored" 1 \
   "$(grep -c '^ExecStartPost=-/usr/bin/docker compose .* up --detach runner$' "${unit}")"
 
+# Every service's log is capped and rotated by Docker, so a long-lived container cannot fill the disk.
+compose="${HERE}/docker-compose.yml"
+check "one log limit for every service" 1 "$(grep -c '^x-logging: &logging' "${compose}")"
+check "the limit rotates" 1 "$(grep -cE 'max-size: "10m"' "${compose}")"
+check "postgres, app and runner all use it" 3 "$(grep -c '^    logging: \*logging$' "${compose}")"
+
 exit $fail
