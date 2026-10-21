@@ -146,7 +146,9 @@ class PracticeApiTest extends PostgresTestBase {
     saveCode(CODING, "class Solution {}", TESTER).andExpect(status().isOk()).andExpect(jsonPath("$.savedAt").isNotEmpty());
     mvc.perform(as(get("/api/units/" + CODING + "/code"), TESTER)).andExpect(jsonPath("$.code").value("class Solution {}"));
     mvc.perform(as(get("/api/units/" + CODING + "/code"), OTHER)).andExpect(jsonPath("$.code").value(""));
-    saveCode(CODING, "x".repeat(32 * 1024 + 1), TESTER).andExpect(status().isBadRequest());
+    saveCode(CODING, "x".repeat(32 * 1024 + 1), TESTER).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value("too-big"));
+    saveCode(CONCEPT, "class Solution {}", TESTER).andExpect(status().isNotFound());
     mvc.perform(as(get("/api/units/" + PRIVATE + "/code"), OTHER)).andExpect(status().isNotFound());
   }
 
@@ -225,7 +227,7 @@ class PracticeApiTest extends PostgresTestBase {
     jdbc.update("delete from coding_fixture where unit_id = ?", CODING);
     runCode(CODING, "class Solution {}", false, TESTER)
         .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value("not-ready"));
-    runCode(CONCEPT, "class Solution {}", false, TESTER).andExpect(status().isConflict());
+    runCode(CONCEPT, "class Solution {}", false, TESTER).andExpect(status().isNotFound());
     runCode(PRIVATE, "class Solution {}", false, OTHER).andExpect(status().isNotFound());
     assertThat(CALLS.get()).isZero();
   }
@@ -261,8 +263,18 @@ class PracticeApiTest extends PostgresTestBase {
     mvc.perform(as(get("/api/units/" + CODING + "/code"), TESTER))
         .andExpect(jsonPath("$.starter").value(org.hamcrest.Matchers.containsString("public int maxSum(int[] nums, int k)")));
     saveCode(CODING, "class Solution {}", TESTER).andExpect(jsonPath("$.starter").isNotEmpty());
-    mvc.perform(as(get("/api/units/" + CONCEPT + "/code"), TESTER)).andExpect(jsonPath("$.starter").isEmpty());
+    mvc.perform(as(get("/api/units/" + CONCEPT + "/code"), TESTER)).andExpect(status().isNotFound());
     jdbc.update("delete from coding_fixture where unit_id = ?", CODING);
     mvc.perform(as(get("/api/units/" + CODING + "/code"), TESTER)).andExpect(jsonPath("$.starter").isEmpty());
+  }
+
+  @Test
+  void codeOverTheLimitAndARequestTheRunnerRefusesAreNamed() throws Exception {
+    runCode(CODING, "x".repeat(32 * 1024 + 1), false, TESTER)
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value("too-big"));
+    ANSWER.set("{\"status\":\"rejected\"}");
+    ANSWER_STATUS.set(400);
+    runCode(CODING, "class Solution {}", false, TESTER)
+        .andExpect(status().isBadGateway()).andExpect(jsonPath("$.status").value("runner-refused"));
   }
 }

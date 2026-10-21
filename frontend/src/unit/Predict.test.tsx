@@ -67,3 +67,10 @@ it("moves focus to the result after Check, so keyboard and screen-reader users k
   expect(status).toHaveTextContent("Right.");
   expect(document.activeElement).toBe(status);
 });
+
+it("names the choices by the question, and lets phones type a minus sign", () => {
+  render(<Predict source={choice} render={md} />);
+  expect(screen.getByRole("radiogroup", { name: "What happens?" })).toBeInTheDocument();
+  render(<Predict source={number} render={md} />);
+  expect(screen.getByRole("textbox", { name: "Your answer (runs)" })).toHaveAttribute("inputmode", "text");
+});

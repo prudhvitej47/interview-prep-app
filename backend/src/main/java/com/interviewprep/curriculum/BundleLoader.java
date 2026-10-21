@@ -39,6 +39,8 @@ class BundleLoader {
 
   private static final Logger log = LoggerFactory.getLogger(BundleLoader.class);
   private static final int SUPPORTED_SCHEMA = 1;
+  // The comparisons the runner knows (V17 holds coding_fixture to these).
+  private static final Set<String> RUNNER_COMPARES = Set.of("exact", "any-order");
   // Weeks run Monday to Sunday in India time, the same weeks the planner and the streak use.
   private static final ZoneId STUDY_ZONE = ZoneId.of("Asia/Kolkata");
 
@@ -349,14 +351,19 @@ class BundleLoader {
               .addValue("reference", tests.path("reference").asString())
               .addValue("ordered", tests.path("order_matters").asBoolean(false)));
     }
-    if (tests.has("signature")) {
+    String compare = tests.path("compare").asString("exact");
+    if (tests.has("signature") && !RUNNER_COMPARES.contains(compare)) {
+      // A comparison this app does not know yet (content ahead of the app): that problem cannot run
+      // until the app learns it, but the release and every other unit still load.
+      log.warn("unit {}: compare \"{}\" is not supported; it will not run", u.path("id").asString(), compare);
+    } else if (tests.has("signature")) {
       // For the code runner only: never sent to the browser (CurriculumQueries.codingFixture).
       jdbc.update(
           "insert into coding_fixture (unit_id, signature, compare)"
               + " values (:id, cast(:signature as jsonb), :compare)",
           new MapSqlParameterSource("id", u.path("id").asString())
               .addValue("signature", tests.path("signature").toString())
-              .addValue("compare", tests.path("compare").asString("exact")));
+              .addValue("compare", compare));
     }
     int order = 0;
     for (JsonNode c : tests.path("cases")) {

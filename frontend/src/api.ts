@@ -176,7 +176,9 @@ export type RunResult = {
   hidden: { passed: number; total: number } | null;
   output: string | null;
 };
-export type Refusal = "busy" | "unavailable" | "not-ready" | "one-at-a-time" | "too-many" | "too-big";
+const KNOWN_REFUSALS = ["busy", "unavailable", "not-ready", "one-at-a-time", "too-many", "too-big",
+  "runner-refused", "signed-out", "gone", "server-error"] as const;
+export type Refusal = (typeof KNOWN_REFUSALS)[number];
 export type RunAnswer = { kind: "result"; result: RunResult } | { kind: "refused"; reason: Refusal };
 
 const codeUrl = (unitId: string) => `/api/units/${encodeURIComponent(unitId)}/code`;
@@ -189,8 +191,20 @@ export async function saveCode(unitId: string, code: string): Promise<CodeDraft>
     headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
     body: JSON.stringify({ code }),
   });
+  if (response.status === 400 && (await statusOf(response)) === "too-big") throw new CodeTooBigError();
   if (!response.ok) throw new Error(`Could not save your code (${response.status})`);
   return response.json();
+}
+
+/** Code over the server's 32 KB limit: a reason the page can name, not a failure to retry. */
+export class CodeTooBigError extends Error {}
+
+async function statusOf(response: Response): Promise<string | undefined> {
+  try {
+    return ((await response.json()) as { status?: string } | null)?.status;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Run (visible cases) or Submit (all). The server saves the code first, except when it is over 32 KB. */
@@ -201,12 +215,16 @@ export async function runCode(unitId: string, code: string, submit: boolean): Pr
     body: JSON.stringify({ code, submit }),
   });
   if (response.ok) return { kind: "result", result: await response.json() };
-  if (response.status === 400) return { kind: "refused", reason: "too-big" };
-  if ([409, 429, 503].includes(response.status)) {
-    const body = (await response.json()) as { status: Refusal };
-    return { kind: "refused", reason: body.status };
-  }
-  throw new Error(`Could not run your code (${response.status})`);
+  const status = await statusOf(response);
+  // Only a reason this page can explain; anything else from the server is a server error.
+  const named = status && (KNOWN_REFUSALS as readonly string[]).includes(status) ? status : undefined;
+  const reason: Refusal =
+    response.status === 400 ? (named === "too-big" ? "too-big" : "server-error")
+    : [409, 429, 502, 503].includes(response.status) && named ? (named as Refusal)
+    : response.status === 403 ? "signed-out"
+    : response.status === 404 ? "gone"
+    : "server-error";
+  return { kind: "refused", reason };
 }
 
 export type Rating = "again" | "hard" | "good" | "easy";

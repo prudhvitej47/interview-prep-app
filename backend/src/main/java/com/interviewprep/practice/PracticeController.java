@@ -38,9 +38,11 @@ class PracticeController {
   private final CurriculumQueries curriculum;
   private final RunLimiter limiter;
   private final JsonMapper json;
+  private final CodingUnits codingUnits;
 
   PracticeController(CodeDraftController.CodeDrafts drafts, RunnerClient runner, CurriculumQueries curriculum,
-      RunLimiter limiter, JsonMapper json) {
+      RunLimiter limiter, JsonMapper json, CodingUnits codingUnits) {
+    this.codingUnits = codingUnits;
     this.drafts = drafts;
     this.runner = runner;
     this.curriculum = curriculum;
@@ -59,7 +61,7 @@ class PracticeController {
   @PostMapping("/api/units/{unitId}/run")
   ResponseEntity<?> run(@PathVariable String unitId, @AuthenticationPrincipal LearnerPrincipal me,
       @RequestBody RunBody request) {
-    if (!curriculum.isVisible(unitId, me.slug())) {
+    if (!codingUnits.visible(unitId, me.slug())) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
     boolean submit = request != null && request.submit();
@@ -107,7 +109,7 @@ class PracticeController {
             status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable"), "");
         // A 400 is a request the runner refused: in practice a content bug in the signature or cases.
         case RunnerClient.Answered a when a.status() != 200 -> logged(me, unitId, submit, start, sent, 0,
-            status(HttpStatus.SERVICE_UNAVAILABLE, "unavailable"), "runner answered " + a.status());
+            status(HttpStatus.BAD_GATEWAY, "runner-refused"), "runner answered " + a.status());
         case RunnerClient.Answered a -> {
           RunView view = view(a.body(), byId, all, submit);
           int passed = (int) view.cases().stream().filter(c -> c.verdict().equals("pass")).count()

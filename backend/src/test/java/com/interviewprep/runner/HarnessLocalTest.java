@@ -23,7 +23,7 @@ class HarnessLocalTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path dir;
 
-  record Ran(int exit, HarnessOutput.Parsed parsed, long millis) {}
+  record Ran(int exit, HarnessOutput.Parsed parsed, long millis, String raw) {}
 
   private Ran run(String source, String method, String paramType, String returns, String compare,
       String... argExpectedPairs) throws Exception {
@@ -39,12 +39,16 @@ class HarnessLocalTest {
     }
     String java = ProcessHandle.current().info().command().orElse("java");
     long start = System.nanoTime();
-    Process p = new ProcessBuilder(java, "-XX:+UseSerialGC", "Main.java").directory(dir.toFile())
-        .redirectErrorStream(true).start();
+    // The sandbox has no locale: the POSIX one, like the container.
+    ProcessBuilder pb = new ProcessBuilder(java, "-XX:+UseSerialGC", "Main.java").directory(dir.toFile())
+        .redirectErrorStream(true);
+    pb.environment().remove("LANG");
+    pb.environment().put("LC_ALL", "C");
+    Process p = pb.start();
     byte[] out = p.getInputStream().readAllBytes();
     assertThat(p.waitFor(60, TimeUnit.SECONDS)).isTrue();
-    return new Ran(p.exitValue(), HarnessOutput.parse(new String(out, StandardCharsets.UTF_8)),
-        (System.nanoTime() - start) / 1_000_000);
+    String raw = new String(out, StandardCharsets.UTF_8);
+    return new Ran(p.exitValue(), HarnessOutput.parse(raw), (System.nanoTime() - start) / 1_000_000, raw);
   }
 
   private static String echo(String type) {
@@ -166,5 +170,40 @@ class HarnessLocalTest {
     Ran ran = run(source, "f", "int", "int", "exact", "1", "1");
     assertThat(ran.parsed().timedOut()).isEqualTo("c0");
     assertThat(ran.parsed().output()).contains("debug before the loop");
+  }
+
+  @Test
+  void aCommentNamingTreeNodeStillGetsOurs() {
+    String source = "// not my own class TreeNode, the harness's\n"
+        + "class Solution { int f(TreeNode x) { return x == null ? 0 : x.val; } }";
+    Wire.RunRequest request = new Wire.RunRequest(source,
+        new Wire.Signature("f", List.of(new Wire.Param("x", "TreeNode")), "int"), "exact", List.of());
+    assertThat(HarnessSource.files(request)).containsKey("TreeNode.java");
+  }
+
+  @Test
+  void textOutsideAsciiSurvivesTheHarnessInAPosixLocale() throws Exception {
+    String source = "class Solution { String f(String x) { System.out.print(\"₹ é\"); return x + \"₹\"; } }";
+    Ran ran = run(source, "f", "String", "String", "exact", "\"10\"", "\"x\"");
+    assertThat(ran.parsed().cases().get(0).got()).isEqualTo("\"10₹\"");
+    assertThat(ran.parsed().output()).isEqualTo("₹ é");
+  }
+
+  @Test
+  void theLearnersOwnExitIsMarkedSoItIsNotReadAsOutOfMemory() throws Exception {
+    Ran ran = run("class Solution { int f(int x) { System.exit(137); return x; } }", "f", "int", "int", "exact", "1", "1");
+    assertThat(ran.exit()).isEqualTo(137);
+    assertThat(ran.raw()).contains("@@EXIT");
+  }
+
+  @Test
+  void aVeryLongStringLiteralDoesNotBreakTheTreeNodeCheck() {
+    String longString = "class Solution { String f(int x) { return \"" + "a".repeat(20_000) + "\"; } }";
+    String escapes = "class Solution { String f(int x) { return \"" + "\\\"".repeat(10_000) + "\"; } }";
+    for (String source : List.of(longString, escapes)) {
+      Wire.RunRequest request = new Wire.RunRequest(source,
+          new Wire.Signature("f", List.of(new Wire.Param("x", "int")), "String"), "exact", List.of());
+      assertThat(HarnessSource.files(request)).containsKey("TreeNode.java");
+    }
   }
 }

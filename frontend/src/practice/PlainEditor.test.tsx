@@ -58,7 +58,13 @@ describe("PlainEditor", () => {
     fireEvent.keyDown(box, { key: "Escape" });
     expect(fireEvent.keyDown(box, { key: "Tab" })).toBe(true);
     expect(box.value).toBe("x");
-    // Typing again re-arms Tab for indenting.
+    // Leaving and coming back re-arms Tab for indenting.
+    fireEvent.keyDown(box, { key: "Escape" });
+    fireEvent.blur(box);
+    fireEvent.focus(box);
+    expect(fireEvent.keyDown(box, { key: "Tab" })).toBe(false);
+    // So does typing again.
+    fireEvent.keyDown(box, { key: "Escape" });
     fireEvent.keyDown(box, { key: "a" });
     expect(fireEvent.keyDown(box, { key: "Tab" })).toBe(false);
   });

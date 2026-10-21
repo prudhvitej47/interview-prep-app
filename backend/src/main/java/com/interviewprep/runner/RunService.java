@@ -110,7 +110,7 @@ final class RunService {
     if (parsed.timedOut() != null || result.timedOut()) {
       status = "timeout";
     } else if (parsed.cases().stream().anyMatch(c -> c.error() != null && c.error().startsWith("OutOfMemoryError: Java heap space"))
-        || (!parsed.ended() && result.exitCode() == 137)) {
+        || (!parsed.ended() && result.exitCode() == 137 && !result.output().contains("\n@@EXIT"))) {
       status = "oom";
     } else if (!parsed.ended() || parsed.cases().size() < request.cases().size()) {
       status = "crashed";

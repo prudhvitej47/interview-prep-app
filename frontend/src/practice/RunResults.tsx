@@ -8,6 +8,10 @@ const REFUSALS: Record<Refusal, string> = {
   "one-at-a-time": "Your previous run is still going.",
   "too-many": "That's ten runs in a minute. Wait a moment and try again.",
   "too-big": "Code is limited to 32 KB.",
+  "runner-refused": "The runner could not use this problem's cases: a problem in the curriculum, not in your code. Your code is saved.",
+  "signed-out": "Reload the page to sign in again. Copy your code first if you changed it since saving.",
+  gone: "This problem is no longer available.",
+  "server-error": "Something went wrong on the server. Try again in a moment.",
 };
 
 const STOPPED: Record<string, string> = {
@@ -18,7 +22,25 @@ const STOPPED: Record<string, string> = {
   crashed: "The program crashed before it finished.",
 };
 
-const MARK: Record<CaseResult["verdict"], string> = { pass: "✓", fail: "✗", error: "✗ error", timeout: "✗ timed out", "not-run": "not run" };
+// The symbol says pass or not at a glance; the word says how it failed. Only the symbol takes the state
+// colour: green is 3.2:1 on the light background, enough for a bold symbol but not for small text.
+const MARK: Record<CaseResult["verdict"], { glyph: string; word?: string }> = {
+  pass: { glyph: "✓" },
+  fail: { glyph: "✗" },
+  error: { glyph: "✗", word: "error" },
+  timeout: { glyph: "✗", word: "timed out" },
+  "not-run": { glyph: "–", word: "not run" },
+};
+
+function Mark({ verdict }: { verdict: CaseResult["verdict"] }) {
+  const m = MARK[verdict];
+  return (
+    <>
+      <span className={`glyph ${verdict === "pass" ? "pass" : verdict === "not-run" ? "" : "fail"}`}>{m.glyph}</span>
+      {m.word && <> {m.word}</>}
+    </>
+  );
+}
 
 /**
  * What a Run or Submit came back with (runner design §2): one verdict line, the visible cases with
@@ -45,10 +67,10 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
               <tr><th>Result</th><th>Case</th><th>Input</th><th>Expected</th><th>Got</th></tr>
             </thead>
             <tbody>
-              {r.cases.map((c) => (
-                <Fragment key={c.name}>
+              {r.cases.map((c, i) => (
+                <Fragment key={i}>
                   <tr>
-                    <td className="mark">{MARK[c.verdict]}</td>
+                    <td className="mark"><Mark verdict={c.verdict} /></td>
                     <td>{c.name}</td>
                     <td><code>{c.input}</code></td>
                     <td><code>{c.expected}</code></td>
@@ -64,6 +86,12 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
             </tbody>
           </table>
         </div>
+      )}
+      {r.cases.some((c) => c.verdict === "fail" && c.got !== null && c.got === c.expected) && (
+        <p className="hint">
+          A result that looks the same as expected but did not pass is usually a different type: check the
+          method's return type against the starting code.
+        </p>
       )}
       {submit && r.hidden && <p className="hidden-count">Hidden cases: {r.hidden.passed} of {r.hidden.total} pass</p>}
       {!submit && r.output && (

@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -52,5 +53,31 @@ class SweeperTest {
   void aLineItCannotReadIsSkippedNotFatal() throws Exception {
     Path docker = fakeDocker("x\\n", "x not-a-date\\n");
     assertThat(new Sweeper(docker.toString(), Clock.systemUTC()).sweepOnce()).isZero();
+  }
+
+  private Path script(String name, String body) throws Exception {
+    Path p = dir.resolve(name);
+    Files.writeString(p, "#!/bin/sh\n" + body);
+    p.toFile().setExecutable(true);
+    return p;
+  }
+
+  @Test
+  void aDockerThatHangsIsStoppedSoTheSweeperCarriesOn() throws Exception {
+    Path hang = script("hang", "exec sleep 30\n");
+    long start = System.nanoTime();
+    assertThat(new Sweeper(hang.toString(), Clock.systemUTC(), Duration.ofMillis(500)).sweepOnce()).isZero();
+    assertThat((System.nanoTime() - start) / 1_000_000).isLessThan(5_000);
+  }
+
+  @Test
+  void aRemovalThatFailsIsNotCounted() throws Exception {
+    Path docker = script("failing-rm", "case \"$1\" in\n"
+        + "  ps) printf 'old1\\n' ;;\n"
+        + "  inspect) printf 'old1 2026-10-20T14:50:00Z\\n' ;;\n"
+        + "  rm) exit 1 ;;\n"
+        + "esac\n");
+    Instant now = Instant.parse("2026-10-20T15:00:00Z");
+    assertThat(new Sweeper(docker.toString(), Clock.fixed(now, ZoneOffset.UTC)).sweepOnce()).isZero();
   }
 }

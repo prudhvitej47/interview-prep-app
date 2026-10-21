@@ -44,7 +44,7 @@ export function UnitPage() {
       <h2>{unit.title}</h2>
       <p className="meta">
         {TYPE_LABEL[unit.type] ?? unit.type} · difficulty {unit.difficulty}/5 · {unit.estMinutes} min
-        {unit.lab && <> · lab on your laptop</>}
+        {unit.lab && unit.state !== "retired" && <> · lab on your laptop</>}
         {unit.rounds.length > 0 && <> · asked in {unit.rounds.join(", ")} rounds</>}
       </p>
       {unit.state === "retired" && (

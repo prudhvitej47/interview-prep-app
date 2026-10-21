@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeAll;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -130,5 +133,16 @@ class DockerSandboxTest {
     assertThat(r.status()).isEqualTo("compile-error");
     assertThat(r.compileErrors()).contains("Solution.java:2").doesNotContain("424242").doesNotContain("777777")
         .doesNotContain("Main.java");
+  }
+
+  @Test
+  void aHungImageCheckIsUnhealthyAndLeavesNoProcessBehind(@TempDir Path dir) throws Exception {
+    Path hang = dir.resolve("docker");
+    Files.writeString(hang, "#!/bin/sh\nexec sleep 60\n");
+    hang.toFile().setExecutable(true);
+    assertThat(new DockerSandbox(hang.toString(), DockerSandbox.DEFAULT_IMAGE, null).healthy()).isFalse();
+    Thread.sleep(300);
+    assertThat(ProcessHandle.current().children().filter(ProcessHandle::isAlive)
+        .filter(h -> h.info().command().map(c -> c.endsWith("sleep")).orElse(false))).isEmpty();
   }
 }

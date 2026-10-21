@@ -20,6 +20,7 @@ const shown = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day
 export function LabPanel({ unitId, lab }: { unitId: string; lab: Lab }) {
   const inputId = useId();
   const [doneAt, setDoneAt] = useState<string | null>(null);
+  const [statusFailed, setStatusFailed] = useState(false);
   const [token, setToken] = useState("");
   const [message, setMessage] = useState<{ right: boolean; text: string } | null>(null);
   const status = useRef<HTMLParagraphElement>(null);
@@ -28,7 +29,7 @@ export function LabPanel({ unitId, lab }: { unitId: string; lab: Lab }) {
 
   useEffect(() => {
     // A check that already answered wins over a status that arrives after it.
-    fetchLabStatus(unitId).then((s) => setDoneAt((current) => current ?? s.doneAt)).catch(() => {});
+    fetchLabStatus(unitId).then((s) => setDoneAt((current) => current ?? s.doneAt)).catch(() => setStatusFailed(true));
   }, [unitId]);
 
   async function check() {
@@ -49,6 +50,7 @@ export function LabPanel({ unitId, lab }: { unitId: string; lab: Lab }) {
       <h3>Lab: {lab.title}</h3>
       <p className="meta">About {lab.minutes} min on your laptop · needs {lab.needs.map((n) => NEEDS[n] ?? n).join(", ")}</p>
       {doneAt && <p className="lab-done">✓ Lab done {shown(doneAt)}</p>}
+      {!doneAt && statusFailed && <p className="hint">Could not check whether you finished this lab.</p>}
       <p><a href={labStarterUrl(unitId)} download>Download the starter (.zip)</a></p>
       <details className="folded">
         <summary>Show the lab steps</summary>

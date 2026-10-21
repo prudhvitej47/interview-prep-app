@@ -52,6 +52,9 @@ export function PlainEditor({ value, onChange, label, disabled }: EditorProps) {
       autoCorrect="off"
       disabled={disabled}
       onKeyDown={onKeyDown}
+      onFocus={() => {
+        released.current = false;
+      }}
       onChange={(e) => onChange(e.target.value)}
     />
   );

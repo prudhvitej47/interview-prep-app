@@ -73,3 +73,9 @@ it("keeps a fresh Lab done when the first status answer arrives late", async () 
   await new Promise((r) => setTimeout(r, 0));
   expect(screen.getByText(`✓ Lab done ${shownDate}`)).toBeInTheDocument();
 });
+
+it("says so when it cannot tell whether the lab is done", async () => {
+  mockFetch({ [BASE]: { status: 500, body: {} } });
+  render(<LabPanel unitId={UNIT} lab={LAB} />);
+  expect(await screen.findByText("Could not check whether you finished this lab.")).toBeInTheDocument();
+});

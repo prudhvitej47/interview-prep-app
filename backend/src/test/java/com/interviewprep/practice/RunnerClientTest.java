@@ -47,4 +47,10 @@ class RunnerClientTest {
     assertThat(off.configured()).isFalse();
     assertThat(off.run(JSON.readTree("{}"))).isInstanceOf(RunnerClient.Unavailable.class);
   }
+
+  @Test
+  void waitsLongerThanTheRunnersWorstCase() {
+    // 20 s queue + 12 s run + up to 10 s each for docker kill and rm + 2 s read: about 54 s.
+    assertThat(RunnerClient.ANSWER_TIMEOUT).isEqualTo(java.time.Duration.ofSeconds(60));
+  }
 }

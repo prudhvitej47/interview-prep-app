@@ -53,3 +53,14 @@ it("moves focus to the result after Check", () => {
   expect(status).toHaveTextContent("Right.");
   expect(document.activeElement).toBe(status);
 });
+
+it("groups the lines under the prompt, and after Check says which were causes", () => {
+  render(<Evidence source={source} render={md} />);
+  expect(screen.getByRole("group", { name: "Which line takes the second lock?" })).toBeInTheDocument();
+  expect(screen.getByRole("list")).toBeInTheDocument(); // still a list for screen readers
+  fireEvent.click(screen.getByRole("checkbox", { name: "Line 1: first.lock.lock();" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Line 2: postFee(fee);" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  expect(screen.getByRole("checkbox", { name: "Line 2: postFee(fee);" })).toHaveAccessibleDescription("cause");
+  expect(screen.getByRole("checkbox", { name: "Line 1: first.lock.lock();" })).toHaveAccessibleDescription("not a cause");
+});

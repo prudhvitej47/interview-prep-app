@@ -7,12 +7,14 @@ import type { TestCase } from "../api";
  */
 export function CodingPractice({ cases, hidden }: { cases: TestCase[]; hidden: number }) {
   const [passed, setPassed] = useState<Set<number>>(new Set());
+  const [touched, setTouched] = useState(false);
 
   function toggle(i: number) {
     const next = new Set(passed);
     if (next.has(i)) next.delete(i);
     else next.add(i);
     setPassed(next);
+    setTouched(true);
   }
 
   return (
@@ -39,7 +41,9 @@ export function CodingPractice({ cases, hidden }: { cases: TestCase[]; hidden: n
           ))}
         </tbody>
       </table>
-      <p role="status" className={`verdict ${passed.size === cases.length ? "right" : ""}`}>
+      {/* Announced only once something is ticked: beside the runner's own status lines, an unchanged
+          "0 of N pass" would only add noise for a screen reader. */}
+      <p role={touched ? "status" : undefined} className={`verdict ${passed.size === cases.length ? "right" : ""}`}>
         {passed.size === cases.length ? "✓ Every case passes." : `${passed.size} of ${cases.length} pass.`}
       </p>
     </section>
