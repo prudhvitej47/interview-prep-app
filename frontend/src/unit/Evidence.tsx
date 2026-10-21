@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { markLines, parseEvidence, type EvidenceSpec } from "./practicals";
 
 /**
@@ -19,6 +19,7 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [checked, setChecked] = useState(false);
   const status = useRef<HTMLParagraphElement>(null);
+  const base = useId();
   // Check disappears once used, so focus moves to the result instead of falling to the page.
   useEffect(() => { if (checked) status.current?.focus(); }, [checked]);
   const result = markLines(spec, [...selected]);
@@ -41,8 +42,8 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
   return (
     <section className="practical evidence" aria-label="Read the evidence">
       <p className="practical-kind">Read the evidence</p>
-      {render(spec.prompt)}
-      <ol className="evidence-lines">
+      <div id={`${base}-prompt`}>{render(spec.prompt)}</div>
+      <ol className="evidence-lines" role="group" aria-labelledby={`${base}-prompt`}>
         {spec.lines.map((line, i) => {
           const n = i + 1;
           const mark = !checked ? null : cause.has(n) ? "cause" : selected.has(n) ? "not a cause" : null;
@@ -50,9 +51,10 @@ function EvidenceExercise({ spec, render }: { spec: EvidenceSpec; render: (markd
             <li key={n} className={selected.has(n) ? "selected" : undefined}>
               <label>
                 <input type="checkbox" checked={selected.has(n)} disabled={checked} onChange={() => toggle(n)}
-                  aria-label={`Line ${n}: ${line.trim() || "(blank)"}`} />
+                  aria-label={`Line ${n}: ${line.trim() || "(blank)"}`}
+                  aria-describedby={mark ? `${base}-mark-${n}` : undefined} />
                 <span className="evidence-n" aria-hidden="true">{n}</span>
-                {checked && (mark ? <span className="evidence-mark">{mark}</span> : <span className="evidence-gap" aria-hidden="true" />)}
+                {checked && (mark ? <span className="evidence-mark" id={`${base}-mark-${n}`}>{mark}</span> : <span className="evidence-gap" aria-hidden="true" />)}
                 <code>{line || " "}</code>
               </label>
             </li>

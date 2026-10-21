@@ -15,6 +15,7 @@ export function Predict({ source, render }: { source: string; render: (markdown:
 
 function PredictExercise({ spec, render }: { spec: PredictSpec; render: (markdown: string) => ReactNode }) {
   const name = useId();
+  const questionId = useId();
   const [choice, setChoice] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState(false);
@@ -31,9 +32,9 @@ function PredictExercise({ spec, render }: { spec: PredictSpec; render: (markdow
   return (
     <section className="practical predict" aria-label="Predict">
       <p className="practical-kind">Predict</p>
-      {render(spec.question)}
+      <div id={questionId}>{render(spec.question)}</div>
       {spec.kind === "choice" ? (
-        <div role="radiogroup" aria-label="Your answer" className="practical-choices">
+        <div role="radiogroup" aria-labelledby={questionId} className="practical-choices">
           {spec.choices.map((c, i) => (
             <label key={i}>
               <input type="radio" name={name} value={i} checked={choice === i} disabled={checked}
@@ -45,7 +46,8 @@ function PredictExercise({ spec, render }: { spec: PredictSpec; render: (markdow
       ) : (
         <label className="practical-number">
           <span aria-hidden="true">{label}</span>
-          <input type="text" inputMode="decimal" value={typed} disabled={checked} aria-label={label}
+          {/* "text", not "decimal": the iOS decimal keypad has no minus key. */}
+          <input type="text" inputMode="text" value={typed} disabled={checked} aria-label={label} aria-describedby={questionId}
             onChange={(e) => setTyped(e.target.value)} />
         </label>
       )}

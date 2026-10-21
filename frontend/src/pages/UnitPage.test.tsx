@@ -124,7 +124,8 @@ describe("UnitPage", () => {
     expect(practice).toHaveTextContent("1 more case is kept back");
     expect(screen.getByRole("heading", { name: "Write and run your solution" })).toBeInTheDocument();
 
-    expect(within(practice).getByRole("status")).toHaveTextContent("0 of 2 pass");
+    expect(within(practice).getByText("0 of 2 pass.")).toBeInTheDocument();
+    expect(within(practice).queryByRole("status")).toBeNull(); // not announced before anything is ticked
     fireEvent.click(screen.getByLabelText("Passes: the example"));
     fireEvent.click(screen.getByLabelText("Passes: every value negative"));
     expect(within(practice).getByRole("status")).toHaveTextContent("Every case passes");
@@ -327,6 +328,7 @@ describe("UnitPage", () => {
     const fetchMock = show(unit({ state: "retired", lab: { title: "Old lab", minutes: 20, needs: ["jdk"], readme: "x" } }));
     expect(await screen.findByText(/has been retired/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Lab:/ })).toBeNull();
+    expect(screen.queryByText(/lab on your laptop/)).toBeNull();
     expect(fetchMock).not.toHaveBeenCalledWith(`${URL}/lab`);
   });
 });

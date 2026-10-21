@@ -8,6 +8,10 @@ const REFUSALS: Record<Refusal, string> = {
   "one-at-a-time": "Your previous run is still going.",
   "too-many": "That's ten runs in a minute. Wait a moment and try again.",
   "too-big": "Code is limited to 32 KB.",
+  "runner-refused": "The runner could not use this problem's cases: a problem in the curriculum, not in your code. Your code is saved.",
+  "signed-out": "Reload the page to sign in again. Copy your code first if you changed it since saving.",
+  gone: "This problem is no longer available.",
+  "server-error": "Something went wrong on the server. Try again in a moment.",
 };
 
 const STOPPED: Record<string, string> = {
@@ -45,8 +49,8 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
               <tr><th>Result</th><th>Case</th><th>Input</th><th>Expected</th><th>Got</th></tr>
             </thead>
             <tbody>
-              {r.cases.map((c) => (
-                <Fragment key={c.name}>
+              {r.cases.map((c, i) => (
+                <Fragment key={i}>
                   <tr>
                     <td className="mark">{MARK[c.verdict]}</td>
                     <td>{c.name}</td>
@@ -64,6 +68,12 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
             </tbody>
           </table>
         </div>
+      )}
+      {r.cases.some((c) => c.verdict === "fail" && c.got !== null && c.got === c.expected) && (
+        <p className="hint">
+          A result that looks the same as expected but did not pass is usually a different type: check the
+          method's return type against the starting code.
+        </p>
       )}
       {submit && r.hidden && <p className="hidden-count">Hidden cases: {r.hidden.passed} of {r.hidden.total} pass</p>}
       {!submit && r.output && (

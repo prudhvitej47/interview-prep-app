@@ -42,6 +42,10 @@ describe("parsePredict", () => {
 describe("readNumber", () => {
   it.each([
     [" 5 ", 5], ["5.0", 5], ["1,000", 1000], ["-2.5", -2.5],
+    // A lone comma before one or two digits is a decimal comma; groups of three are thousands.
+    ["1,5", 1.5], ["-0,25", -0.25], ["12,345,678", 12345678], ["1,500.5", 1500.5],
+    // Half-written decimals are what people type.
+    ["5.", 5], [".5", 0.5], ["-.5", -0.5],
   ])("reads %j as %d", (raw, value) => expect(readNumber(raw)).toBe(value));
 
   it.each(["", "  ", "five", "5x", "1e"])("returns null for %j", (raw) => expect(readNumber(raw)).toBeNull());
@@ -92,4 +96,8 @@ describe("markLines", () => {
   it("names missed and extra lines in order", () => {
     expect(markLines(spec, [3, 2, 1])).toEqual({ right: false, missed: [4], extra: [1, 3] });
   });
+});
+
+describe("readNumber refuses", () => {
+  it.each(["abc", ".", "-", "1,2,3", "1,5.2", "1.2.3", ""])("%j", (raw) => expect(readNumber(raw)).toBeNull());
 });

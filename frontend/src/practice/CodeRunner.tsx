@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { fetchCode, runCode, saveCode, type LastSubmit, type RunAnswer, type TestCase } from "../api";
+import { CodeTooBigError, fetchCode, runCode, saveCode, type LastSubmit, type Refusal, type RunAnswer, type TestCase } from "../api";
 import { useUnsavedGuard } from "../unit/useUnsavedGuard";
 import { CodingPractice } from "./CodingPractice";
 import { PlainEditor } from "./PlainEditor";
@@ -9,6 +9,10 @@ import { storeChoice, storedChoice, type EditorChoice } from "./editorChoice";
 const CodeMirrorEditor = lazy(() => import("./CodeMirrorEditor"));
 
 const LABEL = "Your solution";
+
+// Refusals that come after the server saved the code (PracticeController saves first); too-big, a lost
+// sign-in, a missing unit or a server error may not have saved it.
+const SAVED_BEFORE = new Set<Refusal>(["busy", "unavailable", "not-ready", "one-at-a-time", "too-many", "runner-refused"]);
 
 function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -65,8 +69,8 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
       const d = await saveCode(unitId, code);
       setSavedCode(d.code);
       setSavedAt(d.savedAt);
-    } catch {
-      setProblem("Could not save — try again.");
+    } catch (e) {
+      setProblem(e instanceof CodeTooBigError ? "Code is limited to 32 KB." : "Could not save — try again.");
     } finally {
       setBusy(null);
     }
@@ -79,8 +83,8 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
     setAnswer(null);
     try {
       const a = await runCode(unitId, sent, submit);
-      if (!(a.kind === "refused" && a.reason === "too-big")) {
-        setSavedCode(sent); // the server saved it before running
+      if (a.kind === "result" || SAVED_BEFORE.has(a.reason)) {
+        setSavedCode(sent); // the server saved it before running or refusing
         setSavedAt(new Date().toISOString());
       }
       if (a.kind === "result" && submit) {
@@ -104,6 +108,7 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
     storeChoice(next);
   }
 
+  const cannotRun = load === "ready" && !canRun ? `${unitId}-cannot-run` : undefined;
   const editorProps = { value: code, onChange: setCode, label: LABEL, disabled: locked };
   const runnerDown = answer?.answer.kind === "refused" && answer.answer.reason === "unavailable";
   const status = load === "failed"
@@ -126,7 +131,7 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
         Tab indents; press Esc, then Tab, to move on.
       </p>
       {load === "ready" && !canRun && (
-        <p className="hint">This problem can't run here yet: it arrives with the next curriculum update. Save your code now, and check it by hand below.</p>
+        <p className="hint" id={`${unitId}-cannot-run`}>This problem can't run here yet: it arrives with the next curriculum update. Save your code now, and check it by hand below.</p>
       )}
       <label className="editor-choice">
         <input type="checkbox" checked={choice === "codemirror"} onChange={(e) => pick(e.target.checked ? "codemirror" : "plain")} />
@@ -143,8 +148,8 @@ export function CodeRunner({ unitId, cases, hidden }: { unitId: string; cases: T
         {load === "failed" ? (
           <button type="button" className="secondary" onClick={() => setAttempt((n) => n + 1)}>Try loading it again</button>
         ) : null}
-        <button type="button" className="secondary" onClick={() => run(false)} disabled={locked || !canRun || busy !== null}>Run</button>
-        <button type="button" className="secondary" onClick={() => run(true)} disabled={locked || !canRun || busy !== null}>Submit</button>
+        <button type="button" className="secondary" onClick={() => run(false)} disabled={locked || !canRun || busy !== null} aria-describedby={cannotRun}>Run</button>
+        <button type="button" className="secondary" onClick={() => run(true)} disabled={locked || !canRun || busy !== null} aria-describedby={cannotRun}>Submit</button>
         <button type="button" className="secondary" onClick={save} disabled={locked || !dirty || busy !== null}>Save</button>
         <span role="status">{status}</span>
       </div>

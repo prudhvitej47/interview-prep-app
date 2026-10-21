@@ -138,12 +138,17 @@ describe("CodeRunner", () => {
     expect(screen.getByRole("heading", { name: "Check your solution" })).toBeInTheDocument();
   });
 
-  it("says why a run was refused: busy, one at a time, too many, too big", async () => {
+  it("says why a run was refused or failed, naming only what the server named", async () => {
     for (const [status, reason, words] of [
       [503, "busy", /busy with another run/],
       [429, "one-at-a-time", /previous run is still going/],
       [429, "too-many", /ten runs in a minute/],
       [400, "too-big", /limited to 32 KB/],
+      [400, "something-else", /went wrong on the server/],
+      [502, "runner-refused", /could not use this problem's cases/],
+      [403, "", /Reload the page/],
+      [404, "", /no longer available/],
+      [500, "", /went wrong on the server/],
     ] as const) {
       vi.unstubAllGlobals();
       document.body.innerHTML = "";
@@ -173,5 +178,53 @@ describe("CodeRunner", () => {
     expect(await screen.findByText("Could not load your code.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try loading it again" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
+  });
+
+  it("says a save over 32 KB is too big rather than asking to try again", async () => {
+    mockFetch({ [CODE]: { body: draft() } });
+    show();
+    await waitFor(() => expect(editor().value).toBe(STARTER));
+    fireEvent.change(editor(), { target: { value: "x".repeat(10) } });
+    vi.unstubAllGlobals();
+    mockFetch({ [CODE]: { status: 400, body: { status: "too-big" } } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Code is limited to 32 KB.")).toBeInTheDocument();
+  });
+
+  it("points at the return type when a value looks right but did not pass", async () => {
+    mockFetch({
+      [CODE]: { body: draft() },
+      [RUN]: { body: finished({ cases: [{ ...CASES[0], verdict: "fail", got: "2", error: null, ms: 3 }] }) },
+    });
+    show();
+    await waitFor(() => expect(editor().value).toBe(STARTER));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText(/looks the same as expected/)).toBeInTheDocument();
+  });
+
+  it("shows cases that share a name without mixing them up", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch({
+      [CODE]: { body: draft() },
+      [RUN]: { body: finished({ cases: [
+        { ...CASES[0], name: "same", verdict: "pass", got: "2", error: null, ms: 3 },
+        { ...CASES[1], name: "same", verdict: "fail", got: "7", error: null, ms: 2 },
+      ] }) },
+    });
+    show();
+    await waitFor(() => expect(editor().value).toBe(STARTER));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    const table = await screen.findByRole("table", { name: "Results" });
+    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/);
+    errors.mockRestore();
+  });
+
+  it("ties disabled Run and Submit to the reason they cannot run", async () => {
+    mockFetch({ [CODE]: { body: draft({ starter: null }) } });
+    show();
+    await screen.findByText(/can't run here yet/);
+    expect(screen.getByRole("button", { name: "Run" })).toHaveAccessibleDescription(/can't run here yet/);
+    expect(screen.getByRole("button", { name: "Submit" })).toHaveAccessibleDescription(/can't run here yet/);
   });
 });
