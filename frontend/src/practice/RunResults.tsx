@@ -22,7 +22,25 @@ const STOPPED: Record<string, string> = {
   crashed: "The program crashed before it finished.",
 };
 
-const MARK: Record<CaseResult["verdict"], string> = { pass: "✓", fail: "✗", error: "✗ error", timeout: "✗ timed out", "not-run": "not run" };
+// The symbol says pass or not at a glance; the word says how it failed. Only the symbol takes the state
+// colour: green is 3.2:1 on the light background, enough for a bold symbol but not for small text.
+const MARK: Record<CaseResult["verdict"], { glyph: string; word?: string }> = {
+  pass: { glyph: "✓" },
+  fail: { glyph: "✗" },
+  error: { glyph: "✗", word: "error" },
+  timeout: { glyph: "✗", word: "timed out" },
+  "not-run": { glyph: "–", word: "not run" },
+};
+
+function Mark({ verdict }: { verdict: CaseResult["verdict"] }) {
+  const m = MARK[verdict];
+  return (
+    <>
+      <span className={`glyph ${verdict === "pass" ? "pass" : verdict === "not-run" ? "" : "fail"}`}>{m.glyph}</span>
+      {m.word && <> {m.word}</>}
+    </>
+  );
+}
 
 /**
  * What a Run or Submit came back with (runner design §2): one verdict line, the visible cases with
@@ -52,7 +70,7 @@ export function RunResults({ answer, submit }: { answer: RunAnswer; submit: bool
               {r.cases.map((c, i) => (
                 <Fragment key={i}>
                   <tr>
-                    <td className="mark">{MARK[c.verdict]}</td>
+                    <td className="mark"><Mark verdict={c.verdict} /></td>
                     <td>{c.name}</td>
                     <td><code>{c.input}</code></td>
                     <td><code>{c.expected}</code></td>

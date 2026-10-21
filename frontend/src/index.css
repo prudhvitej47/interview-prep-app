@@ -300,7 +300,12 @@ summary:hover { text-decoration: underline; }
 /* The result comes first so a phone sees it without scrolling; values stay on one line and the table
    scrolls inside its box; an exception gets its own full-width row, wrapping anywhere. */
 .code-practice .run-results td code { white-space: nowrap; }
-.code-practice .run-results td.mark { white-space: nowrap; }
+.code-practice .run-results td.mark { white-space: nowrap; text-align: center; }
+.code-practice .run-results th:first-child { text-align: center; }
+/* The State-Only Rule's colours on the symbol alone, bold so it reads at a glance. */
+.code-practice .run-results .glyph { font-weight: 700; font-size: 1.1rem; }
+.code-practice .run-results .glyph.pass { color: var(--progress); }
+.code-practice .run-results .glyph.fail { color: var(--wrong); }
 .code-practice .run-results tr.case-error td code { white-space: normal; overflow-wrap: anywhere; }
 .code-practice .compile-errors, .code-practice .printed { background: color-mix(in srgb, var(--fg) 6%, transparent);
   padding: 0.6rem 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; white-space: pre; }

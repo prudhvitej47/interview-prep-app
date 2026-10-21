@@ -99,6 +99,10 @@ describe("CodeRunner", () => {
     expect(within(rows[0]).getAllByRole("columnheader")[0]).toHaveTextContent("Result");
     expect(within(rows[1]).getAllByRole("cell")[0]).toHaveTextContent("✓");
     expect(within(rows[2]).getAllByRole("cell")[0]).toHaveTextContent("✗ error");
+    // The symbol carries the state colour (green pass, red otherwise); the word stays ink.
+    expect(within(rows[1]).getByText("✓")).toHaveClass("glyph", "pass");
+    expect(within(rows[2]).getByText("✗")).toHaveClass("glyph", "fail");
+    expect(within(rows[2]).getAllByRole("cell")[0]).toHaveClass("mark");
     expect(rows[3]).toHaveTextContent("throws java.lang.ArithmeticException: / by zero");
   });
 
