@@ -22,11 +22,20 @@ final class HarnessSource {
 
   private HarnessSource() {}
 
+  // Text blocks, string and char literals, then comments: what is left is code, so a comment or a string
+  // that mentions "class TreeNode" does not count as the learner declaring their own.
+  private static final Pattern NOT_CODE = Pattern.compile(
+      "\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'|//[^\\n]*|/\\*[\\s\\S]*?\\*/");
+
+  static String codeOnly(String source) {
+    return NOT_CODE.matcher(source).replaceAll(" ");
+  }
+
   static Map<String, String> files(Wire.RunRequest request) {
     Map<String, String> files = new LinkedHashMap<>();
     files.put("Solution.java", request.source());
     files.put("Main.java", main(request));
-    if (!DECLARES_TREE.matcher(request.source()).find()) {
+    if (!DECLARES_TREE.matcher(codeOnly(request.source())).find()) {
       files.put("TreeNode.java", TREENODE);
     }
     return files;
@@ -92,7 +101,8 @@ final class HarnessSource {
       import java.util.concurrent.Callable;
 
       public class Main {
-        static final PrintStream OUT = System.out;
+        // UTF-8 whatever the sandbox's locale (POSIX there): learners' text and the "…" cut mark survive.
+        static final PrintStream OUT = new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
         static final CappedStream CAPTURED = new CappedStream(%CAP%);
         static final int LIMIT_MS = %LIMIT%;
         static final int GOT_CAP = %GOTCAP%;
@@ -101,6 +111,12 @@ final class HarnessSource {
           PrintStream learner = new PrintStream(CAPTURED, true, StandardCharsets.UTF_8);
           System.setOut(learner);
           System.setErr(learner);
+          // Runs only on the learner's own System.exit (the harness ends with halt, and the out-of-memory
+          // killer runs no hooks), so an exit code of 137 from the learner is not read as out of memory.
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            OUT.println("@@EXIT");
+            OUT.flush();
+          }));
           OUT.println("@@START");
           OUT.flush();
       %RUNS%

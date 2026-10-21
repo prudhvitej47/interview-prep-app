@@ -79,6 +79,8 @@ class RunServiceTest {
 
     assertThat(serviceReturning(-1, "@@START\n", true, false).run(request(false)).status()).isEqualTo("timeout");
     assertThat(serviceReturning(137, "@@START\n", false, false).run(request(false)).status()).isEqualTo("oom");
+    // The learner's own System.exit(137) runs the harness's exit hook; an out-of-memory kill never does.
+    assertThat(serviceReturning(137, "@@START\n@@EXIT\n", false, false).run(request(false)).status()).isEqualTo("crashed");
     String heap = "@@START\n@@CASE {\"case\":\"a\",\"verdict\":\"error\",\"got\":null,"
         + "\"error\":\"OutOfMemoryError: Java heap space\",\"ms\":900}\n";
     assertThat(serviceReturning(0, heap + "@@CASE {\"case\":\"b\",\"verdict\":\"pass\",\"got\":\"2\",\"error\":null,\"ms\":1}\n"

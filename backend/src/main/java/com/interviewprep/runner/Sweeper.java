@@ -1,6 +1,10 @@
 package com.interviewprep.runner;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,21 +27,28 @@ final class Sweeper {
 
   private final String docker;
   private final Clock clock;
+  private final Duration limit;
 
   Sweeper(String docker, Clock clock) {
+    this(docker, clock, Duration.ofSeconds(15));
+  }
+
+  /** {@code limit}: how long one docker command may take before it is killed (a stalled daemon). */
+  Sweeper(String docker, Clock clock, Duration limit) {
     this.docker = docker;
     this.clock = clock;
+    this.limit = limit;
   }
 
   int sweepOnce() {
-    List<String> ids = lines(run(docker, "ps", "-aq", "--filter", "label=interview-prep.run=1"));
+    List<String> ids = lines(run(docker, "ps", "-aq", "--filter", "label=interview-prep.run=1").out());
     if (ids.isEmpty()) {
       return 0;
     }
     List<String> inspect = new ArrayList<>(List.of(docker, "inspect", "--format", "{{.Id}} {{.Created}}"));
     inspect.addAll(ids);
     int removed = 0;
-    for (String line : lines(run(inspect.toArray(String[]::new)))) {
+    for (String line : lines(run(inspect.toArray(String[]::new)).out())) {
       String[] parts = line.split(" ", 2);
       if (parts.length != 2) {
         continue;
@@ -49,8 +60,9 @@ final class Sweeper {
         continue;
       }
       if (Duration.between(created, clock.instant()).getSeconds() > MAX_AGE_SECONDS) {
-        run(docker, "rm", "-f", parts[0]);
-        removed++;
+        if (run(docker, "rm", "-f", parts[0]).ok()) {
+          removed++;
+        }
       }
     }
     return removed;
@@ -76,17 +88,40 @@ final class Sweeper {
     }, 0, 60, TimeUnit.SECONDS);
   }
 
-  private static String run(String... command) {
+  private record Ran(String out, boolean ok) {}
+
+  /**
+   * Runs one docker command, reading its output on its own thread: a docker that never exits (a stalled
+   * daemon) is killed at the limit instead of holding the sweeper thread for good.
+   */
+  private Ran run(String... command) {
+    Process p = null;
     try {
-      Process p = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-      String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      p.waitFor(15, TimeUnit.SECONDS);
-      return out;
-    } catch (IOException e) {
-      return "";
+      p = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+      InputStream in = p.getInputStream();
+      CompletableFuture<byte[]> out = CompletableFuture.supplyAsync(() -> {
+        try {
+          return in.readAllBytes();
+        } catch (IOException e) {
+          return new byte[0];
+        }
+      }, Executors.newVirtualThreadPerTaskExecutor());
+      if (!p.waitFor(limit.toMillis(), TimeUnit.MILLISECONDS)) {
+        p.destroyForcibly();
+        return new Ran("", false);
+      }
+      return new Ran(new String(out.get(2, TimeUnit.SECONDS), StandardCharsets.UTF_8), p.exitValue() == 0);
+    } catch (IOException | ExecutionException | TimeoutException e) {
+      if (p != null) {
+        p.destroyForcibly();
+      }
+      return new Ran("", false);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return "";
+      if (p != null) {
+        p.destroyForcibly();
+      }
+      return new Ran("", false);
     }
   }
 

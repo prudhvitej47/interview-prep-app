@@ -133,7 +133,11 @@ final class DockerSandbox implements Sandbox {
     try {
       Process p = new ProcessBuilder(docker, "image", "inspect", image).redirectErrorStream(true)
           .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-      return p.waitFor(10, TimeUnit.SECONDS) && p.exitValue() == 0;
+      if (!p.waitFor(10, TimeUnit.SECONDS)) {
+        p.destroyForcibly(); // a stalled daemon must not leave a docker process per health check
+        return false;
+      }
+      return p.exitValue() == 0;
     } catch (IOException e) {
       return false;
     } catch (InterruptedException e) {
