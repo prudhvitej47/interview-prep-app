@@ -15,7 +15,10 @@ EnvironmentFile=/etc/interview-prep/app.env
 # Optional (the leading -): the content-repo token for "Send to the curriculum". A file of its own,
 # so vm-setup.sh, which rewrites app.env, never drops it.
 EnvironmentFile=-/etc/interview-prep/github.env
-ExecStart=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml up --detach
+ExecStart=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml up --detach postgres app
+# The code runner after them, and optional (the leading -): if it cannot start, code runs are off but
+# the stack still counts as started, so the app stays up and vm-setup.sh carries on. Stop covers all three.
+ExecStartPost=-/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml up --detach runner
 ExecStop=/usr/bin/docker compose --project-name interview-prep --file /opt/interview-prep/src/deploy/docker-compose.yml stop
 # No `down`, and never `down -v`: the database lives on the mounted disk and must not be at the
 # mercy of a stop command.
