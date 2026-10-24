@@ -68,6 +68,22 @@ class TopicApiTest extends PostgresTestBase {
   }
 
   @Test
+  void theTabIconsAreServedAsImagesAndThePageLinksThem() throws Exception {
+    // Without these files a request for /favicon.ico falls through to index.html: HTML, not an icon.
+    for (String icon : new String[] {"/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
+        "/favicon-48x48.png", "/apple-touch-icon.png"}) {
+      mockMvc.perform(get(icon)).andExpect(status().isOk())
+          .andExpect(content().contentTypeCompatibleWith(icon.endsWith(".ico") ? "image/*" : "image/png"));
+    }
+    // "/" forwards to index.html, and MockMvc does not follow forwards: ask for the page itself.
+    mockMvc.perform(get("/index.html")).andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.allOf(
+            org.hamcrest.Matchers.containsString("<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"48x48\""),
+            org.hamcrest.Matchers.containsString("<link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/favicon-32x32.png\""),
+            org.hamcrest.Matchers.containsString("<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\""))));
+  }
+
+  @Test
   void aMissingAssetIsNotFound() throws Exception {
     // Returning index.html here would hand the browser HTML where it asked for JavaScript,
     // turning a broken build into a blank page with a confusing console error.
