@@ -71,7 +71,7 @@ class TopicApiTest extends PostgresTestBase {
   void theTabIconsAreServedAsImagesAndThePageLinksThem() throws Exception {
     // Without these files a request for /favicon.ico falls through to index.html: HTML, not an icon.
     for (String icon : new String[] {"/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
-        "/favicon-48x48.png", "/apple-touch-icon.png"}) {
+        "/favicon-192x192.png", "/apple-touch-icon.png"}) {
       mockMvc.perform(get(icon)).andExpect(status().isOk())
           .andExpect(content().contentTypeCompatibleWith(icon.endsWith(".ico") ? "image/*" : "image/png"));
     }
@@ -80,6 +80,7 @@ class TopicApiTest extends PostgresTestBase {
         .andExpect(content().string(org.hamcrest.Matchers.allOf(
             org.hamcrest.Matchers.containsString("<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"48x48\""),
             org.hamcrest.Matchers.containsString("<link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/favicon-32x32.png\""),
+            org.hamcrest.Matchers.containsString("<link rel=\"icon\" type=\"image/png\" sizes=\"192x192\" href=\"/favicon-192x192.png\""),
             org.hamcrest.Matchers.containsString("<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\""))));
   }
 
