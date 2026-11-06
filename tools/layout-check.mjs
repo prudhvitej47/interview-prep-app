@@ -114,7 +114,11 @@ const INSPECT = `(() => {
   const limit = unit.getBoundingClientRect().right;
   const tooWide = [];
   // A <pre> or a .diagram is allowed to scroll inside itself; anything else must fit the column.
-  const scrollsItself = (el) => el.closest('pre, .diagram, .diagram-source, table') !== null;
+  // An evidence exercise's lines are copied exactly and scroll inside their list (overflow-x: auto),
+  // so the lines inside it may be wide; the list itself still has to fit.
+  const scrollsItself = (el) =>
+    el.closest('pre, .diagram, .diagram-source, table') !== null ||
+    el.parentElement?.closest('.evidence-lines') != null;
   for (const el of unit.querySelectorAll('*')) {
     if (scrollsItself(el)) continue;
     const box = el.getBoundingClientRect();
